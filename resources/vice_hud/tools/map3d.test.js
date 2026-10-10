@@ -307,9 +307,10 @@ console.log('\n-- tools/map3d/build.py --');
   const f32 = (...v) => Buffer.from(new Float32Array(v).buffer);
   const i32 = (...v) => Buffer.from(new Int32Array(v).buffer);
   const u32 = (...v) => Buffer.from(new Uint32Array(v).buffer);
-  const squares = [[20, 20], [300, 40], [300, 300]], side = 10;
+  // The second of the four is 4 m square: a pylon's worth, not a building's.
+  const squares = [[20, 20, 10], [150, 150, 4], [300, 40, 10], [300, 300, 10]];
   const xy = [], tri = [], owner = [], pts = [], rings = [];
-  squares.forEach(([x, y], b) => {
+  squares.forEach(([x, y, side], b) => {
     const c = [[x, y], [x + side, y], [x + side, y + side], [x, y + side]];
     const base = xy.length / 2;
     [c[0], c[1], c[2], c[0], c[2], c[3]].forEach((p) => xy.push(p[0], p[1]));
@@ -320,7 +321,7 @@ console.log('\n-- tools/map3d/build.py --');
   });
   const layer = (id, v, t) => Buffer.concat([Buffer.from([id]), i32(v.length / 2, t.length / 3), f32(...v), i32(...t)]);
   const head = Buffer.concat([Buffer.from('MMV1'), f32(0, 0, 512, 512), i32(2), layer(0, xy, tri), layer(2, [0, 100, 512, 100, 256, 110], [0, 1, 2])]);
-  const bld = Buffer.concat([Buffer.from('BLD1'), u32(3), f32(5, 12, 40), u32(tri.length / 3), u32(...owner),
+  const bld = Buffer.concat([Buffer.from('BLD1'), u32(4), f32(5, 30, 12, 40), u32(tri.length / 3), u32(...owner),
     u32(pts.length / 2), f32(...pts), u32(rings.length / 3), u32(...rings)]);
   const tile = Buffer.alloc(1024, 2);                       // all water
   const wat = Buffer.concat([Buffer.from('MMW4'), i32(0, 1), i32(0), tile]);
@@ -342,6 +343,9 @@ console.log('\n-- tools/map3d/build.py --');
   const u = (r) => new Uint32Array(buf.buffer.slice(buf.byteOffset + base + r.at, buf.byteOffset + base + r.at + r.n * 4));
   ok(headLen % 4 === 0 && h.gw === 2 && h.gh === 2 && h.chunk === 256, 'a 512 m map is four 256 m squares');
   ok(h.buildings.count === 3 && h.layers.footprint && h.layers.road && !h.layers.rail, 'three buildings, and only the layers the map had');
+  ok(/1 under 60 m2 left out/.test(res.stdout) && h.layers.footprint.tri.n === 18, 'the fourth, too small to be a building, is left off the map altogether rather than drawn as a box', res.stdout.trim().split('\n').slice(-3).join(' | '));
+  const all = spawnSync(py, [path.join(root, 'tools', 'map3d', 'build.py'), '--mod', src, '--out', path.join(dir, 'all'), '--min-area', '0'], { encoding: 'utf8' });
+  ok(all.status === 0 && JSON.parse(fs.readFileSync(path.join(dir, 'all', 'world.bin')).slice(8, 8 + fs.readFileSync(path.join(dir, 'all', 'world.bin')).readUInt32LE(4)).toString()).buildings.count === 4, '--min-area 0 keeps everything');
   const verts = f(h.buildings.verts), roof = u(h.buildings.roof), roofStarts = u(h.buildings.roofStarts), wall = u(h.buildings.wall), wallStarts = u(h.buildings.wallStarts);
   ok(verts.length === (18 + 48) * 5 && roof.length === 18 && wall.length === 72, 'two roof triangles and four walls each', verts.length + ' ' + roof.length + ' ' + wall.length);
   ok(Array.from(roofStarts).join() === '0,6,12,12,18' && Array.from(wallStarts).join() === '0,24,48,48,72', 'sorted into the squares they stand in', Array.from(roofStarts).join());
