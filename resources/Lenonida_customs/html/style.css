@@ -1,0 +1,917 @@
+/* GTA Art Deco: one @font-face per real cut, so the browser never fakes a weight */
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoBold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+}
+/* Condensed headings. Bahnschrift ships with Windows 10 and 11; declaring it here with a
+   stretch range is what lets font-stretch reach its real Condensed width. */
+@font-face {
+    font-family: 'CustomsDisplay';
+    src: local('Bahnschrift');
+    font-weight: 300 700;
+    font-stretch: 75% 100%;
+}
+
+:root {
+    /* swap --font-display for 'GTAArtDeco' to set the headings in Art Deco as well */
+    --font-display: 'CustomsDisplay', 'Bahnschrift Condensed', 'Arial Narrow', 'GTAArtDeco', sans-serif;
+    --font-body: 'GTAArtDeco', 'Segoe UI', Arial, sans-serif;
+    --ink: #17171c;
+    --paper: #e9e8ea;
+    --text: #e6e5e8;
+    --dim: #a9a7b0;
+    --pink: #f1a2c9;
+    --green: #93d9a5;
+    --red: #dc4450;
+    --edge: rgba(20, 20, 26, .9);
+    /* dark outline round light text, thin and heavy */
+    --outline: -.12vh -.12vh 0 var(--edge), .12vh -.12vh 0 var(--edge), -.12vh .12vh 0 var(--edge), .12vh .12vh 0 var(--edge),
+        0 -.14vh 0 var(--edge), 0 .14vh 0 var(--edge), -.14vh 0 0 var(--edge), .14vh 0 0 var(--edge), 0 0 .5vh rgba(0, 0, 0, .45);
+    --outline-mid: -.15vh -.15vh 0 var(--edge), .15vh -.15vh 0 var(--edge), -.15vh .15vh 0 var(--edge), .15vh .15vh 0 var(--edge),
+        0 -.19vh 0 var(--edge), 0 .19vh 0 var(--edge), -.19vh 0 0 var(--edge), .19vh 0 0 var(--edge);
+    --outline-heavy: -.2vh -.2vh 0 var(--edge), .2vh -.2vh 0 var(--edge), -.2vh .2vh 0 var(--edge), .2vh .2vh 0 var(--edge),
+        0 -.26vh 0 var(--edge), 0 .26vh 0 var(--edge), -.26vh 0 0 var(--edge), .26vh 0 0 var(--edge),
+        -.13vh -.24vh 0 var(--edge), .13vh -.24vh 0 var(--edge), -.13vh .24vh 0 var(--edge), .13vh .24vh 0 var(--edge),
+        -.24vh -.13vh 0 var(--edge), .24vh -.13vh 0 var(--edge), -.24vh .13vh 0 var(--edge), .24vh .13vh 0 var(--edge);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    user-select: none;
+}
+
+body {
+    font-family: var(--font-body);
+    font-weight: 400;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+
+h1, h2, h3, .tab, .brand, .model, .stat-label, .stat-val, .card-foot, .prompts button > span, #prompts button > span, .price, .pager {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-stretch: 75%;
+    text-transform: uppercase;
+    letter-spacing: .01em;
+}
+
+#app {
+    position: fixed;
+    inset: 0;
+    cursor: default;
+}
+
+/* darkens the left side and the bottom edge so the text reads over any garage */
+.shade {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(90deg, rgba(30, 31, 44, .9) 0%, rgba(30, 31, 44, .74) 16%, rgba(30, 31, 44, .3) 32%, rgba(30, 31, 44, 0) 46%),
+        linear-gradient(0deg, rgba(22, 22, 32, .5) 0%, rgba(22, 22, 32, 0) 20%);
+}
+
+/* HEADER */
+
+#head {
+    position: absolute;
+    left: 3.3vh;
+    top: 1.75vh;
+    white-space: nowrap;
+}
+
+.shop {
+    font-size: 3.46vh;
+    line-height: 1;
+    color: #e9e7ea;
+}
+
+#head .tabs {
+    margin: 1.15vh 0 0 4.4vh;
+}
+
+/* room for the bumper glyph in front of the first tab */
+#head .tabs:not(.single) {
+    margin-left: .75vh;
+}
+
+#head.sub {
+    left: 2.6vh;
+    top: 2.15vh;
+}
+
+.crumb {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-stretch: 75%;
+    text-transform: uppercase;
+    font-size: 3.05vh;
+    line-height: 1;
+    color: var(--dim);
+}
+
+.crumb i {
+    font-style: normal;
+    color: #d2d0d6;
+}
+
+.title {
+    margin-top: .65vh;
+    font-size: 3.9vh;
+    line-height: 1;
+    color: #ecebee;
+}
+
+/* SLANTED TABS */
+
+.tabs {
+    --slant: .95vh;
+    display: flex;
+    min-height: 3.3vh;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    height: 3.3vh;
+    margin-left: calc(.45vh - var(--slant));
+    padding: 0 calc(1.45vh + var(--slant) / 2);
+    font-size: 2.6vh;
+    line-height: 3.3vh;
+    color: #e3e3e8;
+    background: rgba(58, 60, 74, .8);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .13);
+    clip-path: polygon(var(--slant) 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+}
+
+.tab:first-of-type {
+    margin-left: 0;
+    padding-left: 1.5vh;
+    clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+}
+
+.tab:last-of-type {
+    padding-right: 1.5vh;
+    clip-path: polygon(var(--slant) 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.tabs.single .tab {
+    clip-path: none;
+}
+
+.tab.on {
+    color: var(--ink);
+    background: var(--paper);
+    box-shadow: none;
+}
+
+.tab > span {
+    padding-top: .15vh;
+}
+
+svg.tag {
+    width: 2.3vh;
+    height: 2.3vh;
+    margin-right: .5vh;
+    color: var(--pink);
+    flex: none;
+}
+
+.tab.on svg.tag {
+    color: #e06aa4;
+}
+
+/* LIST */
+
+#menu {
+    position: absolute;
+    left: 3.2vh;
+    top: 14vh;
+    width: 45.6vh;
+    list-style: none;
+}
+
+#menu li {
+    display: flex;
+    align-items: center;
+    height: 5.85vh;
+    padding-left: 1.5vh;
+    font-size: 2.4vh;
+    color: #dcdce0;
+    border-bottom: 1px solid rgba(255, 255, 255, .13);
+    cursor: pointer;
+}
+
+#menu li.sel {
+    color: #1d1d22;
+    background: linear-gradient(90deg, rgba(233, 233, 236, .95) 0%, rgba(233, 233, 236, .93) 45%, rgba(240, 240, 243, .38) 100%);
+    border-bottom-color: transparent;
+}
+
+#menu .label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dot {
+    flex: none;
+    width: 1.45vh;
+    height: 1.45vh;
+    margin: 0 1.7vh 0 .65vh;
+    border-radius: 50%;
+    background: var(--pink);
+}
+
+#menu .right {
+    display: flex;
+    align-items: center;
+    flex: none;
+    margin-left: auto;
+    padding: 0 1.5vh 0 1.2vh;
+}
+
+#menu .now {
+    max-width: 20vh;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 1.8vh;
+    opacity: .62;
+}
+
+.price {
+    font-size: 2.3vh;
+}
+
+.have {
+    display: grid;
+    place-items: center;
+    width: 2.7vh;
+    height: 2.7vh;
+    border-radius: 50%;
+    color: #1d1d24;
+    background: #f1f1f3;
+    box-shadow: 0 0 0 .2vh #23232b;
+}
+
+.have svg {
+    width: 1.9vh;
+    height: 1.9vh;
+}
+
+#count {
+    position: absolute;
+    left: 4.7vh;
+    top: 61.9vh;
+    font-size: 1.7vh;
+    color: var(--dim);
+    text-shadow: var(--outline);
+}
+
+/* VEHICLE CARD */
+
+#card {
+    position: absolute;
+    right: 2.5vh;
+    bottom: 8.1vh;
+    width: 39vh;
+}
+
+.dots {
+    position: absolute;
+    right: 4.6vh;
+    top: -2.75vh;
+    display: flex;
+    align-items: center;
+    gap: .7vh;
+}
+
+.dots i {
+    width: 1.05vh;
+    height: 1.05vh;
+    border-radius: 50%;
+    border: .2vh solid #f1f1f3;
+    box-shadow: 0 0 0 .1vh rgba(20, 20, 26, .7);
+}
+
+.dots i.on {
+    width: 1.5vh;
+    height: 1.5vh;
+    background: rgba(255, 255, 255, .82);
+}
+
+.card-head {
+    position: relative;
+    height: 6.6vh;
+    padding: .95vh 1.2vh;
+    overflow: hidden;
+    background: rgba(45, 38, 56, .86);
+}
+
+.brand {
+    font-size: 2.2vh;
+    line-height: 2.3vh;
+    color: #f1f0f3;
+}
+
+.model {
+    font-size: 2.45vh;
+    line-height: 2.6vh;
+    color: #b9b6be;
+}
+
+/* Every mark is the same square canvas with the ink in the middle (about half of it), so one
+   size fits them all: the ink runs a little past the header and is cropped by it. */
+.emblem {
+    position: absolute;
+    right: -1.75vh;
+    top: 50%;
+    width: 15.5vh;
+    height: 15.5vh;
+    margin-top: -7.75vh;
+    opacity: .2;
+    pointer-events: none;
+}
+
+.card-body {
+    padding: 1.1vh 1.15vh .35vh;
+    background: rgba(214, 214, 220, .2);
+    border: 1px solid rgba(255, 255, 255, .26);
+    border-width: 0 1px;
+    backdrop-filter: blur(.8vh);
+}
+
+.stat {
+    position: relative;
+    height: 5.6vh;
+}
+
+.stat-label {
+    font-size: 2.5vh;
+    line-height: 2.9vh;
+    color: #f3f3f5;
+    text-shadow: var(--outline-mid);
+}
+
+.stat-val {
+    position: absolute;
+    right: 0;
+    top: 0;
+    display: flex;
+    height: 2.8vh;
+    font-size: 2.35vh;
+    line-height: 2.9vh;
+    clip-path: polygon(.75vh 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.stat-val .num {
+    min-width: 3.5vh;
+    padding: 0 .55vh 0 .75vh;
+    text-align: center;
+    color: #fff;
+    background: #1a1920;
+}
+
+.stat-val .delta {
+    padding: 0 .75vh 0 1.35vh;
+    background: #262a33;
+}
+
+.stat-val .delta + .num {
+    padding-left: .55vh;
+}
+
+.delta.up {
+    color: var(--green);
+}
+
+.delta b {
+    display: inline-block;
+    margin-right: .35vh;
+    font-size: 1.75vh;
+    font-weight: 700;
+    transform: translateY(-.15vh);
+}
+
+.delta.down {
+    color: var(--red);
+}
+
+.bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3.2vh;
+    height: 1.2vh;
+    border: 1px solid #22222b;
+    background: rgba(176, 176, 183, .42);
+}
+
+.bar i {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+}
+
+.bar .fill {
+    left: 0;
+    background: #e4e4e7;
+    border-right: 1px solid #22222b;
+}
+
+.bar .seg {
+    border-right: 1px solid #22222b;
+}
+
+.bar .seg.up {
+    background: #8fd6a0;
+}
+
+.bar .seg.down {
+    background: #d9434d;
+}
+
+.bar .tick {
+    top: -.5vh;
+    bottom: -.5vh;
+    width: .55vh;
+    margin-left: -.28vh;
+    background: #f5f5f6;
+    border: 1px solid #1d1d25;
+}
+
+.card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 4.5vh;
+    padding: 0 1.2vh;
+    font-size: 2.5vh;
+    color: #d9d8dc;
+    background: rgba(40, 38, 52, .88);
+}
+
+.ratings {
+    display: flex;
+    align-items: center;
+    gap: .7vh;
+    height: 3.4vh;
+    margin-right: -.45vh;
+    padding: 0 .55vh 0 1.5vh;
+    color: #fff;
+    background: #1c1b24;
+    clip-path: polygon(.9vh 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.ratings .delta {
+    font-size: 2.2vh;
+}
+
+svg.rate {
+    width: 2.7vh;
+    height: 2.7vh;
+    margin-right: .4vh;
+}
+
+svg.rate:last-child {
+    margin-right: 0;
+}
+
+.card-body.parts {
+    padding: .9vh 1.2vh 1vh;
+}
+
+.part {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.2vh;
+    height: 2.9vh;
+    font-size: 1.75vh;
+    white-space: nowrap;
+    text-shadow: var(--outline);
+}
+
+.part em {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-style: normal;
+    opacity: .78;
+}
+
+/* BOTTOM LEFT: THE OPTION BEING LOOKED AT */
+
+#detail {
+    position: absolute;
+    left: 2.6vh;
+    bottom: 1.95vh;
+}
+
+#detail .name {
+    margin-bottom: 3.9vh;
+    font-size: 3.45vh;
+    line-height: 1;
+    color: #ecebee;
+    text-shadow: var(--outline-mid);
+    white-space: nowrap;
+}
+
+.counter {
+    width: max-content;
+    height: 2.6vh;
+    margin: 0 0 1.7vh 4.4vh;
+    font-size: 2.3vh;
+    line-height: 2.6vh;
+    color: #d6d5da;
+    text-shadow: var(--outline);
+    cursor: pointer;
+}
+
+.counter i {
+    margin: 0 1.25vh;
+    font-style: normal;
+    opacity: .75;
+}
+
+#detail .line {
+    width: 60vh;
+    height: 1px;
+    margin-bottom: 1.55vh;
+    background: linear-gradient(90deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, .22) 65%, rgba(255, 255, 255, 0));
+}
+
+.pager {
+    font-size: 2vh;
+    color: var(--dim);
+    text-shadow: var(--outline);
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    height: 2.9vh;
+    font-size: 2.45vh;
+    color: #dedde2;
+    text-shadow: var(--outline);
+}
+
+.status .dot {
+    margin: 0 1.6vh 0 .9vh;
+}
+
+.status .have {
+    margin: 0 1.1vh 0 .15vh;
+}
+
+.status .price {
+    margin-left: 2.2vh;
+    padding-top: .1vh;
+    color: #fff;
+}
+
+#detail.paint .name {
+    margin-bottom: .8vh;
+}
+
+#detail .sub {
+    font-size: 2.85vh;
+    line-height: 1;
+    margin-bottom: 2.8vh;
+    color: #e4e3e7;
+    text-shadow: var(--outline-mid);
+}
+
+.swatches {
+    display: flex;
+    align-items: flex-end;
+    height: 10.6vh;
+    margin: 0 0 3.4vh .3vh;
+}
+
+#detail.paint .line {
+    display: none;
+}
+
+.swatch {
+    position: relative;
+    flex: none;
+    width: 10.6vh;
+    height: 10.6vh;
+    margin-right: .75vh;
+    border: 1px solid rgba(255, 255, 255, .2);
+}
+
+.swatch.sel {
+    box-shadow: 0 0 0 .3vh #f1f1f3;
+    z-index: 1;
+}
+
+.swatch .mark {
+    position: absolute;
+    left: .9vh;
+    bottom: .9vh;
+    display: grid;
+    place-items: center;
+    width: 3.8vh;
+    height: 3.8vh;
+    font-style: normal;
+    font-size: 2.2vh;
+    color: var(--ink);
+    background: #dddde0;
+}
+
+.swatch .mark svg.tag {
+    margin: 0;
+    color: #d8569a;
+}
+
+.swatch .have {
+    position: absolute;
+    right: .8vh;
+    bottom: .8vh;
+    width: 3vh;
+    height: 3vh;
+}
+
+.swatch .none {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0) 48.5%, rgba(255, 255, 255, .6) 48.5%, rgba(255, 255, 255, .6) 51.5%, rgba(0, 0, 0, 0) 51.5%), rgba(40, 40, 50, .55);
+}
+
+.swatch .plus {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 5vh;
+    color: #fff;
+    text-shadow: var(--outline-heavy);
+}
+
+.swatches .pager {
+    align-self: center;
+    margin-left: 1.2vh;
+}
+
+#detail .tabs {
+    margin: 0 0 2.8vh 4.8vh;
+    min-height: 3.6vh;
+}
+
+#detail .tabs:not(.single) {
+    margin-left: 1.15vh;
+}
+
+#detail .tab {
+    height: 3.6vh;
+    line-height: 3.6vh;
+}
+
+/* BOTTOM BAR */
+
+#hint {
+    position: absolute;
+    left: 3.3vh;
+    bottom: 3vh;
+    font-size: 2.35vh;
+    color: #d9d8dd;
+    text-shadow: var(--outline);
+    white-space: nowrap;
+}
+
+#objective {
+    position: absolute;
+    left: 50%;
+    bottom: 3vh;
+    transform: translateX(-50%);
+    font-size: 2.4vh;
+    font-weight: 500;
+    color: #f5f5f7;
+    text-shadow: var(--outline);
+    white-space: nowrap;
+}
+
+#objective b {
+    font-weight: 500;
+    color: var(--pink);
+}
+
+#prompts, .prompts {
+    position: absolute;
+    right: 3vh;
+    bottom: 3.1vh;
+    display: flex;
+    align-items: center;
+    gap: 2.3vh;
+}
+
+#prompts button, .prompts button {
+    display: flex;
+    align-items: center;
+    gap: 1.25vh;
+}
+
+#prompts button > span, .prompts button > span {
+    font-size: 2.75vh;
+    line-height: 1;
+    padding-top: .2vh;
+    color: #f4f4f6;
+    text-shadow: var(--outline-mid);
+}
+
+.key {
+    display: grid;
+    place-items: center;
+    min-width: 2.95vh;
+    height: 2.95vh;
+    border-radius: 1.5vh;
+    font-family: var(--font-body);
+    font-style: normal;
+    font-weight: 700;
+    font-size: 1.6vh;
+    color: #2a2a31;
+    background: #e9e9ec;
+}
+
+.key.wide {
+    padding: 0 .75vh;
+    font-size: 1.3vh;
+    letter-spacing: .03em;
+}
+
+/* bumper glyphs at the ends of a tab strip, and the card page glyph beside its dots */
+.tabs > span {
+    display: flex;
+    align-items: center;
+    flex: none;
+    cursor: pointer;
+}
+
+.key.bump {
+    min-width: 2.7vh;
+    height: 2.7vh;
+    margin: 0 .95vh 0 0;
+}
+
+.tabs > span:last-child .key.bump {
+    margin: 0 0 0 .95vh;
+}
+
+.key.mini {
+    min-width: 2.3vh;
+    height: 2.3vh;
+    margin-right: .35vh;
+    font-size: 1.3vh;
+}
+
+.key.mini.wide {
+    font-size: 1.05vh;
+    padding: 0 .55vh;
+}
+
+.dots {
+    cursor: pointer;
+}
+
+.key.hold {
+    box-shadow: 0 0 0 .32vh rgba(52, 52, 60, .92), 0 0 0 .5vh #cfcfd4;
+}
+
+/* "Purchased" confirmation, above the vehicle card */
+#toast {
+    position: absolute;
+    right: 3.6vh;
+    top: 38.6vh;
+    display: flex;
+    align-items: center;
+    gap: 1vh;
+    font-size: 2.45vh;
+    color: #f4f4f6;
+    text-shadow: var(--outline);
+    animation: toast .25s ease-out;
+}
+
+@keyframes toast {
+    from { opacity: 0; transform: translateX(1.5vh); }
+    to { opacity: 1; transform: none; }
+}
+
+/* DIALOG (repair, check out, leave) */
+
+#dialog, #spray {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 29.4vh;
+    background: #272831;
+}
+
+#spray {
+    position: fixed;
+}
+
+#dialog h2, #spray h2 {
+    position: absolute;
+    left: 5.7vh;
+    top: 7.2vh;
+    font-size: 4.75vh;
+    line-height: 1;
+    color: #e3e1e4;
+}
+
+.rule {
+    position: absolute;
+    left: 5.7vh;
+    top: 14.4vh;
+    width: 58vh;
+    height: .2vh;
+    background: linear-gradient(90deg, rgba(196, 190, 200, .78), rgba(205, 160, 215, .7) 55%, rgba(120, 110, 150, .08));
+}
+
+#dialog-body, #spray label {
+    position: absolute;
+    left: 5.7vh;
+    top: 17.1vh;
+    font-size: 2.25vh;
+    line-height: 3.75vh;
+    color: #d6d6db;
+}
+
+#spray label {
+    display: flex;
+    align-items: center;
+    gap: 2vh;
+}
+
+#spray-color {
+    width: 9vh;
+    height: 4.6vh;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+#dialog .prompts, #spray .prompts {
+    right: 3.4vh;
+    bottom: 3.2vh;
+}
+
+#dialog .prompts button > span, #spray .prompts button > span {
+    font-size: 2.2vh;
+    text-shadow: none;
+}
+
+.dialog-open > .shade, .dialog-open > #head, .dialog-open > #menu, .dialog-open > #count, .dialog-open > #card,
+.dialog-open > #detail, .dialog-open > #hint, .dialog-open > #objective, .dialog-open > #prompts, .dialog-open > #toast {
+    display: none;
+}
+
+#picker {
+    position: absolute;
+    left: 3vh;
+    bottom: 30vh;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
