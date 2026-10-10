@@ -1,0 +1,26 @@
+-- Freeroam speed-trap cop spawn points (subset is chosen at resource start on the server).
+
+SKPoliceTrapLocations = {
+    { coords = vector3(36.4734,   -1100.7910, 28.7957),  heading = 238.4115, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-553.3807, -1111.7320, 21.3259),  heading = 264.5463, vehicle = 'police2', cop = 's_m_y_cop_01'      },
+    { coords = vector3(-939.0082, -262.7068,  38.7015),  heading = 297.0,    vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-129.5407, -346.5009,  35.6624),  heading = 81.1136,  vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(332.2418, -1032.3165, 28.9092), heading = 175.7480, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(33.9033, -955.1868, 28.9766), heading = 155.9055, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-294.8703, -1171.2660, 22.8096), heading = 277.7953, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-410.3341, -1716.6066, 18.9172), heading = 260.7874, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-16.9846, -1717.4242, 28.9766), heading = 17.0079, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(267.4418, -1492.1143, 28.9260), heading = 308.9764, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-781.9253, -966.8307, 15.0417), heading = 226.7717, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-915.7714, -487.7934, 36.2388), heading = 107.7165, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-536.5055, -22.8000, 43.8213), heading = 354.3307, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(248.2549, 281.0110, 105.2388), heading = 73.7008, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(557.7231, 176.1363, 100.1670), heading = 48.1890, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(362.5319, -197.2220, 57.8572), heading = 260.7874, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(2277.2439, 3012.7649, 44.1355), heading = 235.2756, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(2718.6199, 4394.3604, 46.2080), heading = 136.0630, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(326.7956, 2638.7341, 42.9561), heading = 8.0, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-406.8132, 6048.2769, 30.7964), heading = 133.2283, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-966.6066, -1255.0022, 4.8645), heading = 25.0, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+    { coords = vector3(-3170.0044, 903.0593, 12.8455), heading = 269.2914, vehicle = 'police3', cop = 's_m_y_hwaycop_01' },
+}

@@ -1,0 +1,312 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --ember:    #ff5a36;
+    --ember-d:  #d6431f;
+    --bg:       #0b0c0e;
+    --surface:  #17181b;
+    --surf2:    #202226;
+    --border:   #2b2d31;
+    --text:     #eceae6;
+    --muted:    #8c8b87;
+    --green:    #3fb950;
+    --red:      #f85149;
+    --tabh:     54px;
+}
+
+html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* lb-phone reveals this after injecting its bridge script */
+body { visibility: hidden; }
+
+/* CRITICAL: must always stay display:none - lb-phone pulls .app out of it */
+#phone-wrapper { display: none; }
+
+.app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+}
+
+/* ── Header ─────────────────────────────────────── */
+
+#header {
+    padding: 66px 14px 12px;
+    background: var(--surface);
+    border-bottom: 2px solid var(--ember);
+    display: flex;
+    align-items: flex-end;
+    flex-shrink: 0;
+    gap: 8px;
+}
+#header .ico   { font-size: 18px; line-height: 1; }
+#header .title { font-size: 14px; font-weight: 900; color: var(--ember); letter-spacing: 2px; text-transform: uppercase; }
+
+/* ── Loading ────────────────────────────────────── */
+
+#loading {
+    position: absolute;
+    inset: 0;
+    z-index: 999;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+}
+#loading h1 { font-size: 24px; font-weight: 900; color: var(--ember); letter-spacing: 3px; text-transform: uppercase; }
+.spin {
+    width: 28px; height: 28px;
+    border: 3px solid var(--border);
+    border-top-color: var(--ember);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Content / panels ───────────────────────────── */
+
+#content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.panel {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    display: none;
+    padding: 12px 14px calc(var(--tabh) + 16px);
+}
+.panel.on { display: block; }
+
+/* ── Invite card ────────────────────────────────── */
+
+.invite-card {
+    background: linear-gradient(155deg, var(--surf2), var(--surface));
+    border: 1px solid var(--ember-d);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+}
+.invite-rival {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--ember);
+}
+.invite-msg {
+    margin-top: 4px;
+    color: var(--text);
+    line-height: 1.4;
+}
+.invite-timer {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.invite-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+}
+
+.btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+}
+.btn-g     { background: var(--ember); color: #1a0a05; }
+.btn-g:hover { background: #ff7351; }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+/* ── Profile ────────────────────────────────────── */
+
+.level-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    margin-bottom: 14px;
+}
+.level-num {
+    font-size: 34px;
+    font-weight: 900;
+    color: var(--ember);
+    line-height: 1;
+}
+.level-label {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.xp-label {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.stat-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+.stat-val {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text);
+}
+.stat-lbl {
+    margin-top: 2px;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 30px 10px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* ── Races ──────────────────────────────────────── */
+
+.race-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+}
+.race-card.locked { opacity: 0.6; }
+.race-name {
+    font-weight: 800;
+    font-size: 13.5px;
+}
+.race-lock { font-size: 11px; }
+.race-meta {
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+}
+
+/* ── Leaderboard ────────────────────────────────── */
+
+#board-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+select {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 8px;
+    font-size: 12px;
+}
+
+.board-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border);
+}
+.board-row:first-child { border-top: 1px solid var(--border); }
+
+.board-rank {
+    width: 22px;
+    text-align: center;
+    font-weight: 800;
+    color: var(--muted);
+    font-size: 12px;
+}
+.board-row.first .board-rank  { color: #ffd35a; }
+.board-row.second .board-rank { color: #c9c9c9; }
+.board-row.third .board-rank  { color: #cf8a4d; }
+
+.board-info { flex: 1; min-width: 0; }
+.board-alias {
+    font-weight: 700;
+    font-size: 12.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.board-vehicle {
+    font-size: 10.5px;
+    color: var(--muted);
+    margin-top: 1px;
+}
+.board-time {
+    font-weight: 800;
+    font-size: 13px;
+    color: var(--ember);
+}
+
+/* ── Tab bar ────────────────────────────────────── */
+
+#tabbar {
+    height: var(--tabh);
+    flex-shrink: 0;
+    display: flex;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+}
+.tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 9.5px;
+    cursor: pointer;
+}
+.tab svg {
+    width: 19px; height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.tab.on { color: var(--ember); }

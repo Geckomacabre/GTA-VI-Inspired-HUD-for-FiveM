@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Street Kings</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- CRITICAL: lb-phone pulls .app out of here and mounts it in its own frame.
+     This wrapper must stay display:none (enforced in style.css) or it takes
+     over the screen. Same structure geocaching_phone uses. -->
+<div id="phone-wrapper"></div>
+
+<div class="app" id="app">
+
+    <div id="header">
+        <span class="ico">&#127942;</span>
+        <span class="title">Street Kings</span>
+    </div>
+
+    <div id="loading">
+        <h1>Street Kings</h1>
+        <div class="spin"></div>
+    </div>
+
+    <div id="content">
+
+        <!-- PROFILE -->
+        <div class="panel" id="p-profile">
+            <div id="invite-card" class="invite-card" style="display:none">
+                <div class="invite-rival" id="inv-rival"></div>
+                <div class="invite-msg" id="inv-msg"></div>
+                <div class="invite-timer" id="inv-timer"></div>
+                <div class="invite-actions">
+                    <button class="btn btn-ghost" id="inv-decline">Decline</button>
+                    <button class="btn btn-g" id="inv-accept">Set Waypoint</button>
+                </div>
+            </div>
+
+            <div id="profile-body">
+                <div class="spin" style="margin:40px auto;"></div>
+            </div>
+        </div>
+
+        <!-- RACES -->
+        <div class="panel" id="p-races">
+            <div id="races-list"></div>
+        </div>
+
+        <!-- LEADERBOARD -->
+        <div class="panel" id="p-board">
+            <div id="board-controls">
+                <select id="board-route"></select>
+                <select id="board-class"></select>
+            </div>
+            <div id="board-rows"></div>
+        </div>
+
+    </div>
+
+    <div id="tabbar">
+        <button class="tab on" data-p="profile">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Profile</span>
+        </button>
+        <button class="tab" data-p="races">
+            <svg viewBox="0 0 24 24"><path d="M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4"/></svg>
+            <span>Races</span>
+        </button>
+        <button class="tab" data-p="board">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
+            <span>Leaderboard</span>
+        </button>
+    </div>
+
+</div>
+
+<script>
+    window.addEventListener('message', function (e) {
+        if (e.data === 'componentsLoaded') {
+            document.body.style.visibility = 'visible';
+            var s = document.createElement('script');
+            s.src = 'app.js';
+            document.body.appendChild(s);
+        }
+    });
+</script>
+</body>
+</html>

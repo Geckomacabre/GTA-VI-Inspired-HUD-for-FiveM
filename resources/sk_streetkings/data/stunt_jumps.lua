@@ -1,0 +1,29 @@
+-- Stunt Jump Definitions (Ambient Freeroam Feature)
+-- Jumps can be created two ways:
+--   1. IN-GAME (recommended): Use /stuntdev command (admin only)
+--      to place zones and ramps visually, then save to the database.
+--   2. IN THIS FILE: Create jumps below using the example shown.
+--      Jumps from this file are merged with DB jumps at startup.
+--
+-- example (uncomment and fill in coords to use):
+--
+-- SKStuntJumps['stunt_example_gap'] = {
+--     id   = 'stunt_example_gap',
+--     name = 'Example Gap Jump',
+--     zoneA = {
+--         center = vector3(x, y, z),
+--         radius = 10.0,
+--         ramp   = {
+--             model   = 'stt_prop_stunt_ramp',
+--             coords  = vector3(x, y, z),
+--             heading = 0.0,
+--         },
+--     },
+--     zoneB = {
+--         center = vector3(x, y, z),
+--         radius = 12.0,
+--         ramp   = nil,
+--     },
+-- }
+
+SKStuntJumps = SKStuntJumps or {}
