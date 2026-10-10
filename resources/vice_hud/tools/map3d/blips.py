@@ -22,9 +22,10 @@ import os
 import re
 import sys
 
+import numpy as np
 from PIL import Image
 
-CELL = 36       # the largest picture in the set; most are 32 and sit centred
+CELL = 36      # the largest picture in the set; most are 32 and sit centred
 COLS = 32
 
 
@@ -59,6 +60,23 @@ def main():
         box = im.getbbox()
         if box is None:
             continue
+        px = np.asarray(im).astype(np.int32)
+        solid = px[..., 3] > 128
+        if not solid.any():
+            continue
+        # The documentation stands a plain red square in for a sprite it has
+        # no picture of. That is not a blip; leave it to be drawn as a dot.
+        red = solid & (px[..., 0] > 240) & (px[..., 1] < 16) & (px[..., 2] < 16)
+        if red.sum() > 0.9 * solid.sum():
+            continue
+        # Some pictures there are drawn black with a white edge. On the radar
+        # a blip is a white shape with a dark edge, which is also the only
+        # kind a blip's colour can tint, so those are turned inside out.
+        grey = np.abs(px[..., 0] - px[..., 1]) + np.abs(px[..., 1] - px[..., 2]) < 24
+        light = px[..., :3].mean(axis=-1) > 128
+        if grey[solid].mean() > 0.95 and light[solid].mean() < 0.45:
+            px[..., :3] = 255 - px[..., :3]
+            im = Image.fromarray(px.astype(np.uint8), 'RGBA')
         # The animated ones are stored large; everything is brought to the
         # size the still ones already are.
         if max(im.size) > CELL:

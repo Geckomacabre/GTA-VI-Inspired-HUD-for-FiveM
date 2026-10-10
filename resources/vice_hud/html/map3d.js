@@ -12,11 +12,15 @@
  * frame is a few dozen draw calls over the 256 m squares around the player,
  * and a frame is only drawn when client_map3d.lua says something moved.
  *
- *   map3d       { load, show, config }      fetch the world; on or off; and
- *                                           Config.Map3D's view and paint
+ *   map3d       { load, show, config, night }   fetch the world; on or off;
+ *                                           Config.Map3D's view and paints;
+ *                                           how far into the night it is, 0-1
  *   map3dPos    { x, y, c, h, s }           position, camera and ped heading
  *                                           (degrees), speed (m/s)
- *   map3dRoute  { routes: [{ pts, rgb }] }  the GPS line(s), world x,y pairs
+ *   map3dRoute  { routes: [{ pts, rgb, rim, head }], ends: [{ x, y, rgb, ring, icon, iconRgb }] }
+ *               the GPS line(s) as world x,y pairs, `head` on the one that
+ *               starts at the player; and where each ends -- ringed, with the
+ *               place's blip picture in the ring if it ends at one
  *   map3dBlips  { list: [[x, y, sprite, r, g, b, a, flags, rot], ...] }
  *               flags: 1 = stays on the edge when out of view, 2 = turns with
  *               its heading
@@ -44,7 +48,10 @@
         liftCap: 400,       // tall buildings stop growing, in panel pixels
         opacity: 0.87,
         fade: { rx: 30, ry: 40, up: 6, min: 0.18, near: 0.3 },
-        route: { lane: 3.5, minWidth: 6, rim: 1.2 },
+        // The line starts `gap` metres ahead of the player and comes in over
+        // the next `fade`, as the reference's does; it never touches the marker.
+        route: { lane: 3.5, minWidth: 6, rim: 1.2, gap: 5, fade: 10 },
+        end: { ring: 27.6, pin: 16.2 },     // a route's end: the ring, and the disc in it
         marker: 12.4,       // diameter, panel pixels
         blip: 16.5,
         north: true
@@ -58,12 +65,32 @@
         route: [250, 116, 165]
     };
 
+    // The same things after dark, sampled off the reference's night footage:
+    // the land goes to slate and the roads stand out of it, lighter. `night`
+    // runs from 0 (day) to 1 and every colour is mixed by it, so dusk and dawn
+    // are a slow change and not a switch.
+    var NIGHT = {
+        land: [42, 42, 62], water: [27, 35, 58], sand: [58, 56, 70],
+        footprint: [50, 50, 72], rail: [60, 59, 76], road: [90, 86, 100],
+        lot: [66, 64, 82], lane: [132, 130, 146, 0.2],
+        roof: [62, 62, 86], wall: [36, 36, 54], shadow: 34 / 255
+    };
+    var night = 0;
+    function ink(name) {
+        var d = PAINT[name], n = NIGHT[name];
+        if (n == null || night <= 0) return d;
+        if (typeof d === 'number') return d + (n - d) * night;
+        var out = [];
+        for (var i = 0; i < d.length; i++) out.push(d[i] + ((n[i] != null ? n[i] : d[i]) - d[i]) * night);
+        return out;
+    }
+
     var PANEL_H = 115;          // the panel height every size above is measured on
     var canvas, gl, world, glFailed = false;
     var progs = {}, layers = {}, bld, groundTex, uiTex, atlasTex, atlas;
     var routeBuf, routeCount = 0, routes = [];
     var spriteBuf, spriteData = new Float32Array(8 * 6 * 512);
-    var blips = [], fixed = [], moving = [], routeSrc = [];
+    var blips = [], fixed = [], moving = [], routeSrc = [], ends = [];
     var booted = false;
     var shown = false, wanted = false, loaded = false, dirty = false, queued = false;
     var pos = { x: 0, y: 0, c: 0, h: 0, s: 0 };
@@ -140,9 +167,16 @@
             ].join('\n')
         },
         route: {
-            vs: PLACE + '\nlayout(location = 0) in vec2 aPos; layout(location = 1) in vec2 aOff; uniform float uHalf;' +
-                'void main() { gl_Position = place(aPos + aOff * uHalf, 0.0); }',
-            fs: 'uniform vec4 uColour; out vec4 o; void main() { o = uColour; }'
+            vs: PLACE + '\nlayout(location = 0) in vec2 aPos; layout(location = 1) in vec2 aOff; layout(location = 2) in float aAlong;' +
+                'layout(location = 3) in vec2 aTan; uniform float uHalf; uniform float uZ; out float vAlong;' +
+                // How far along the line this vertex is -- for a round join,
+                // including how far forward of its centre the vertex sits.
+                'void main() { vAlong = aAlong + dot(aOff, aTan) * uHalf; gl_Position = place(aPos + aOff * uHalf, 0.0);' +
+                ' gl_Position.z = uZ * gl_Position.w; }',
+            // Nothing of the line is drawn behind the player, and it comes in
+            // gradually ahead of them.
+            fs: 'in float vAlong; uniform float uStart; uniform float uFade; uniform vec4 uColour; out vec4 o;' +
+                'void main() { float a = smoothstep(uStart, uStart + uFade, vAlong); if (a < 0.004) discard; o = vec4(uColour.rgb, a); }'
         },
         building: {
             vs: PLACE + [
@@ -312,10 +346,10 @@
        badge and a plain dot. Painted once, at a size no screen will outgrow.
        The player is the marker measured off the reference footage -- the same
        one tools/minimap_marker puts into the game's own minimap. */
-    var UI = { cell: 128, player: 0, north: 1, dot: 2 };
+    var UI = { cell: 128, cells: 5, player: 0, north: 1, dot: 2, ring: 3, pin: 4 };
     function paintUi() {
         var c = document.createElement('canvas');
-        c.width = UI.cell * 3; c.height = UI.cell;
+        c.width = UI.cell * UI.cells; c.height = UI.cell;
         var x = c.getContext('2d'), R = UI.cell * 0.46, m = UI.cell / 2;
 
         x.fillStyle = '#000000'; x.beginPath(); x.arc(m, m, R, 0, 7); x.fill();
@@ -335,6 +369,26 @@
         var dx = UI.cell * 2 + m;
         x.fillStyle = 'rgba(0,0,0,0.55)'; x.beginPath(); x.arc(dx, m, R, 0, 7); x.fill();
         x.fillStyle = '#ffffff'; x.beginPath(); x.arc(dx, m, R * 0.8, 0, 7); x.fill();
+
+        // The ring round a route's end, measured off the reference: four arcs
+        // of about 66 degrees, up, right, down and left, light with a dark
+        // edge all round. White here; the tint makes it the route's colour
+        // and leaves the edge dark.
+        var rx = UI.cell * 3 + m, span = 66 * Math.PI / 180, k;
+        x.lineCap = 'butt';
+        for (k = 0; k < 4; k++) {
+            var mid = k * Math.PI / 2 - Math.PI / 2;
+            x.strokeStyle = '#000000'; x.lineWidth = R * 0.215;
+            x.beginPath(); x.arc(rx, m, R * 0.885, mid - span / 2 - 0.05, mid + span / 2 + 0.05); x.stroke();
+            x.strokeStyle = '#ffffff'; x.lineWidth = R * 0.115;
+            x.beginPath(); x.arc(rx, m, R * 0.885, mid - span / 2, mid + span / 2); x.stroke();
+        }
+
+        // And what sits in it when the route ends on open ground: a disc, dark
+        // edged, to be tinted the route's colour.
+        var px = UI.cell * 4 + m;
+        x.fillStyle = '#000000'; x.beginPath(); x.arc(px, m, R, 0, 7); x.fill();
+        x.fillStyle = '#ffffff'; x.beginPath(); x.arc(px, m, R * 0.84, 0, 7); x.fill();
         return c;
     }
 
@@ -361,8 +415,10 @@
         gl.bindVertexArray(rv);
         routeBuf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, routeBuf);
-        gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0);
-        gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 16, 8);
+        gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 28, 0);
+        gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 28, 8);
+        gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 28, 16);
+        gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 2, gl.FLOAT, false, 28, 20);
         progs.routeVao = rv;
 
         var sv = gl.createVertexArray();
@@ -522,9 +578,10 @@
         gl.uniform1i(u.uGround, 0);
         gl.uniform2f(u.uGroundAt, world.ground.x0, world.ground.y0);
         gl.uniform2f(u.uGroundSize, world.ground.w * world.ground.cell, world.ground.h * world.ground.cell);
-        gl.uniform3f(u.uLand, PAINT.land[0] / 255, PAINT.land[1] / 255, PAINT.land[2] / 255);
-        gl.uniform3f(u.uWater, PAINT.water[0] / 255, PAINT.water[1] / 255, PAINT.water[2] / 255);
-        gl.uniform3f(u.uSand, PAINT.sand[0] / 255, PAINT.sand[1] / 255, PAINT.sand[2] / 255);
+        var land = ink('land'), water = ink('water'), sand = ink('sand');
+        gl.uniform3f(u.uLand, land[0] / 255, land[1] / 255, land[2] / 255);
+        gl.uniform3f(u.uWater, water[0] / 255, water[1] / 255, water[2] / 255);
+        gl.uniform3f(u.uSand, sand[0] / 255, sand[1] / 255, sand[2] / 255);
         gl.uniform1f(u.uAlpha, A);
         gl.bindVertexArray(progs.quad);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -536,26 +593,37 @@
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         u = shared(progs.flat, V);
-        [['footprint', 1], ['rail', 1], ['road', 1], ['bridge', 1], ['lot', 1], ['lane', PAINT.lane[3]]].forEach(function (l) {
-            if (!layers[l[0]]) return;
-            var c = PAINT[l[0] === 'bridge' ? 'road' : l[0]];
-            gl.uniform4f(u.uColour, c[0] / 255 * A, c[1] / 255 * A, c[2] / 255 * A, l[1]);
-            drawChunks(layers[l[0]], R);
+        ['footprint', 'rail', 'road', 'bridge', 'lot', 'lane'].forEach(function (name) {
+            if (!layers[name]) return;
+            var c = ink(name === 'bridge' ? 'road' : name);
+            gl.uniform4f(u.uColour, c[0] / 255 * A, c[1] / 255 * A, c[2] / 255 * A, c.length > 3 ? c[3] : 1);
+            drawChunks(layers[name], R);
         });
 
         if (routeCount) {
             u = shared(progs.route, V);
             gl.bindVertexArray(progs.routeVao);
             var half = Math.max(VIEW.route.lane, VIEW.route.minWidth * V.unit / V.s) / 2;
+            // The line is made of overlapping pieces. Depth lets each pixel be
+            // painted by one of them only, so where it is fading in it fades
+            // evenly and not in patches: the rim first, then the fill nearer.
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthFunc(gl.LESS);
+            gl.uniform1f(u.uFade, Math.max(0.01, VIEW.route.fade));
             routes.forEach(function (r) {
                 var rim = r.rim, fill = r.rgb;
+                gl.uniform1f(u.uStart, r.head ? startOf(r, pos.x, pos.y) + VIEW.route.gap : -1e6);
+                gl.uniform1f(u.uZ, 0.2);
                 gl.uniform1f(u.uHalf, half + VIEW.route.rim * V.unit / V.s);
                 gl.uniform4f(u.uColour, rim[0] / 255 * A, rim[1] / 255 * A, rim[2] / 255 * A, 1);
                 gl.drawArrays(gl.TRIANGLES, r.from, r.count);
+                gl.uniform1f(u.uZ, 0.0);
                 gl.uniform1f(u.uHalf, half);
                 gl.uniform4f(u.uColour, fill[0] / 255 * A, fill[1] / 255 * A, fill[2] / 255 * A, 1);
                 gl.drawArrays(gl.TRIANGLES, r.from, r.count);
+                gl.clear(gl.DEPTH_BUFFER_BIT);
             });
+            gl.disable(gl.DEPTH_TEST);
         }
 
         if (bld && VIEW.buildings !== false) {
@@ -564,7 +632,7 @@
             gl.uniform1f(u.uLift, VIEW.lift);
             gl.uniform1f(u.uLiftCap, cap);
             gl.uniform1f(u.uShadowMax, 20 * V.unit);
-            gl.uniform4f(u.uColour, 0, 0, 0, PAINT.shadow);
+            gl.uniform4f(u.uColour, 0, 0, 0, ink('shadow'));
             gl.enable(gl.DEPTH_TEST);
             gl.depthFunc(gl.LESS);
             drawChunks(bld.roof, R);
@@ -575,8 +643,9 @@
             u = shared(progs.building, V);
             gl.uniform1f(u.uLift, VIEW.lift);
             gl.uniform1f(u.uLiftCap, cap);
-            gl.uniform3f(u.uRoof, PAINT.roof[0] / 255, PAINT.roof[1] / 255, PAINT.roof[2] / 255);
-            gl.uniform3f(u.uWall, PAINT.wall[0] / 255, PAINT.wall[1] / 255, PAINT.wall[2] / 255);
+            var roof = ink('roof'), wall = ink('wall');
+            gl.uniform3f(u.uRoof, roof[0] / 255, roof[1] / 255, roof[2] / 255);
+            gl.uniform3f(u.uWall, wall[0] / 255, wall[1] / 255, wall[2] / 255);
             gl.uniform2f(u.uFadeAt, V.ox, V.oy - VIEW.fade.up * V.unit);
             gl.uniform2f(u.uFadeSize, VIEW.fade.rx * V.unit, VIEW.fade.ry * V.unit);
             gl.uniform1f(u.uFadeMin, VIEW.fade.min);
@@ -660,36 +729,78 @@
         spriteN = 0;
     }
 
-    function uiCell(i) { return [i / 3, 0, (i + 1) / 3, 1]; }
+    function uiCell(i) { return [i / UI.cells, 0, (i + 1) / UI.cells, 1]; }
+
+    // The HUD's own panels sit on the map's top edge, so nothing pinned to the
+    // edge is allowed to hang over that one: it would be half hidden.
+    function clear(at, size) { return at.y < size * 0.46 ? { x: at.x, y: size * 0.46 } : at; }
 
     function drawSprites(V) {
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         var corner = V.corner, m = V.m;
-        var size = VIEW.blip * V.unit, dots = [], i, b, p, at, on;
+        var size = VIEW.blip * V.unit, dots = [], marks = [], i, b, p, at, on, cell, cols, rows, cx, cy;
+
+        // Where each route ends. Worked out first, because a blip standing on
+        // one is drawn as part of it and not a second time beside it.
+        for (i = 0; i < ends.length; i++) {
+            p = project(V, ends[i].x, ends[i].y);
+            on = p.w > 0.25 && outline(V, p.x, p.y, corner) < -size * 0.25;
+            marks.push({ end: ends[i], at: on ? p : clear(edgePoint(V, p.u, -p.g, corner, 0), VIEW.end.ring * V.unit * 0.9) });
+        }
+        function taken(blip) {
+            for (var k = 0; k < ends.length; k++) {
+                if (ends[k].icon === blip[2] && Math.abs(ends[k].x - blip[0]) + Math.abs(ends[k].y - blip[1]) < 8) return true;
+            }
+            return false;
+        }
 
         // Blips with a picture go first, in one batch; the rest are dots.
         for (i = 0; i < blips.length; i++) {
             b = blips[i];
+            if (ends.length && taken(b)) continue;
             p = project(V, b[0], b[1]);
             on = p.w > 0.25 && outline(V, p.x, p.y, corner) < -size * 0.25;
             if (!on) {
                 if (!(b[7] & 1)) continue;
-                at = edgePoint(V, p.u, -p.g, corner, 0);
+                at = clear(edgePoint(V, p.u, -p.g, corner, 0), size * 0.8);
             } else at = p;
             var tint = [b[3] / 255, b[4] / 255, b[5] / 255, b[6] / 255];
-            var cell = atlas && atlas.cells[b[2]];
+            cell = atlas && atlas.cells[b[2]];
             if (cell == null) { dots.push([at.x, at.y, tint]); continue; }
-            var cols = atlas.cols, rows = atlas.rows, cx = cell % cols, cy = Math.floor(cell / cols);
+            cols = atlas.cols; rows = atlas.rows; cx = cell % cols; cy = Math.floor(cell / cols);
             var rot = (b[7] & 2) ? (pos.c - b[8]) * Math.PI / 180 : 0;
             sprite(at.x + m, at.y + m, size, rot, cx / cols, cy / rows, (cx + 1) / cols, (cy + 1) / rows, tint);
+        }
+        // A route that ends at a place: the place's own picture in the ring.
+        for (i = 0; i < marks.length; i++) {
+            var e = marks[i].end;
+            cell = (atlas && e.icon != null) ? atlas.cells[e.icon] : null;
+            marks[i].pictured = cell != null;
+            if (cell == null) continue;
+            cols = atlas.cols; rows = atlas.rows; cx = cell % cols; cy = Math.floor(cell / cols);
+            sprite(marks[i].at.x + m, marks[i].at.y + m, size, 0, cx / cols, cy / rows, (cx + 1) / cols, (cy + 1) / rows,
+                   [e.iconRgb[0] / 255, e.iconRgb[1] / 255, e.iconRgb[2] / 255, 1]);
         }
         if (atlasTex) flush(atlasTex, V);
 
         var c = uiCell(UI.dot);
         for (i = 0; i < dots.length; i++) sprite(dots[i][0] + m, dots[i][1] + m, size * 0.62, 0, c[0], c[1], c[2], c[3], dots[i][2]);
 
+        // The ring round a route's end: four arcs, as the reference marks a
+        // destination. In it, the place's picture (above) or, for a waypoint
+        // dropped on open ground, a plain disc in the route's colour.
+        for (i = 0; i < marks.length; i++) {
+            var end = marks[i].end, q = marks[i].at;
+            if (!marks[i].pictured) {
+                c = uiCell(UI.pin);
+                sprite(q.x + m, q.y + m, VIEW.end.pin * V.unit, 0, c[0], c[1], c[2], c[3], [end.rgb[0] / 255, end.rgb[1] / 255, end.rgb[2] / 255, 1]);
+            }
+            c = uiCell(UI.ring);
+            sprite(q.x + m, q.y + m, VIEW.end.ring * V.unit, 0, c[0], c[1], c[2], c[3], [end.ring[0] / 255, end.ring[1] / 255, end.ring[2] / 255, 1]);
+        }
+
         if (VIEW.north) {
-            at = edgePoint(V, Math.sin(V.rad), -Math.cos(V.rad), corner, 0);
+            at = clear(edgePoint(V, Math.sin(V.rad), -Math.cos(V.rad), corner, 0), 10.8 * V.unit);
             c = uiCell(UI.north);
             sprite(at.x + m, at.y + m, 10.8 * V.unit, 0, c[0], c[1], c[2], c[3], [1, 1, 1, 1]);
         }
@@ -700,43 +811,132 @@
 
     /* --- the route -------------------------------------------------------- */
 
-    // One round of corner cutting: the game hands the route over as the road
-    // network's own points, which turn in visible steps.
-    function soften(p) {
-        if (p.length < 6) return p;
-        var out = [p[0], p[1]];
+    // The game hands the line over as points along its road network: unevenly
+    // spaced, a lane to one side where two stretches of road meet, and begun
+    // at the last junction behind the player rather than at the player. Left
+    // as it comes, that is a line with kinks in it and a tail. So:
+    //
+    //   tidy()     the same line as points two metres apart, then smoothed --
+    //              hard where smoothing barely moves it (a lane's sidestep),
+    //              lightly where it would cut a real corner off the road.
+    //   startOf()  where along it the player is, found again every frame, so
+    //              the line always begins under the marker and never behind.
+    var ROUTE = { step: 2, heavy: 8, light: 2.2, look: 80, hook: 40, near: 12 };
+
+    function resample(p, step) {
+        var out = [p[0], p[1]], carry = 0;
         for (var i = 0; i + 3 < p.length; i += 2) {
-            var ax = p[i], ay = p[i + 1], bx = p[i + 2], by = p[i + 3];
-            out.push(ax * 0.75 + bx * 0.25, ay * 0.75 + by * 0.25, ax * 0.25 + bx * 0.75, ay * 0.25 + by * 0.75);
+            var ax = p[i], ay = p[i + 1], dx = p[i + 2] - ax, dy = p[i + 3] - ay, len = Math.hypot(dx, dy);
+            if (len < 1e-6) continue;
+            var t = step - carry;
+            while (t <= len) { out.push(ax + dx * t / len, ay + dy * t / len); t += step; }
+            carry = len - (t - step);
         }
-        out.push(p[p.length - 2], p[p.length - 1]);
+        var n = out.length, lx = p[p.length - 2], ly = p[p.length - 1];
+        if (Math.hypot(lx - out[n - 2], ly - out[n - 1]) > step * 0.25) out.push(lx, ly);
+        return out;
+    }
+
+    // A Gaussian along the line. Past either end the line is carried on as its
+    // own mirror image through the end point, which leaves the ends in place.
+    function blur(p, sigma, step) {
+        var n = p.length / 2, r = Math.max(1, Math.ceil(sigma * 2.5 / step)), k = [], out = new Array(p.length), i, j;
+        for (j = -r; j <= r; j++) k.push(Math.exp(-0.5 * Math.pow(j * step / sigma, 2)));
+        for (i = 0; i < n; i++) {
+            var sx = 0, sy = 0, sw = 0;
+            for (j = -r; j <= r; j++) {
+                var q = i + j, x, y, w = k[j + r];
+                if (q < 0) { q = Math.min(n - 1, -q); x = 2 * p[0] - p[q * 2]; y = 2 * p[1] - p[q * 2 + 1]; }
+                else if (q >= n) { q = Math.max(0, 2 * (n - 1) - q); x = 2 * p[2 * n - 2] - p[q * 2]; y = 2 * p[2 * n - 1] - p[q * 2 + 1]; }
+                else { x = p[q * 2]; y = p[q * 2 + 1]; }
+                sx += x * w; sy += y * w; sw += w;
+            }
+            out[i * 2] = sx / sw; out[i * 2 + 1] = sy / sw;
+        }
+        return out;
+    }
+
+    function tidy(raw) {
+        var p = [], i;
+        for (i = 0; i + 1 < raw.length; i += 2) {
+            if (!p.length || Math.hypot(raw[i] - p[p.length - 2], raw[i + 1] - p[p.length - 1]) > 0.05) p.push(raw[i], raw[i + 1]);
+        }
+        if (p.length < 4) return null;
+        p = resample(p, ROUTE.step);
+        var heavy = blur(p, ROUTE.heavy, ROUTE.step), light = blur(p, ROUTE.light, ROUTE.step);
+        var n = p.length / 2, line = new Float32Array(n * 2), arc = new Float32Array(n);
+        for (i = 0; i < n; i++) {
+            // How far the hard smoothing would move this point: a metre or two
+            // is a sidestep being ironed out, more is a corner being cut.
+            var moved = Math.hypot(heavy[i * 2] - p[i * 2], heavy[i * 2 + 1] - p[i * 2 + 1]);
+            var t = Math.min(1, Math.max(0, (moved - 1.0) / 2.5)), w = t * t * (3 - 2 * t);
+            line[i * 2] = heavy[i * 2] * (1 - w) + light[i * 2] * w;
+            line[i * 2 + 1] = heavy[i * 2 + 1] * (1 - w) + light[i * 2 + 1] * w;
+            if (i) arc[i] = arc[i - 1] + Math.hypot(line[i * 2] - line[i * 2 - 2], line[i * 2 + 1] - line[i * 2 - 1]);
+        }
+        return { line: line, arc: arc };
+    }
+
+    // How far along the line the player is. The nearest point, with one
+    // exception: off the road the game's line first runs BACK to the road and
+    // only then forward, passing the player a second time on its way. The line
+    // should start at that second pass, so a later nearest-approach wins over
+    // an earlier one -- but only close by and early on, or a route that loops
+    // round the block would be cut short at the point it comes back past.
+    function startOf(r, px, py) {
+        var p = r.line, s = r.arc, n = s.length, best = 0, bestD = Infinity, pick = -1, i;
+        function dsq(k) { var dx = p[k * 2] - px, dy = p[k * 2 + 1] - py; return dx * dx + dy * dy; }
+        var before = Infinity, here = dsq(0), after;
+        for (i = 0; i < n && s[i] <= ROUTE.look; i++) {
+            after = i + 1 < n ? dsq(i + 1) : Infinity;
+            if (here < bestD) { bestD = here; best = i; }
+            if (here <= before && here < after && here <= ROUTE.near * ROUTE.near && s[i] <= ROUTE.hook) pick = i;
+            before = here; here = after;
+        }
+        var at = pick >= 0 ? pick : best, out = s[at], near = dsq(at);
+        // Between the points either side of it, exactly.
+        [at - 1, at].forEach(function (k) {
+            if (k < 0 || k + 1 >= n) return;
+            var ax = p[k * 2], ay = p[k * 2 + 1], dx = p[k * 2 + 2] - ax, dy = p[k * 2 + 3] - ay, len = dx * dx + dy * dy;
+            if (len < 1e-9) return;
+            var t = Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / len));
+            var ex = ax + dx * t - px, ey = ay + dy * t - py, d = ex * ex + ey * ey;
+            if (d <= near) { near = d; out = s[k] + (s[k + 1] - s[k]) * t; }
+        });
         return out;
     }
 
     function setRoutes(src) {
-        var v = [], FAN = 10;
+        var v = [], FAN = 8;
         routeSrc = list(src);
         if (!gl) return;
         routes = [];
         routeSrc.forEach(function (r) {
-            var p = soften(list(r.pts)), from = v.length / 4;
-            for (var i = 0; i + 1 < p.length; i += 2) {
-                var x = p[i], y = p[i + 1];
+            var made = tidy(list(r.pts));
+            if (!made) return;
+            var p = made.line, s = made.arc, n = s.length, from = v.length / 7;
+            for (var i = 0; i < n; i++) {
+                var x = p[i * 2], y = p[i * 2 + 1], d = s[i];
+                // Which way the line is going here, for the round join.
+                var i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1);
+                var tx = p[i1 * 2] - p[i0 * 2], ty = p[i1 * 2 + 1] - p[i0 * 2 + 1], tl = Math.hypot(tx, ty) || 1;
+                tx /= tl; ty /= tl;
                 for (var f = 0; f < FAN; f++) {
                     var a0 = f / FAN * 6.2832, a1 = (f + 1) / FAN * 6.2832;
-                    v.push(x, y, 0, 0, x, y, Math.cos(a0), Math.sin(a0), x, y, Math.cos(a1), Math.sin(a1));
+                    v.push(x, y, 0, 0, d, tx, ty, x, y, Math.cos(a0), Math.sin(a0), d, tx, ty, x, y, Math.cos(a1), Math.sin(a1), d, tx, ty);
                 }
-                if (i + 3 >= p.length) break;
-                var bx = p[i + 2], by = p[i + 3], dx = bx - x, dy = by - y, len = Math.hypot(dx, dy);
+                if (i + 1 >= n) break;
+                var bx = p[i * 2 + 2], by = p[i * 2 + 3], dx = bx - x, dy = by - y, len = Math.hypot(dx, dy), e = s[i + 1];
                 if (len < 1e-4) continue;
                 var nx = -dy / len, ny = dx / len;
-                v.push(x, y, nx, ny, x, y, -nx, -ny, bx, by, -nx, -ny, x, y, nx, ny, bx, by, -nx, -ny, bx, by, nx, ny);
+                v.push(x, y, nx, ny, d, 0, 0, x, y, -nx, -ny, d, 0, 0, bx, by, -nx, -ny, e, 0, 0,
+                       x, y, nx, ny, d, 0, 0, bx, by, -nx, -ny, e, 0, 0, bx, by, nx, ny, e, 0, 0);
             }
-            var count = v.length / 4 - from;
             var rgb = list(r.rgb).length === 3 ? r.rgb : PAINT.route;
-            if (count) routes.push({ from: from, count: count, rgb: rgb, rim: list(r.rim).length === 3 ? r.rim : lighten(rgb) });
+            routes.push({ from: from, count: v.length / 7 - from, line: p, arc: s, head: r.head === true,
+                          rgb: rgb, rim: list(r.rim).length === 3 ? r.rim : lighten(rgb) });
         });
-        routeCount = v.length / 4;
+        routeCount = v.length / 7;
         gl.bindBuffer(gl.ARRAY_BUFFER, routeBuf);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.DYNAMIC_DRAW);
     }
@@ -759,11 +959,18 @@
         if (d.action === 'map3dPos') {
             pos.x = d.x; pos.y = d.y; pos.c = d.c; pos.h = d.h; pos.s = d.s || 0;
         } else if (d.action === 'map3d') {
-            if (d.config) { merge(VIEW, d.config.view); merge(PAINT, d.config.paint); }
+            if (d.config) { merge(VIEW, d.config.view); merge(PAINT, d.config.paint); merge(NIGHT, d.config.paintNight); }
+            if (typeof d.night === 'number') night = Math.min(1, Math.max(0, d.night));
             if (d.load || d.show) boot();
             if (d.show != null) { wanted = d.show === true; setShown(wanted); }
         } else if (d.action === 'map3dRoute') {
             setRoutes(d.routes);
+            ends = list(d.ends).filter(function (e) { return e && typeof e.x === 'number' && typeof e.y === 'number'; }).map(function (e) {
+                var rgb = list(e.rgb).length === 3 ? e.rgb : PAINT.route;
+                var pictured = typeof e.icon === 'number' && list(e.iconRgb).length === 3;
+                return { x: e.x, y: e.y, rgb: rgb, ring: list(e.ring).length === 3 ? e.ring : lighten(rgb),
+                         icon: pictured ? e.icon : null, iconRgb: pictured ? e.iconRgb : null };
+            });
         } else if (d.action === 'map3dBlips') {
             fixed = list(d.list);
             blips = fixed.concat(moving);
@@ -776,12 +983,13 @@
 
     // For tests and the browser preview.
     window.ViceMap3D = {
-        state: function () { return { booted: booted, shown: shown, loaded: loaded, failed: glFailed, zoom: zoomNow, routes: routes.length, blips: blips.length, hasAtlas: !!atlasTex }; },
+        state: function () { return { booted: booted, shown: shown, loaded: loaded, failed: glFailed, zoom: zoomNow, routes: routes.length, ends: ends, night: night, blips: blips.length, hasAtlas: !!atlasTex }; },
         project: function (x, y) { var V = view(canvas.width, canvas.height, 0); return project(V, x, y); },
         // A frame right now, without waiting for the browser to offer one: a
         // page nobody is looking at is never offered any.
         draw: function () { dirty = true; queued = false; frame(performance.now()); },
-        VIEW: VIEW, PAINT: PAINT
+        route: { tidy: tidy, startOf: startOf },
+        VIEW: VIEW, PAINT: PAINT, NIGHT: NIGHT, ink: ink
     };
 
     post('map3dHello');
