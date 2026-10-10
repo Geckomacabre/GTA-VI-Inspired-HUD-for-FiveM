@@ -667,7 +667,7 @@ python tools/map3d/blips.py --docs path/to/fivem-docs
   mod is run; its map is read out of the file. Needs numpy, scipy and Pillow.
 - `blips.py` writes the sheet of blip pictures, from a clone of
   [fivem-docs](https://github.com/citizenfx/fivem-docs). Without it every
-  blip is a round dot in its own colour.
+  blip is a round dot in its own colour. Needs numpy and Pillow.
 - Until `world.bin` exists the page says so, one line is printed, and the
   engine's radar carries on. Nothing else changes.
 
@@ -687,7 +687,15 @@ What to know about it:
   pinned to the edge, as on the radar. Radius and area blips are not drawn:
   the game will not say how big they are.
 - **The route** is the game's own GPS line, read back from it, for the
-  waypoint and for a blip a script gave a route.
+  waypoint and for a blip a script gave a route. The game hands it over with
+  kinks in it and a tail behind the player, so it is smoothed, started where
+  the player is, and brought in gradually just ahead of the marker.
+- **Where a route ends is ringed**: four arcs in the route's colour, as the
+  reference marks a destination. In the ring is a plain disc of that colour,
+  or, when the waypoint was set on a place, that place's own blip.
+- **After dark the map is dark**: slate land with the roads standing out of
+  it, changing over gradually at dusk and dawn by the game's clock
+  (`night`, `nightHours`, `paintNight`).
 - The pause map and the big map are the engine's and are untouched.
 - `/hudmap3d` switches between it and the game's radar for that player.
 

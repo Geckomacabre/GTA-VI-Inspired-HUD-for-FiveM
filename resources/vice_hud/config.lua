@@ -101,7 +101,18 @@ Config.Map3D = {
         north = true,       -- the N badge (also follows /movehud's north toggle)
     },
 
+    -- A dark map after dark. true follows the game's clock and changes over
+    -- gradually at dusk and dawn; false is the daytime map always; 'always' is
+    -- the night one always.
+    night = true,
+    nightHours = { dusk = 19.5, dark = 21.0, dawn = 5.0, light = 6.5 },
+
     -- Colours, 0-255. Left out, each keeps the value in html/map3d.js.
+    -- paintNight is the same list for the night map.
+    paintNight = {
+        -- land = { 42, 42, 62 }, road = { 90, 86, 100 }, water = { 27, 35, 58 },
+        -- roof = { 62, 62, 86 }, wall = { 36, 36, 54 },
+    },
     paint = {
         -- land = { 160, 155, 149 }, water = { 118, 152, 158 }, sand = { 178, 162, 134 },
         -- road = { 172, 167, 161 }, lot = { 182, 177, 170 }, rail = { 148, 144, 140 },

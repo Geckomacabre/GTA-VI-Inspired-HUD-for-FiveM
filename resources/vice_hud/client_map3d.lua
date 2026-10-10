@@ -77,7 +77,7 @@ function ViceMap3D.show(on, showNorth)
         for k, v in pairs(C.view or {}) do view[k] = v end
         view.north = north and view.north ~= false
         view.buildings = C.buildings ~= false
-        msg.config = { view = view, paint = C.paint }
+        msg.config = { view = view, paint = C.paint, paintNight = C.paintNight }
     end
     say('map3d', msg)
     if drawing then routeDirty = true end
@@ -165,23 +165,59 @@ feed('position', function()
     end
 end)
 
+-- ---- day and night ---------------------------------------------------------------
+-- The map has a daytime look and a night one, and the page mixes between them
+-- by a number from 0 to 1. This is that number, off the game's own clock: fully
+-- night from `dark` to `dawn`, changing gradually either side of it.
+local function nightNow()
+    if C.night == false then return 0.0 end
+    if C.night == 'always' then return 1.0 end
+    local h = C.nightHours or {}
+    local dusk, dark, dawn, light = h.dusk or 19.5, h.dark or 21.0, h.dawn or 5.0, h.light or 6.5
+    local t = GetClockHours() + GetClockMinutes() / 60.0
+    if t >= dark or t < dawn then return 1.0 end
+    if t >= dusk then return (t - dusk) / (dark - dusk) end
+    if t < light then return 1.0 - (t - dawn) / (light - dawn) end
+    return 0.0
+end
+
+feed('clock', function()
+    local sent = -1.0
+    while true do
+        if drawing then
+            local n = nightNow()
+            if math.abs(n - sent) > 0.01 then
+                sent = n
+                say('map3d', { night = round(n, 3) })
+            end
+        else
+            sent = -1.0
+        end
+        Wait(2000)
+    end
+end)
+
 -- ---- the GPS line --------------------------------------------------------------
 -- The engine will not hand a route over, but it will say where a point so many
 -- metres along it is. Walk that out to routeLength and there is the line.
 -- Slot 0 is the player's own waypoint, slot 1 a blip some script gave a route.
 local ROUTE_LENGTH = (C.route and C.route.length) or 500.0
-local ROUTE_PER_FRAME = 24
 
 local function stepAt(d)
-    if d < 70.0 then return 2.0 elseif d < 140.0 then return 3.0 elseif d < 220.0 then return 4.5 end
-    return 7.0
+    if d < 150.0 then return 3.0 elseif d < 300.0 then return 5.0 end
+    return 8.0
 end
 
 --- One slot's route as runs of x,y pairs. More than one run when the route
 --- jumps (a ferry, a tunnel the road network does not connect across).
+---
+--- All of it in one frame, on purpose: the game re-plans the route as the
+--- player turns, and a walk spread over several frames could come back with
+--- the front of one plan joined to the back of another -- a line with a step
+--- in it. It is about a hundred cheap calls.
 local function walkRoute(slot)
     local runs, run = {}, {}
-    local dist, same, budget = 0.0, 0, ROUTE_PER_FRAME
+    local dist, same = 0.0, 0
     local lastx, lasty
     while dist <= ROUTE_LENGTH do
         local ok, pos = GetPosAlongGpsTypeRoute(true, dist, slot)
@@ -208,12 +244,6 @@ local function walkRoute(slot)
         run[#run + 1] = round(pos.y, 1)
         lastx, lasty = pos.x, pos.y
         ::continue::
-        budget = budget - 1
-        if budget <= 0 then
-            budget = ROUTE_PER_FRAME
-            Wait(0)
-            if not drawing then return {} end
-        end
     end
     if #run >= 4 then runs[#runs + 1] = run end
     return runs
@@ -224,7 +254,23 @@ local function hudRgb(index)
     return { r, g, b }
 end
 
-local routedBlipColour = nil    -- set by the blip scan below
+-- Both set by the blip scan further down.
+local routedBlip = nil      -- the blip some script has given a route
+local places = {}           -- every still blip, as the page gets them
+
+--- The still blip a point is on, if any. A waypoint set on a place in the
+--- pause map lands on that place's blip, so "is the waypoint on a place?" is
+--- "is there a blip within a few metres of it?".
+local function placeAt(x, y)
+    local best, bestD = nil, 36.0
+    for i = 1, #places do
+        local b = places[i]
+        local dx, dy = b[1] - x, b[2] - y
+        local d = dx * dx + dy * dy
+        if d < bestD then best, bestD = b, d end
+    end
+    return best
+end
 
 feed('route', function()
     if C.route == false then return end
@@ -233,27 +279,49 @@ feed('route', function()
         if not drawing then
             Wait(500)
         else
-            local routes = {}
+            -- Each route ends in a ring: four arcs in the route's light
+            -- colour. What sits in the ring is the page's business, from what
+            -- it is told here -- the picture of the place the route ends at,
+            -- or, for a waypoint dropped on open ground, nothing but colour.
+            local routes, ends = {}, {}
             if IsWaypointActive() then
-                -- 142 / 150 are the waypoint's own purples, which client.lua
-                -- has already repainted in the HUD's accent.
-                local fill, rim = hudRgb(142), hudRgb(150)
-                for _, run in ipairs(walkRoute(0)) do
-                    routes[#routes + 1] = { pts = run, rgb = fill, rim = rim }
+                -- 142 / 150 are the waypoint's own purple and its light, which
+                -- client.lua has already repainted in the HUD's accent.
+                local fill, light = hudRgb(142), hudRgb(150)
+                for i, run in ipairs(walkRoute(0)) do
+                    routes[#routes + 1] = { pts = run, rgb = fill, rim = light, head = i == 1 }
+                end
+                -- The stock waypoint sprite is left out of the blips: this is it.
+                local blip = GetFirstBlipInfoId(8)
+                if DoesBlipExist(blip) then
+                    local at = GetBlipInfoIdCoord(blip)
+                    local e = { x = round(at.x, 1), y = round(at.y, 1), rgb = fill, ring = light }
+                    local place = placeAt(at.x, at.y)
+                    if place then
+                        e.icon = place[3]
+                        e.iconRgb = { place[4], place[5], place[6] }
+                    end
+                    ends[#ends + 1] = e
                 end
             end
-            if drawing and routedBlipColour then
-                for _, run in ipairs(walkRoute(1)) do
-                    routes[#routes + 1] = { pts = run, rgb = routedBlipColour }
+            local routed = routedBlip
+            if routed and DoesBlipExist(routed.blip) then
+                for i, run in ipairs(walkRoute(1)) do
+                    routes[#routes + 1] = { pts = run, rgb = routed.rgb, head = i == 1 }
                 end
+                local at = GetBlipInfoIdCoord(routed.blip)
+                ends[#ends + 1] = { x = round(at.x, 1), y = round(at.y, 1), rgb = routed.rgb,
+                                    icon = routed.sprite, iconRgb = routed.rgb }
             end
-            if drawing and (#routes > 0 or hadRoute or routeDirty) then
+            if #routes > 0 or #ends > 0 or hadRoute or routeDirty then
                 routeDirty = false
-                hadRoute = #routes > 0
-                say('map3dRoute', { routes = routes })
+                hadRoute = #routes > 0 or #ends > 0
+                say('map3dRoute', { routes = routes, ends = ends })
             end
+            -- The page finds the player on the line every frame, so the line
+            -- itself only has to be fetched often enough to follow a re-plan.
             local ped = PlayerPedId()
-            Wait(GetEntitySpeed(ped) > 5.0 and 150 or 500)
+            Wait(GetEntitySpeed(ped) > 5.0 and 250 or 600)
         end
     end
 end)
@@ -264,7 +332,9 @@ end)
 -- seconds, a slice a frame, and in between only follow the ones that move.
 local SPRITE_MAX = 1000
 local SPRITES_PER_FRAME = 150
-local SKIP_SPRITE = { [4] = true, [5] = true, [6] = true, [7] = true, [9] = true }
+-- 4, 5, 9: radius and area shapes. 6, 7: the player and north, which the page
+-- draws itself. 8: the waypoint, which the page draws as the route's end.
+local SKIP_SPRITE = { [4] = true, [5] = true, [6] = true, [7] = true, [8] = true, [9] = true }
 local NOT_ON_MINIMAP = { [0] = true, [1] = true, [3] = true, [4] = true }
 local BLIP_CAP = 400
 
@@ -311,7 +381,9 @@ feed('blip', function()
                             elseif kind ~= 7 then
                                 static[#static + 1] = describe(blip, sprite)
                             end
-                            if DoesBlipHaveGpsRoute(blip) then routed = blipColour(blip) end
+                            if DoesBlipHaveGpsRoute(blip) then
+                                routed = { blip = blip, sprite = sprite, rgb = blipColour(blip) }
+                            end
                         end
                         blip = GetNextBlipInfoId(sprite)
                     end
@@ -319,18 +391,23 @@ feed('blip', function()
                 if sprite % SPRITES_PER_FRAME == SPRITES_PER_FRAME - 1 then Wait(0) end
             end
             moving = found
-            routedBlipColour = routed
+            routedBlip = routed
+            places = static
 
+            local shown = static
             if #static > BLIP_CAP then
-                -- Too many to be worth drawing: keep the nearest.
+                -- Too many to be worth drawing: the nearest are drawn. (All of
+                -- them are still places a waypoint can be on.)
                 local me = GetEntityCoords(PlayerPedId())
-                table.sort(static, function(a, b)
+                shown = {}
+                for i = 1, #static do shown[i] = static[i] end
+                table.sort(shown, function(a, b)
                     return (a[1] - me.x) ^ 2 + (a[2] - me.y) ^ 2 < (b[1] - me.x) ^ 2 + (b[2] - me.y) ^ 2
                 end)
-                for i = #static, BLIP_CAP + 1, -1 do static[i] = nil end
+                for i = #shown, BLIP_CAP + 1, -1 do shown[i] = nil end
             end
             if drawing then
-                say('map3dBlips', { list = static })
+                say('map3dBlips', { list = shown })
             end
             Wait(2000)
         end
