@@ -17,15 +17,16 @@ local PAD_BUTTONS = {
   SELECT_INDEX = true, START_INDEX = true, TOUCH_INDEX = true,
 }
 
+---@param field string name in Config.Input, for the warning
 ---@return string? padKey validated, or nil with a console warning
-local function padKey()
-  local key = Config.Input.padKey
+local function padKey(field)
+  local key = Config.Input[field]
   if key == nil then return nil end
 
   if not PAD_BUTTONS[key] then
-    print(('[osm-target] Config.Input.padKey "%s" is not a PAD_DIGITALBUTTONANY id, so no pad binding was made. '
+    print(('[osm-target] Config.Input.%s "%s" is not a PAD_DIGITALBUTTONANY id, so no pad binding was made. '
       .. 'Valid ids are L1/R1/L2/R2/L3/R3_INDEX, LUP/LDOWN/LLEFT/LRIGHT_INDEX, '
-      .. 'RUP/RDOWN/RLEFT/RRIGHT_INDEX, SELECT/START/TOUCH_INDEX.'):format(tostring(key)))
+      .. 'RUP/RDOWN/RLEFT/RRIGHT_INDEX, SELECT/START/TOUCH_INDEX.'):format(field, tostring(key)))
     return nil
   end
 
@@ -36,7 +37,7 @@ function Input.register()
   if keybindRegistered then return end
   keybindRegistered = true
 
-  local pad = padKey()
+  local pad = padKey('padKey')
 
   lib.addKeybind({
     name = 'osm_target',
@@ -67,6 +68,25 @@ function Input.register()
     onReleased = function()
       if Config.Input.mode == 'toggle' then return end
       Machine.stop()
+    end,
+  })
+
+  -- The layer swap (Config.Layers). A keybind of its own, not a control read in
+  -- the draw loop like the ones below, so that it is a real chord with the key
+  -- above: it is only acted on while targeting is up, and the player can move
+  -- it in FiveM's keybind settings without touching this file.
+  local layerPad = padKey('layerPadKey')
+
+  lib.addKeybind({
+    name = 'osm_target_layer',
+    description = Locale('toggle_layer'),
+    defaultKey = Config.Input.layerKey,
+    defaultMapper = 'keyboard',
+    secondaryMapper = layerPad and 'PAD_DIGITALBUTTONANY' or nil,
+    secondaryKey = layerPad,
+
+    onPressed = function()
+      Machine.cycleLayer()
     end,
   })
 end
@@ -272,6 +292,25 @@ function Input.directKeyLabel(poolIndex, name)
   local entry = (name and Config.Input.directKeyByName[name]) or Config.Input.directOptionKeys[poolIndex]
   if not entry then return '' end
   return labelFor(entry)
+end
+
+---Whether an option's direct-prompt key would land on a given pad control.
+---Used to keep the direct prompt off the button the layer swap is on: the same
+---press would otherwise both fire the option and change layer under it.
+---@param poolIndex number
+---@param name string? see Input.directKeyLabel
+---@param control number
+---@return boolean
+function Input.directKeyUsesPadControl(poolIndex, name, control)
+  local entry = (name and Config.Input.directKeyByName[name]) or Config.Input.directOptionKeys[poolIndex]
+  local list = entry and entry.pad
+  if not list then return false end
+
+  for i = 1, #list do
+    if list[i] == control then return true end
+  end
+
+  return false
 end
 
 ---@param poolIndex number

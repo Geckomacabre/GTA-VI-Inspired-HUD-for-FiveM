@@ -24,6 +24,12 @@ function Adapter.GetGroups()
   return groups
 end
 
+function Adapter.GetJobName()
+  local data = playerData()
+  local job = data and data.job
+  return job and job.name or nil
+end
+
 -- Gang fallback: return empty map as ESX lacks native gang structure
 function Adapter.GetGangs() return {} end
 

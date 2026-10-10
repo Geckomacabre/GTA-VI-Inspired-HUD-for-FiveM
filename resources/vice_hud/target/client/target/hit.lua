@@ -197,12 +197,16 @@ end
 
 ---Build resolution context: assemble player state, spatial checker, and interaction runner.
 function Hit.context(target, menu)
+  local player = Player.state()
+
   return {
     distance = target.distance,
     entity = target.entity ~= 0 and target.entity or nil,
     coords = hitPoint(target),
     menu = menu,
-    player = Player.state(),
+    player = player,
+    layer = Layers.active(player),
+    layerOf = Layers.of,
     policy = Config.Options,
     spatial = Hit.makeSpatial(target),
     interact = Hit.makeInteract(target),

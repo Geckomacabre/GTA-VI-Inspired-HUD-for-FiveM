@@ -93,6 +93,23 @@ function Machine.isDisabled() return disabled end
 ---    once, each independently keyed.
 ---  - 'list' - 3+ options, or fewer with the collapsed prompt disabled: the
 ---    ordinary scrolling rail.
+---Whether a 'direct' prompt would put an option on the same pad button as the
+---layer swap. A press then does both -- runs the option and changes layer under
+---it -- so the prompt has to fall back to the shared cursor, which needs only
+---scroll and confirm. Keyboard never collides: the swap is Numpad +, and the
+---direct keys are E and G.
+---@return boolean
+local function directClashesWithLayerKey()
+  local control = Config.Layers and Config.Layers.padControl
+  if not control or not Input.usingPad() or not Layers.focus() then return false end
+
+  for i = 1, #resolved do
+    if Input.directKeyUsesPadControl(i, resolved[i].option.name, control) then return true end
+  end
+
+  return false
+end
+
 ---@return 'list' | 'collapsed' | 'direct'
 local function computeMode()
   local count = #resolved
@@ -104,10 +121,10 @@ local function computeMode()
     local tunables = Appearance.tunables or {}
     local enabled = tunables.collapsedPrompt
     if enabled == nil or enabled == true then return 'collapsed' end
-    return 'direct'
+    return directClashesWithLayerKey() and 'list' or 'direct'
   end
 
-  if count <= 2 then return 'direct' end
+  if count <= 2 then return directClashesWithLayerKey() and 'list' or 'direct' end
   return 'list'
 end
 
@@ -554,6 +571,39 @@ local function followHit(scan)
   return true
 end
 
+---The layer swap (Config.Layers): change which set of options is showing and
+---redo whatever is up against it. Ignored unless targeting is open and the
+---player's job actually uses layers, so the key does nothing for anyone else.
+---
+---A target with nothing on the new layer closes its menu rather than showing an
+---empty one; targeting stays open, so the swap can be undone or the crosshair
+---moved on to something that does have options there.
+function Machine.cycleLayer()
+  if state == IDLE or state == RELEASING or not Layers.focus() then return end
+
+  local secondary = Layers.toggle()
+  Bridge.Notify(Locale(secondary and 'layer_secondary' or 'layer_primary'), 'inform')
+  Nui.sfx('scroll')
+
+  -- Indicators were filtered for the old layer.
+  Discovery.run(true)
+
+  if (state ~= MENU_OPEN and state ~= MAGNETISED) or not target then return end
+
+  -- A submenu, and a part the player picked, both belonged to the old layer.
+  menuName, menuHistory = nil, {}
+  partKey, partPinned, pinOffset = nil, false, nil
+
+  resolveTarget()
+  if #resolved == 0 then
+    release()
+    return
+  end
+
+  anchor = Hit.anchor(target, resolved)
+  if state == MENU_OPEN then sendMenu() end
+end
+
 local function confirm()
   local entry = resolved[focus]
   if not entry then return end
@@ -841,6 +891,9 @@ function Machine.start()
   requested = true
   if state ~= IDLE then return end
   if blocked() then return end
+
+  -- Every hold starts on the job's own options; letting go is the way back.
+  Layers.reset()
 
   Surfaces.init()
   Discovery.run(true)

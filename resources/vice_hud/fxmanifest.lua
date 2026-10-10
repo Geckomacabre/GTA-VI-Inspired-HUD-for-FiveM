@@ -65,6 +65,7 @@ client_scripts {
     'target/client/framework/standalone.lua',
     'target/client/target/player.lua',
     'target/client/target/store.lua',
+    'target/client/target/layers.lua',
     'target/client/api/native.lua',
     'target/client/api/qb.lua',
     'target/client/api/qtarget.lua',

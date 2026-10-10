@@ -39,8 +39,8 @@ per-passenger and per-pickpocket hooks below have them and the once-per-heist on
 | `drug_deal_rejected` | a buyer refuses the sale (a *clean* sale has no hook at all) | `tk_drugs/client/main_editable.lua` |
 | `drug_deal_caught` | a buyer calls the police on you | `tk_drugs/client/main_editable.lua` |
 | `aim_at_civilian` | you point a gun at a civilian (off by default) | this resource (`client/conduct.lua`) |
-| `greet_npc` | "Greet" ox_target option on a civilian | this resource (`client/conduct.lua`) |
-| `antagonize_npc` | "Antagonize" ox_target option on a civilian | this resource (`client/conduct.lua`) |
+| `greet_npc` | "Greet" world-action prompt on a civilian | this resource (`client/conduct.lua`) |
+| `antagonize_npc` | "Antagonize" world-action prompt on a civilian | this resource (`client/conduct.lua`) |
 | `fish_release` | you put a landed fish back | `fusion_fishing/server/fishing.lua` |
 | `geocache` | cache found or traded | `qbx_geocaching/server/main.lua` |
 | `bounty` | lawful bounty collected | `qbox_bounties/server/main.lua` |
@@ -174,7 +174,10 @@ and animals around you, with no dependency on any other resource. Tuned under
   holding a weapon are also treated as fair game (`armedPedsAreFairGame`) — a heuristic,
   since a dead ped drops its weapon quickly; the grace window is the reliable half of the
   check.
-- **Greet / Antagonize** are `ox_target` options on any ped (target it, pick the option).
+- **Greet / Antagonize** are always-visible `vice_hud` world-action prompts (LMB / RMB) on
+  whichever civilian ped you're actually aiming at, rather than an `ox_target` option — a ped
+  with 2+ target options always routes through ox_target's hold-third-eye menu, which these
+  were never meant to sit behind.
   Greet waves and ticks honor up (`Config.Hooks.greet_npc`); Antagonize intimidates and
   ticks honor down (`Config.Hooks.antagonize_npc`). Both read the player's own
   `qbx_reputation` standing if that resource is running, so a well-known criminal gets

@@ -208,13 +208,39 @@ end)
 -- ============================================================================
 -- Greeting / Antagonizing
 --
--- Both are exports.ox_target:addGlobalPed options rather than a command, so
--- ox_target owns targeting/range/prompt UI (same "Pickpocket" pattern
--- [UM]/um_beg/client/pickpocket.lua uses). canInteract is intentionally
--- omitted for the same reason that file's comment gives - ox_target calls it
--- from its own Lua state where this resource's globals don't exist - so the
--- civilian-type check happens inside onSelect instead. Selecting either
--- option on a non-civilian ped (cop, gang member, ...) is a silent no-op.
+-- ox_target migration (2026-09-10): this used to be rebuilt on vice_hud's
+-- raw ShowWorldActions instead of routing through ox_target at all (see
+-- this file's own git history for the previous version of this comment),
+-- because ox_target's UI at the time only had an always-on single-line
+-- prompt for a target with exactly ONE visible option -- the instant a ped
+-- had 2+ (Greet AND Antagonize together, and worse once um_beg's Pickpocket
+-- -- deliberately thirdEyeOnly, see that file -- was also on the same ped),
+-- the whole set got routed through the third-eye/menu system regardless of
+-- either option's own flag. Both were meant to stay always-visible RDR2-
+-- style prompts, not gated behind holding third-eye.
+--
+-- ox_target's driveUi now has a dedicated 2-3 option row branch for exactly
+-- this shape (simultaneous key prompts, e.g. "LMB: Greet  |  E: Antagonize"
+-- -- see ox_target/client/main.lua), so the custom vice_hud bypass is no
+-- longer needed: this is a plain exports.ox_target:addGlobalPed
+-- registration again, same pattern um_beg's Pickpocket uses.
+--
+-- ox_target reverted to third-eye-only reveal entirely (2026-09-11, see
+-- that resource's own client/main.lua header comment) -- nothing shows
+-- for ANY option, this pair included, until the player holds the
+-- third-eye keybind. A short-lived separate "focus" gesture (hold right
+-- click, camera nudges in) existed here in between those two points but
+-- is gone now that third-eye covers the same job for every option, not
+-- just this one -- no focusOnly flag needed any more.
+--
+-- Detection is now ox_target's own aim capsule-cast, not this file's own
+-- raycast loop -- still aim-only in practice, not proximity: ox_target's
+-- proximity fallback only ever substitutes a candidate with EXACTLY ONE
+-- visible option (see scanNearbyEntities' probeOptionCount gate in
+-- ox_target/client/main.lua), and this always registers two options
+-- (Greet + Antagonize) together, so it can only ever resolve via a real aim
+-- hit -- matching the original "while looking at the ped" intent without
+-- this file needing to raycast itself any more.
 --
 -- The reaction to either one reads the player's OWN qbx_reputation standing
 -- (client-cached, so this never blocks on a round-trip): a well-known
@@ -326,26 +352,20 @@ CreateThread(function()
 
     exports.ox_target:addGlobalPed({
         {
-            name = 'qbx_honor_greet',
+            name = 'qbx_honor:greet',
+            icon = 'fa-solid fa-hand',
             label = 'Greet',
-            icon = 'fas fa-hand-paper',
             distance = watcher.interactionDistance,
-            onSelect = function(data)
-                local target = data.entity
-                if not isGreetable(target) then return end
-                CreateThread(function() greet(target) end)
-            end,
+            canInteract = function(entity) return isGreetable(entity) end,
+            onSelect = function(data) greet(data.entity) end,
         },
         {
-            name = 'qbx_honor_antagonize',
+            name = 'qbx_honor:antagonize',
+            icon = 'fa-solid fa-face-angry',
             label = 'Antagonize',
-            icon = 'fas fa-hand-fist',
             distance = watcher.interactionDistance,
-            onSelect = function(data)
-                local target = data.entity
-                if not isGreetable(target) then return end
-                CreateThread(function() antagonize(target) end)
-            end,
+            canInteract = function(entity) return isGreetable(entity) end,
+            onSelect = function(data) antagonize(data.entity) end,
         },
     })
 end)

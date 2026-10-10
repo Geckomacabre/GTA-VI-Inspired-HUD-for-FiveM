@@ -27,6 +27,9 @@ Locales['en'] = {
   go_back = 'Back',
   no_options = 'Nothing to do here',
   toggle_targeting = 'Interact (osm-target)',
+  toggle_layer = 'Switch interaction set while targeting (osm-target)',
+  layer_primary = 'Job actions',
+  layer_secondary = 'Other actions',
 
   admin_no_perm = 'You do not have permission to do that.',
   admin_ingame_only = '/%s must be run in-game.',

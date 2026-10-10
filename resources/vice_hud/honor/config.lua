@@ -182,7 +182,7 @@ Config.Hooks = {
     kill_civilian   = { delta = -8,  cooldownMs = 4000, label = 'Killed a bystander', severity = 'terrible' },
     kill_animal     = { delta = -2,  cooldownMs = 4000, label = 'Killed an animal', severity = 'bad' },
     aim_at_civilian = { delta = -1,  cooldownMs = 45000, sessionCap = 6, label = 'Threatened a civilian', severity = 'bad' },
-    -- qbx_honor's conduct watcher: the ox_target "Antagonize" option on a civilian.
+    -- qbx_honor's conduct watcher: the "Antagonize" world-action prompt on a civilian.
     antagonize_npc  = { delta = -2,  cooldownMs = 45000, sessionCap = 8, label = 'Antagonized a civilian', severity = 'bad' },
 
     -- qbx_honor's own conduct watcher: a COP-type ped killed, full stop. Always
@@ -240,6 +240,11 @@ Config.Hooks = {
     -- loaf_bankrobbery: the big one.
     bank_robbery    = { delta = -12, label = 'Robbed a bank', severity = 'bad',
         escalate = { delta = -20, label = 'Robbed a bank in a firefight', severity = 'terrible' } },
+    -- safecracker: successfully dialling open a safe. cooldownMs guards against
+    -- a player spamming SafeCracker:server:cracked for the same safe; the real
+    -- anti-farm is whatever places the safe deciding when it may be cracked again.
+    safe_crack      = { delta = -6, cooldownMs = 30000, label = 'Cracked a safe', severity = 'bad',
+        escalate = { delta = -14, label = 'Cracked a safe with police on you', severity = 'terrible' } },
 
     -- tk_drugs: a CLEAN sale is deliberately not here at all - no hook, no
     -- honor change. Dealing only costs you when it goes wrong in public: the
@@ -266,7 +271,7 @@ Config.Hooks = {
     -- fusion_fishing: putting a landed fish back in the water instead of
     -- keeping it. Keeping the fish is deliberately neutral - no gain, no loss.
     fish_release    = { delta = 2,   cooldownMs = 30000, sessionCap = 20, label = 'Released a fish', severity = 'good' },
-    -- qbx_honor's conduct watcher: the ox_target "Greet" option on a civilian.
+    -- qbx_honor's conduct watcher: the "Greet" world-action prompt on a civilian.
     greet_npc       = { delta = 1,   cooldownMs = 180000, sessionCap = 6, label = 'Greeted a stranger', severity = 'good' },
     -- qbx_geocaching: finding or trading a cache.
     geocache        = { delta = 3, label = 'Found a geocache', severity = 'good' },
@@ -353,10 +358,12 @@ Config.ConductWatcher = {
     -- moment, but not always, which is what selfDefenceGraceMs is really for.
     armedPedsAreFairGame = true,
 
-    -- Greeting / Antagonizing. Both are ox_target options on any ped (filtered
-    -- to civilianPedTypes inside onSelect - see client/conduct.lua), so this is
-    -- just ox_target's own targeting distance for both. The real anti-farm is
-    -- Config.Hooks.greet_npc / antagonize_npc's cooldown/cap.
+    -- Greeting / Antagonizing. Both are vice_hud ShowWorldActions prompts
+    -- (LMB/RMB) on whichever ped is aimed at within this distance (filtered
+    -- to civilianPedTypes - see client/conduct.lua's isGreetable/raycast
+    -- thread), so this is that thread's own lib.raycast.fromCamera max
+    -- distance for both. The real anti-farm is Config.Hooks.greet_npc /
+    -- antagonize_npc's cooldown/cap.
     interactionDistance = 2.5,
 
     -- Pointing a gun at a civilian. Off by default: it fires on a very common

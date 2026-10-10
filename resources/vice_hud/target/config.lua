@@ -58,16 +58,36 @@ Config.Input = {
   -- with nothing specific to bind, every button on the pad triggers the action.
   -- Input.register checks the name for that reason.
   --
-  -- A shoulder button, not a trigger and not the d-pad, because on a pad both
-  -- of those are already carrying the game: the triggers are accelerate and
-  -- aim, and the d-pad is the radio while driving. Avoid LUP_INDEX/LDOWN_INDEX
-  -- for the same reason the confirm list avoids the triggers -- up and down
-  -- already move the focus through the list.
+  -- D-pad left, so that holding it leaves both shoulder buttons and every face
+  -- button free: Config.Input.layerPadKey (Y / Triangle) is pressed while it
+  -- is held, the pad half of the keyboard's Alt + Numpad +. Left rather than up
+  -- or down because those already move the focus through the list, and rather
+  -- than right because that is the part toggle (cyclePart). It was L1_INDEX
+  -- (LB / L1) before Config.Layers, which is a button players do reach for
+  -- with the other hand busy on a stick.
   --
   -- Both this and the keyboard key are rebindable by the player in FiveM's
   -- keybind settings, and like the keyboard key, a change here only takes
-  -- effect next session: ox_lib registers the bind once, at start.
-  padKey = 'L1_INDEX',  -- LB / L1
+  -- effect next session: ox_lib registers the bind once, at start. A player who
+  -- has already rebound it keeps their own choice.
+  padKey = 'LLEFT_INDEX',  -- D-pad left
+
+  -- Layer toggle (see Config.Layers): pressed while the targeting key is held,
+  -- swaps the rail between the job's own options and the ones behind them.
+  -- Their own keybind rather than a control read in the draw loop, so a player
+  -- can move it in FiveM's keybind settings like the two above.
+  --
+  -- ADD is Numpad +, the key name FiveM's keyboard mapper uses for it. A key
+  -- rather than a plain control id because 97 (the control whose default is
+  -- Numpad +) is shared with the scroll wheel, and that would swap layers every
+  -- time the wheel walked the rows.
+  layerKey = 'ADD',
+
+  -- Y / Triangle. Sits on Config.Input.directOptionKeys' second slot (203/204),
+  -- so Layers.padControl below names the control this maps to and the direct
+  -- prompt falls back to the ordinary cursor whenever the two would collide --
+  -- see computeMode in client/target/machine.lua.
+  layerPadKey = 'RUP_INDEX',
 
   -- Interaction mode: 'hold' or 'toggle'
   mode = 'hold',
@@ -223,6 +243,8 @@ Config.Input = {
     53,              -- Weapon special ability (physical Y)
     56,              -- Drop weapon (physical Y)
     74,              -- Vehicle headlight (physical d-pad right, shared with cyclePart)
+    52,              -- Context secondary (physical d-pad left, the pad targeting key)
+    85,              -- Vehicle radio wheel (physical d-pad left, the pad targeting key)
     75,              -- Exit vehicle (physical Y)
     81, 82, 83, 84,  -- Vehicle radio and weapon cycling
     99, 100,         -- Vehicle select next / prev weapon
@@ -234,6 +256,45 @@ Config.Input = {
     257, 263, 264,   -- Alternate attack controls
     331,             -- Vehicle radio wheel
   },
+}
+
+-- Option layers: keep a job's own prompts from sharing a menu with the ones that
+-- are always there.
+--
+-- Every ped carries Greet / Antagonize / Pickpocket, so a burger customer or a
+-- parcel recipient used to open a list where the job's own action was one row
+-- among three. For a player whose active job is in `focusJobs` the rail now
+-- shows only what is NOT in `secondary`; hold the targeting key and press
+-- Config.Input.layerKey (Numpad +) or Config.Input.layerPadKey (Y / Triangle)
+-- and it swaps to only what IS, and back. Any other job, or no job, sees
+-- everything together exactly as before -- the swap does nothing for them.
+--
+-- The layer starts on the job's options every time targeting is opened, so
+-- letting go of the key is always the way back.
+Config.Layers = {
+  enabled = true,
+
+  -- Active job NAMES (not types) that put the rail in focus mode. Only the job
+  -- the player is working now counts, not every job they own.
+  focusJobs = {
+    'postal',       -- Go Postal
+    'burgershot',   -- Burger Shot (no such job in qbx_core yet; um_burgershot
+                    -- also admits the 'vagos' gang, which is not a job)
+  },
+
+  -- Option NAMES that live on the secondary layer. A resource can instead tag
+  -- its own option with `layer = 'secondary'`, which is the better way for
+  -- anything new; this list is for options from resources that were not edited.
+  secondary = {
+    'qbx_honor:greet',
+    'qbx_honor:antagonize',
+    'um_hobos_pickpocket',
+  },
+
+  -- The control id layerPadKey lands on (RUP_INDEX -> 204, INPUT_FRONTEND_Y).
+  -- Only used to spot a direct prompt option that would fire on the same
+  -- button; keep it in step with Config.Input.layerPadKey.
+  padControl = 204,
 }
 
 Config.Interaction = {

@@ -49,6 +49,12 @@ function Adapter.GetJobType()
   return job and job.type or nil
 end
 
+function Adapter.GetJobName()
+  local data = playerData()
+  local job = data and data.job
+  return job and job.name or nil
+end
+
 -- Item count fallback: handled via ox_inventory in init.lua
 function Adapter.GetItemCount(_name) return nil end
 

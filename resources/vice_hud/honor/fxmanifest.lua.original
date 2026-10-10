@@ -9,6 +9,7 @@ version '1.1.0'
 lua54 'yes'
 
 shared_scripts {
+    '@ox_lib/init.lua',
     'config.lua',
 }
 
@@ -23,7 +24,15 @@ client_scripts {
     'client/debug.lua',
 }
 
+-- ox_target migrated back in (2026-09-10): Greet/Antagonize are a plain
+-- exports.ox_target:addGlobalPed registration again -- see
+-- client/conduct.lua's own comment on that section for why the earlier
+-- (2026-09-07) drop onto raw vice_hud:ShowWorldActions + this file's own
+-- raycast is no longer needed. vice_hud stays a dependency regardless --
+-- client/main.lua's honor toast is a separate, unrelated use of it.
 dependencies {
     'qbx_core',
+    'ox_lib',
     'ox_target',
+    'vice_hud',
 }

@@ -387,6 +387,86 @@ local function carOptions()
   }
 end
 
+-- Badge visuals for the three consumable categories ox_inventory's
+-- GetConsumableBadges export can return -- same colors vice_hud's own
+-- health/stamina/focus status rows use, so an item that restores one reads
+-- consistently whether you're looking at the HUD or this menu.
+local BADGE_STYLE = {
+  health  = { icon = 'heart', color = '#f5acc6' },
+  stamina = { icon = 'power', color = '#5fd8c8' },
+  focus   = { icon = 'eye',   color = '#b98bd6' },
+}
+
+---Real ox_inventory item as a target option -- label from Bridge.GetItemLabel,
+---badges from Bridge.GetConsumableBadges (both wrapping ox_inventory exports
+---added alongside this feature). Returns nil if ox_inventory doesn't know the
+---item (not running, or a typo'd name), so a caller can just skip it.
+---@param name string ox_inventory item name
+local function realItemOption(name)
+  local label = Bridge.GetItemLabel(name)
+  if not label then return nil end
+
+  local badges
+  for _, category in ipairs(Bridge.GetConsumableBadges(name) or {}) do
+    local style = BADGE_STYLE[category]
+    if style then
+      badges = badges or {}
+      badges[#badges + 1] = style
+    end
+  end
+
+  return {
+    name = 'osm:test:consumables:' .. name,
+    label = label,
+    badges = badges,
+    -- Real consumption, not an announcement: useItem takes a slot, not a
+    -- bare name (see modules/inventory/client.lua's Search('slots', ...)),
+    -- so the actual slot is looked up on select rather than cached -- the
+    -- player could pick one up or use their last one between menu opens.
+    -- If it plays out (anim, hunger/thirst,
+    -- vice_hud.restoreStamina*/restoreFocus*/health_items.* and all), that's
+    -- proof the badge shown here matches what the item actually does. If the
+    -- player doesn't have one, ox_inventory's own notify says so.
+    onSelect = function()
+      local ok, slots = pcall(function() return exports.ox_inventory:Search('slots', name) end)
+      local slot = ok and slots and slots[1]
+      if slot then
+        exports.ox_inventory:useItem(slot)
+      else
+        Bridge.Notify(("You don't have a %s"):format(label), 'error')
+      end
+    end,
+  }
+end
+
+---Generate consumables test options: real food/drink/medkit items pulled
+---straight out of ox_inventory, badges computed from what they actually
+---restore -- proof the badge wiring tracks real item data instead of a
+---hand-typed fixture. 'ifaks' is included deliberately badge-less (no
+---client.export on that item) as the contrast case. Falls back to a single
+---notice row if ox_inventory isn't running.
+local function consumablesOptions()
+  local names = { 'sandwich', 'green_tea', 'medikit', 'ifaks' }
+  local options = {}
+
+  for _, name in ipairs(names) do
+    local option = realItemOption(name)
+    if option then options[#options + 1] = option end
+  end
+
+  if #options == 0 then
+    return {
+      {
+        name = 'osm:test:consumables:none',
+        label = 'ox_inventory is not running',
+        canInteract = function() return false end,
+      },
+    }
+  end
+
+  return options
+end
+
 local function removeTestSubject()
   if not testPed then return false end
 
@@ -400,7 +480,7 @@ local function removeTestSubject()
 end
 
 ---Spawn test subject: create test ped carrying representative options.
----@param variant string? 'fridge' | 'car' | standard
+---@param variant string? 'fridge' | 'car' | 'consumables' | standard
 function Debug.spawnTestSubject(variant)
   removeTestSubject()
 
@@ -431,7 +511,8 @@ function Debug.spawnTestSubject(variant)
 
   local options = testOptions()
   if variant == 'fridge' then options = fridgeOptions()
-  elseif variant == 'car' then options = carOptions() end
+  elseif variant == 'car' then options = carOptions()
+  elseif variant == 'consumables' then options = consumablesOptions() end
   Api.addLocalEntity(testPed, options)
   Bridge.Notify(Locale('test_spawned', Config.Commands.test), 'success')
 end

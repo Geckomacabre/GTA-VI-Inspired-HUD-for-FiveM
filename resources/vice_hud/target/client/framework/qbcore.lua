@@ -58,6 +58,12 @@ function Adapter.GetJobType()
   return job and job.type or nil
 end
 
+function Adapter.GetJobName()
+  local data = playerData()
+  local job = data and data.job
+  return job and job.name or nil
+end
+
 ---Count inventory items: aggregate item quantity across player inventory slots.
 function Adapter.GetItemCount(name)
   local data = playerData()

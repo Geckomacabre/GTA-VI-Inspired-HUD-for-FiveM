@@ -13,6 +13,10 @@ Adapter = {
   GetCitizenId = function() return nil end,
   ---@return string? qb-target job type ('leo', 'ems', ...) for jobType gates
   GetJobType = function() return nil end,
+  ---@return string? name of the job the player is working right now, not every
+  ---job they own -- GetGroups merges those, which is right for gates but would
+  ---put a multi-job player in another job's Config.Layers focus mode
+  GetJobName = function() return nil end,
   ---@return number count of an item in the player's inventory, or nil if unknown
   GetItemCount = function(_name) return nil end,
   ---@return string? display label for a group name
@@ -75,6 +79,18 @@ function Bridge.GetItemLabel(name)
   return Adapter.GetItemLabel(name)
 end
 
+--- 'health'/'stamina'/'focus' categories for an item, derived from its own
+--- client.export by ox_inventory's GetConsumableBadges export -- ox_inventory
+--- specific (like the label cache above, no other Adapter knows what a
+--- consumable even is), so nil outside it rather than a fake Adapter path.
+function Bridge.GetConsumableBadges(name)
+  if not Bridge.UseOxInventory then return nil end
+  local ok, badges = pcall(function()
+    return exports.ox_inventory:GetConsumableBadges(name)
+  end)
+  return ok and badges or nil
+end
+
 ---Invalidate player cache: placeholder replaced by player module at startup.
 function Bridge.InvalidatePlayerState() end
 
@@ -82,6 +98,7 @@ function Bridge.GetGroups()      return Adapter.GetGroups() or {} end
 function Bridge.GetGangs()       return Adapter.GetGangs() or {} end
 function Bridge.GetCitizenId()   return Adapter.GetCitizenId() end
 function Bridge.GetJobType()     return Adapter.GetJobType() end
+function Bridge.GetJobName()     return Adapter.GetJobName() end
 function Bridge.GetGroupLabel(n) return Adapter.GetGroupLabel(n) end
 
 ---Whether targeting should be allowed at all yet. Never lets an adapter fault

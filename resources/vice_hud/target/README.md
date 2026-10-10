@@ -212,6 +212,16 @@ compared to [upstream](https://github.com/OsmFX-Mods/osm-target):
   actually bound instead of a hardcoded glyph.
 - **Vehicle door options ship on by default** (`config.lua`), rather than
   requiring manual configuration.
+- **Option layers** (`Config.Layers`, `client/target/layers.lua`). A ped that
+  carries always-there options (Greet, Antagonize, Pickpocket) used to open a
+  list where a job's own action was one row among several. For a player whose
+  active job is listed in `Config.Layers.focusJobs`, the rail now shows only
+  the job's options; holding the targeting key and pressing the layer key
+  (Numpad + / Y or Triangle, both rebindable) swaps to the others and back.
+  Options are put on the second layer by name in `Config.Layers.secondary`, or
+  by a resource tagging its own option `layer = 'secondary'`. Everyone else
+  sees one list, as before. The pad's targeting button moves from LB / L1 to
+  D-pad left to make room.
 - **No OsmFX Mods marketing assets.** Upstream's `docs/media/` includes
   promotional preview images of the paid `Target VI` pack (`tvi-2.webp`
   through `tvi-5.webp`); this fork does not include them.

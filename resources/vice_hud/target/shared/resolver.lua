@@ -172,6 +172,13 @@ function Resolver.evaluate(option, ctx, distance)
     return Resolver.HIDDEN
   end
 
+  -- Option layers (Config.Layers): while a layer is active the other one is not
+  -- shown at all. Left to the context rather than read from Config here because
+  -- this file is shared, and nil means layering is off and everything shows.
+  if ctx.layer and ctx.layerOf and ctx.layerOf(option) ~= ctx.layer then
+    return Resolver.HIDDEN
+  end
+
   distance = distance or ctx.distance or 0
   local maxDistance = option.distance or policy.defaultDistance or 7.0
   if distance > maxDistance then

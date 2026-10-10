@@ -37,11 +37,16 @@ local ctx = {
   player = nil,
   policy = nil,
   menu = nil,
+  layer = nil,
+  layerOf = Layers.of,
 }
 
 local function beginPass()
   ctx.player = Player.state()
   ctx.policy = Config.Options
+  -- A marker on something whose only options are on the other layer would lead
+  -- to a menu that opens empty, so the world indicators follow the layer too.
+  ctx.layer = Layers.active(ctx.player)
 end
 
 ---Populate probe context: set distance, entity handle, and world coordinates.

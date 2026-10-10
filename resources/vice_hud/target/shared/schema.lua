@@ -20,6 +20,10 @@ Schema.RESERVED = {
   command = true, qbCommand = true, openMenu = true, menuName = true,
 
   order = true, index = true, resource = true,
+
+  -- 'secondary' puts the option on the layer behind Config.Input.layerKey
+  -- instead of the one a focus-job player sees first (see Config.Layers)
+  layer = true,
   dialect = true, qb = true, qtarget = true,
 }
 

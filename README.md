@@ -193,7 +193,7 @@ included here.
   Rail* design — the look-at-it-and-choose interaction list, drawn in the
   world rather than on the screen. The code is
   [Geckomacabre/osm-target](https://github.com/Geckomacabre/osm-target)
-  (commit `228aebb`), which is itself a **modified fork** of
+  (commit `cfbab26`, with option layers), which is itself a **modified fork** of
   [osm-target by OsmFX Mods](https://github.com/OsmFX-Mods/osm-target) and
   not an official, endorsed or supported OsmFX Mods release; the original
   and its support are at <https://osmfxmods.com>. `vice_hud` therefore
