@@ -1,41 +1,60 @@
 # vi_crashcam
 
-A GTA VI style crash cam. Hit something hard enough and the game cuts away:
-a couple of black frames, then a low camera at the roadside watching your car
-go by in slow motion with the HUD off, then a short fade back into the seat.
+The GTA VI crash cam. Crash hard enough and:
 
-Standalone. If `vice_hud` is running its HUD is hidden for the length of the
-shot; without it the native HUD and radar are hidden and that is all there is
-to hide.
+1. the hit plays out, already slowed, from wherever you were looking;
+2. the game cuts hard to a camera standing well back from the car, with the
+   edges of the screen closed in and the HUD gone, for a little over three
+   seconds;
+3. it cuts hard back to **exactly the view you had** (behind, to one side, from
+   the bonnet), time runs back up to normal, and the HUD returns a moment later.
 
-## Install
-
-```
-ensure vi_crashcam
-```
-
-`/crashcam` plays the shot on the car you are sitting in, without needing a
-crash — use it to check the camera on your own server before trusting it to a
-real one.
+Timed off the reference crashes, which all go that way.
 
 ## What counts as a crash
 
-Speed lost in almost no time. With the defaults you have to be doing 80 km/h
-or more and lose 45 km/h of it inside a tenth of a second, which braking
-cannot do and a wall can. Both numbers, the length of the shot, how slow it
-is, where the camera stands and the 20 second cooldown are in `config.lua`.
+A lot of speed lost in almost no time: by default 80 km/h or more beforehand
+and 45 km/h of it gone inside a tenth of a second. Braking cannot do that, so
+it never triggers on a hard stop. One shot per 20 seconds at most, and only for
+the driver unless `Config.DriverOnly` is off.
 
-## For other resources
+`/crashcam` plays the shot on the car you are sitting in, without a crash.
+
+## The picture
+
+- **Where the camera stands.** `Config.Shots` lists the places it can go (low at
+  the roadside, further up the road with the car coming to it, up and well back
+  looking down). Each is tried on both sides and closer in, and one with a clear
+  view of the car is picked at random, so two crashes in a row are not filmed
+  the same way.
+- **The overlay.** With `vice_hud` running it is the same kind of effect as its
+  Focus one, in black instead of purple: the edges of the screen closed in,
+  breathing slowly, with thin bars top and bottom. Without `vice_hud` only the
+  bars are drawn. `Config.Overlay` sets how strong, how tall the bars are, and
+  whether it breathes.
+- **Hard cuts.** The reference cuts both ways. `Config.BlackFlashMs` and
+  `Config.FadeInMs` are there if you want a few black frames in or a fade back.
+- **A little hand movement** on the camera (`Config.HandShake`).
+
+## On a server
+
+Slow motion is `SetTimeScale`, which slows this client only. For those few
+seconds other players see this car move slowly and then catch up. That is the
+price of slow motion in multiplayer, and the reason the shot is short and has a
+cooldown.
+
+## For other scripts
 
 ```lua
-exports.vi_crashcam:PlayCrashCam()            -- on the player's current vehicle
-exports.vi_crashcam:SetCrashCamEnabled(false) -- e.g. for the length of a race
+exports.vi_crashcam:PlayCrashCam()              -- on the current vehicle
+exports.vi_crashcam:SetCrashCamEnabled(false)   -- e.g. during a race
 exports.vi_crashcam:IsCrashCamPlaying()
 ```
 
-## One thing to know
+## Install
 
-Slow motion is `SetTimeScale`, which slows the game for the player it happens
-to and nobody else. For those few seconds other players see that car move
-slowly and then catch up. That is why the shot is short and has a cooldown,
-and why a race resource may want to switch it off while a race is running.
+Copy the folder into `resources/` and `ensure vi_crashcam`. No dependencies.
+
+## Licence
+
+CC BY-NC-SA 4.0, like the rest of this repository.

@@ -24,24 +24,54 @@ Config.DriverOnly = true
 Config.CooldownMs = 20000
 
 -- ---- the shot ---------------------------------------------------------------
--- Timed off the reference clip: a couple of black frames on the cut, about
--- 3.8 seconds of slow motion from a low camera at the roadside that turns to
--- keep the car in frame, then a short fade back into the driver's seat.
+-- Timed off the reference crashes, which all go the same way:
+--
+--   1. the hit itself, already slowed, still seen from where you were sitting
+--   2. a hard cut to a camera standing well back from the car, the screen's
+--      edges closed in and the HUD gone, for a little over three seconds
+--   3. a hard cut back to exactly the view you had before, time running back
+--      up to normal, and the HUD returning a moment after that
+--
+-- All of these are REAL milliseconds, not slowed ones.
 Config.TimeScale    = 0.2      -- 1.0 is real time
-Config.DurationMs   = 3800     -- REAL time, not slowed time
-Config.BlackFlashMs = 60       -- the cut in; 0 for a plain cut
-Config.FadeInMs     = 350      -- the cut back
+Config.ImpactHoldMs = 350      -- step 1
+Config.DurationMs   = 3400     -- step 2
+Config.EaseOutMs    = 450      -- step 3: how long time takes to run back up
+Config.HudReturnMs  = 800      -- step 3: how long after the cut the HUD comes back
 
--- Where the camera goes, relative to the way the car was travelling just
--- before it hit: `ahead` metres further down the road, `side` metres off to
--- one side of it, `height` metres above the ground there. Whichever side has
--- a clear view of the car is used.
-Config.Camera = {
-    ahead  = 5.0,
-    side   = 10.0,
-    height = 0.7,
-    fov    = 45.0,
+-- The reference cuts hard both ways. Set these above 0 for a few black frames
+-- on the way in, or a fade on the way back.
+Config.BlackFlashMs = 0
+Config.FadeInMs     = 0
+
+-- What is laid over the picture during the shot. With vice_hud running it is
+-- the same kind of effect as its Focus one: the edges of the screen closed in,
+-- breathing slowly, in black instead of purple, with thin bars top and
+-- bottom. Without vice_hud only the bars are drawn.
+Config.Overlay = {
+    enabled  = true,
+    strength = 1.0,     -- how dark the edges go; 0 to 2
+    bars     = 0.032,   -- height of each bar as a fraction of the screen; 0 for none
+    pulse    = true,    -- the slow breathing; false for a still vignette
 }
+
+-- Where the camera can stand. Each is tried on both sides of the road and
+-- closer in if something is in the way, and one with a clear view of the car
+-- is picked at random, so two crashes in a row do not look the same.
+--
+--   ahead    metres further along the way the car was travelling
+--   side     metres off to one side of that line
+--   height   metres above the ground there
+--   fov      field of view; lower is more zoomed in
+Config.Shots = {
+    { ahead = 6.0,  side = 15.0, height = 0.6, fov = 40.0 },   -- low at the roadside, side on
+    { ahead = 16.0, side = 7.0,  height = 0.9, fov = 36.0 },   -- low, further up the road, the car coming to it
+    { ahead = 4.0,  side = 19.0, height = 7.5, fov = 42.0 },   -- up and well back, looking down on it
+}
+
+-- A little handheld movement on the camera, so the shot is not dead still.
+-- 0 turns it off.
+Config.HandShake = 0.25
 
 -- /crashcam plays the shot on the car you are sitting in, without a crash.
 -- Set to false to register no command at all.

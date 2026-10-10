@@ -1,9 +1,11 @@
 --[[ ===========================================================================
      vi_crashcam — client
      ---------------------------------------------------------------------------
-     Crash hard enough and the game cuts away: a couple of black frames, then a
-     low camera at the roadside watching the car go by in slow motion with the
-     HUD off, then a short fade back into the seat.
+     Crash hard enough and the game cuts away. The hit itself is seen, already
+     slowed, from wherever you were looking; then a hard cut to a camera
+     standing well back from the car, the edges of the screen closed in and the
+     HUD gone; then a hard cut back to exactly the view you had, with time
+     running back up to normal.
 
      Everything here is local to the player it happens to. SetTimeScale slows
      this client's simulation only, so for those few seconds other players see
@@ -22,91 +24,100 @@ local enabled = Config.Enabled ~= false
 local playing = false
 local readyAt = 0               -- GetGameTimer() before which nothing triggers
 local activeCam = nil
+local hudOverlay = false        -- vice_hud is drawing the overlay (else the bars are native)
+local hudHidden = false
 
--- =============================================================================
--- Real time
--- =============================================================================
--- The shot has to last DurationMs on the wall, and the game is running at a
--- fifth of its speed while it does. Network time is not slowed by the time
--- scale; the game timer may be, so it is only the floor under it -- whichever
--- clock says more time has passed is believed, which is right if either one
--- is honest.
+-- Two clocks, because slow motion stretches the game timer. Whichever has
+-- moved further is the real one.
 local function clocks()
     return GetNetworkTimeAccurate(), GetGameTimer()
 end
-
 local function elapsedSince(net0, game0)
     local net, game = clocks()
     return math.max(net - net0, game - game0)
 end
 
--- =============================================================================
--- HUD
--- =============================================================================
-local function setHud(visible)
-    if GetResourceState('vice_hud') ~= 'started' then return end
-    -- vice_hud hides itself on death and shows itself again on revive, once
-    -- per transition. Handing the HUD back to a player who died in the crash
-    -- would undo the first half of that and nothing would redo it.
-    if visible and IsEntityDead(PlayerPedId()) then return end
-    pcall(function() exports.vice_hud:SetHudVisible(visible) end)
+local function hudRunning()
+    return GetResourceState('vice_hud') == 'started'
 end
 
--- =============================================================================
--- Where the camera goes
--- =============================================================================
+local function setHud(visible)
+    if not hudRunning() then return end
+    -- A crash that kills hands the screen to whatever draws death; putting the
+    -- HUD back over that is not this resource's call.
+    if visible and IsEntityDead(PlayerPedId()) then return end
+    pcall(function() exports.vice_hud:SetHudVisible(visible) end)
+    hudHidden = not visible
+end
+
+-- The edges of the screen closing in. vice_hud draws it when it is there (its
+-- Focus effect, in black, with bars); without it the bars alone are drawn per
+-- frame from here.
+local function setOverlay(on)
+    local o = Config.Overlay
+    if not o or o.enabled == false then hudOverlay = false return end
+    local ok = hudRunning() and pcall(function()
+        exports.vice_hud:SetCinematicFx(on, { strength = o.strength, bars = o.bars, pulse = o.pulse })
+    end)
+    hudOverlay = ok and on or false
+end
+
+local function drawBars()
+    local o = Config.Overlay
+    if hudOverlay or not o or o.enabled == false then return end
+    local h = tonumber(o.bars) or 0.0
+    if h <= 0.0 then return end
+    DrawRect(0.5, h / 2, 1.0, h, 0, 0, 0, 255)
+    DrawRect(0.5, 1.0 - h / 2, 1.0, h, 0, 0, 0, 255)
+end
+
 local function flat(v)
     local len = math.sqrt(v.x * v.x + v.y * v.y)
     if len < 0.001 then return nil end
     return vector3(v.x / len, v.y / len, 0.0)
 end
 
+-- Can the camera, standing at `from`, see the car? Anything solid in between
+-- (a wall, a truck, the barrier the car just went through) rules the spot out.
 local function clearView(from, veh)
     local to = GetEntityCoords(veh) + vector3(0.0, 0.0, 0.5)
-    -- 1 = world, 16 = objects. Other vehicles are allowed to pass through the
-    -- shot; a wall between the camera and the car is not.
     local ray = StartExpensiveSynchronousShapeTestLosProbe(
         from.x, from.y, from.z, to.x, to.y, to.z, 1 | 16, veh, 4)
     local _, hit = GetShapeTestResult(ray)
-    -- `hit` has been a 0/1 number on some builds and a boolean on others.
     return hit == 0 or hit == false
 end
 
---- `dir` is the direction of travel just before the hit. The camera goes
---- further along it and off to one side, so the car comes TOWARDS the shot
---- and across it rather than away -- on the ground at the roadside, where a
---- person filming would be standing.
+-- One of Config.Shots, placed. The list is walked from a random start so two
+-- crashes in a row are not filmed the same way; each shot is tried on both
+-- sides of the line of travel, then closer in.
 local function findSpot(veh, dir)
-    local cam = Config.Camera
+    local shots = Config.Shots
     local pos = GetEntityCoords(veh)
     dir = dir or flat(GetEntityForwardVector(veh)) or vector3(0.0, 1.0, 0.0)
     local side = vector3(-dir.y, dir.x, 0.0)
+    local first = math.random(1, #shots)
+    local firstSign = math.random(0, 1) == 0 and 1.0 or -1.0
 
-    -- Full distance on either side first, then pulled in: a tunnel or a
-    -- narrow street has no room ten metres out, and a closer shot beats a
-    -- camera inside a wall.
-    for _, scale in ipairs({ 1.0, 0.6, 0.35 }) do
-        for _, sign in ipairs({ 1.0, -1.0 }) do
-            local at = pos + dir * (cam.ahead * scale) + side * (cam.side * scale * sign)
-            local found, groundZ = GetGroundZFor_3dCoord(at.x, at.y, pos.z + 2.0, false)
-            -- Ground a long way below the car is the road under a bridge, or
-            -- the sea: not somewhere to stand.
-            if found and math.abs(groundZ - pos.z) < 3.5 then
-                local spot = vector3(at.x, at.y, groundZ + cam.height)
-                if clearView(spot, veh) then return spot end
+    for step = 0, #shots - 1 do
+        local shot = shots[((first - 1 + step) % #shots) + 1]
+        for _, scale in ipairs({ 1.0, 0.65, 0.4 }) do
+            for _, sign in ipairs({ firstSign, -firstSign }) do
+                local at = pos + dir * (shot.ahead * scale) + side * (shot.side * scale * sign)
+                local found, groundZ = GetGroundZFor_3dCoord(at.x, at.y, pos.z + 3.0, false)
+                if found and math.abs(groundZ - pos.z) < 4.0 then
+                    local spot = vector3(at.x, at.y, groundZ + shot.height)
+                    if clearView(spot, veh) then return spot, shot.fov end
+                end
             end
         end
     end
 
-    -- Nowhere on the ground works. Above and behind always has a view.
-    return pos - dir * 6.0 + side * 3.0 + vector3(0.0, 0.0, 2.5)
+    -- Nothing had a clear view (a tunnel, a multi-storey): stand just behind
+    -- and above the car instead of not filming it at all.
+    return pos - dir * 7.0 + side * 3.5 + vector3(0.0, 0.0, 2.8), 45.0
 end
 
--- =============================================================================
--- The shot
--- =============================================================================
-local function restore()
-    SetTimeScale(1.0)
+local function dropCam()
     if activeCam then
         RenderScriptCams(false, false, 0, true, false)
         DestroyCam(activeCam, false)
@@ -114,64 +125,102 @@ local function restore()
     end
 end
 
+-- Hold for `ms` of real time, running `each` every frame.
+local function hold(ms, each)
+    local net0, game0 = clocks()
+    local frames = 0
+    while elapsedSince(net0, game0) < ms and frames < 3000 do
+        if each and each(elapsedSince(net0, game0) / ms) == false then break end
+        frames = frames + 1
+        Wait(0)
+    end
+end
+
 local function play(veh, dir)
     if playing or not DoesEntityExist(veh) then return end
-    -- Something else already owns the screen (a respawn, a loading fade).
     if IsScreenFadedOut() or IsScreenFadingOut() or IsPauseMenuActive() then return end
     playing = true
 
     local ok, err = pcall(function()
-        local spot = findSpot(veh, dir)
+        -- Where the player's own camera is, measured against the car, so the
+        -- view can be handed back exactly as it was: behind, to one side,
+        -- from the bonnet, whatever they had.
+        local view = {
+            heading = GetGameplayCamRelativeHeading(),
+            pitch = GetGameplayCamRelativePitch(),
+            mode = GetFollowVehicleCamViewMode(),
+        }
 
+        -- 1. The hit, slowed, from the seat.
+        SetTimeScale(Config.TimeScale)
+        setOverlay(true)
+        hold(Config.ImpactHoldMs, drawBars)
+
+        -- 2. The cut. The spot is chosen now rather than at the moment of the
+        -- hit, so it is placed against where the car has ended up heading.
+        if not DoesEntityExist(veh) then return end
+        local spot, fov = findSpot(veh, dir)
         if Config.BlackFlashMs > 0 then
             DoScreenFadeOut(0)
             Wait(Config.BlackFlashMs)
         end
-
         activeCam = CreateCamWithParams('DEFAULT_SCRIPTED_CAMERA',
-            spot.x, spot.y, spot.z, 0.0, 0.0, 0.0, Config.Camera.fov, false, 2)
-        -- Pointed AT the car rather than given a rotation, so it turns to
-        -- follow as the car slides past, the way the reference shot does.
+            spot.x, spot.y, spot.z, 0.0, 0.0, 0.0, fov, false, 2)
         PointCamAtEntity(activeCam, veh, 0.0, 0.0, 0.3, true)
+        if (Config.HandShake or 0) > 0 then ShakeCam(activeCam, 'HAND_SHAKE', Config.HandShake + 0.0) end
         SetCamActive(activeCam, true)
         RenderScriptCams(true, false, 0, true, false)
-
         setHud(false)
-        SetTimeScale(Config.TimeScale)
-        DoScreenFadeIn(0)
+        if Config.BlackFlashMs > 0 then DoScreenFadeIn(0) end
 
-        local net0, game0 = clocks()
-        local frames = 0
-        -- The frame cap is a backstop for both clocks failing at once: the
-        -- worst it can do is end the shot late, where without it the shot
-        -- would not end at all.
-        while elapsedSince(net0, game0) < Config.DurationMs and frames < 3000 do
+        hold(Config.DurationMs, function()
             HideHudAndRadarThisFrame()
-            if not DoesEntityExist(veh) then break end
-            frames = frames + 1
-            Wait(0)
-        end
+            drawBars()
+            return DoesEntityExist(veh)
+        end)
 
-        -- Back into the seat behind a fade, so the camera change is not seen.
+        -- 3. Back to the view the player had.
         if Config.FadeInMs > 0 then DoScreenFadeOut(0) end
-        restore()
-        Wait(0)
+        dropCam()
+        setOverlay(false)
+        if GetVehiclePedIsIn(PlayerPedId(), false) ~= 0 then
+            SetFollowVehicleCamViewMode(view.mode)
+        end
+        SetGameplayCamRelativeHeading(view.heading)
+        SetGameplayCamRelativePitch(view.pitch, 1.0)
         if Config.FadeInMs > 0 then DoScreenFadeIn(Config.FadeInMs) end
+
+        -- Time runs back up rather than snapping, and the camera is put back
+        -- once more on the next frame: the first frame after a scripted
+        -- camera is the one the game is most likely to override.
+        local resetAgain = true
+        hold(math.max(Config.EaseOutMs, 1), function(t)
+            SetTimeScale(Config.TimeScale + (1.0 - Config.TimeScale) * math.min(t, 1.0))
+            HideHudAndRadarThisFrame()
+            if resetAgain then
+                resetAgain = false
+                SetGameplayCamRelativeHeading(view.heading)
+                SetGameplayCamRelativePitch(view.pitch, 1.0)
+            end
+        end)
+        SetTimeScale(1.0)
+
+        hold(math.max(Config.HudReturnMs - Config.EaseOutMs, 0), function() HideHudAndRadarThisFrame() end)
     end)
 
-    -- Whatever happened in there, the player gets their game back.
-    restore()
+    -- However it ended, the game is left as it was found.
+    SetTimeScale(1.0)
+    dropCam()
+    setOverlay(false)
     if IsScreenFadedOut() then DoScreenFadeIn(0) end
-    setHud(true)
+    if hudHidden then setHud(true) end
+
     readyAt = GetGameTimer() + Config.CooldownMs
     playing = false
-
     if not ok then print('^1[vi_crashcam]^7 ' .. tostring(err)) end
 end
 
--- =============================================================================
--- Noticing a crash
--- =============================================================================
+-- Detection: the speed one sample ago against the speed now.
 CreateThread(function()
     local lastVeh, lastSpeed, lastPos, lastDir = 0, 0.0, nil, nil
 
@@ -188,20 +237,19 @@ CreateThread(function()
             local speed = GetEntitySpeed(veh) * KMH
             local pos = GetEntityCoords(veh)
 
+            -- The distance test keeps a teleport (a garage, an admin goto)
+            -- from reading as the biggest crash of all time.
             if veh == lastVeh and lastPos
                 and lastSpeed >= Config.MinSpeed
                 and lastSpeed - speed >= Config.MinSpeedLoss
-                -- A teleport (a garage, an admin) is also 100 to 0 in one
-                -- sample. A crash does not move you forty metres.
                 and #(pos - lastPos) < 40.0
                 and GetGameTimer() >= readyAt then
                 play(veh, lastDir)
                 lastVeh, lastSpeed, lastPos, lastDir = 0, 0.0, nil, nil
             else
-                -- The direction is kept from BEFORE the hit: afterwards the
-                -- car may be spinning, stopped or going backwards, and none
-                -- of those say which way the road runs.
                 lastVeh, lastSpeed, lastPos = veh, speed, pos
+                -- The way it was GOING, kept from before the hit: afterwards
+                -- the car may be spinning or stopped and has no useful heading.
                 lastDir = flat(GetEntityVelocity(veh)) or lastDir
             end
             Wait(Config.SampleMs)
@@ -209,9 +257,6 @@ CreateThread(function()
     end
 end)
 
--- =============================================================================
--- API, test command, cleanup
--- =============================================================================
 local function playOnCurrent()
     local veh = GetVehiclePedIsIn(PlayerPedId(), false)
     if veh == 0 then return false end
@@ -231,11 +276,12 @@ if Config.TestCommand then
     end, false)
 end
 
--- A restart mid-shot must not leave the game at a fifth of its speed behind a
--- camera nobody owns any more.
+-- Stopped mid-shot: put the game back.
 AddEventHandler('onResourceStop', function(res)
     if res ~= GetCurrentResourceName() or not playing then return end
-    restore()
+    SetTimeScale(1.0)
+    dropCam()
+    setOverlay(false)
     DoScreenFadeIn(0)
-    setHud(true)
+    if hudHidden then setHud(true) end
 end)
