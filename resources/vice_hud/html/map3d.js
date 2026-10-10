@@ -733,12 +733,36 @@
 
     // The HUD's own panels sit on the map's top edge, so nothing pinned to the
     // edge is allowed to hang over that one: it would be half hidden.
-    function clear(at, size) { return at.y < size * 0.46 ? { x: at.x, y: size * 0.46 } : at; }
+    //
+    // And the distance to the waypoint is written in the map's top-left corner,
+    // which is exactly where a waypoint ahead and to the left gets pinned. So
+    // a pinned thing that would land on the figure is slid out from under it,
+    // along the top edge or down the side, whichever is the shorter way.
+    var keepOut = null, keepOutAt = -1e9;
+    function findKeepOut(V, now) {
+        if (now - keepOutAt < 400) return;
+        keepOutAt = now;
+        keepOut = null;
+        var el = document.getElementById('nav-compass');
+        if (!el || el.classList.contains('hidden') || !el.offsetWidth || !canvas.clientHeight) return;
+        var a = el.getBoundingClientRect(), c = canvas.getBoundingClientRect(), k = V.Hc / c.height;
+        keepOut = { x0: (a.left - c.left) * k - V.m, y0: (a.top - c.top) * k - V.m,
+                    x1: (a.right - c.left) * k - V.m, y1: (a.bottom - c.top) * k - V.m };
+    }
+    function clear(at, size) {
+        var r = size * 0.46, x = at.x, y = Math.max(at.y, r), k = keepOut;
+        if (k && x + r > k.x0 && x - r < k.x1 && y + r > k.y0 && y - r < k.y1) {
+            var right = k.x1 + r - x, down = k.y1 + r - y;
+            if (right <= down) x = k.x1 + r; else y = k.y1 + r;
+        }
+        return (x === at.x && y === at.y) ? at : { x: x, y: y };
+    }
 
     function drawSprites(V) {
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         var corner = V.corner, m = V.m;
         var size = VIEW.blip * V.unit, dots = [], marks = [], i, b, p, at, on, cell, cols, rows, cx, cy;
+        findKeepOut(V, performance.now());
 
         // Where each route ends. Worked out first, because a blip standing on
         // one is drawn as part of it and not a second time beside it.
@@ -799,10 +823,18 @@
             sprite(q.x + m, q.y + m, VIEW.end.ring * V.unit, 0, c[0], c[1], c[2], c[3], [end.ring[0] / 255, end.ring[1] / 255, end.ring[2] / 255, 1]);
         }
 
+        // North gives way to a route's end: heading north, the two are pinned
+        // to the same spot, and the destination is the one worth seeing.
         if (VIEW.north) {
             at = clear(edgePoint(V, Math.sin(V.rad), -Math.cos(V.rad), corner, 0), 10.8 * V.unit);
-            c = uiCell(UI.north);
-            sprite(at.x + m, at.y + m, 10.8 * V.unit, 0, c[0], c[1], c[2], c[3], [1, 1, 1, 1]);
+            var room = (VIEW.end.ring + 10.8) * V.unit * 0.5, crowded = false;
+            for (i = 0; i < marks.length; i++) {
+                if (Math.hypot(marks[i].at.x - at.x, marks[i].at.y - at.y) < room) crowded = true;
+            }
+            if (!crowded) {
+                c = uiCell(UI.north);
+                sprite(at.x + m, at.y + m, 10.8 * V.unit, 0, c[0], c[1], c[2], c[3], [1, 1, 1, 1]);
+            }
         }
         c = uiCell(UI.player);
         sprite(V.ox + m, V.oy + m, VIEW.marker * V.unit, (pos.c - pos.h) * Math.PI / 180, c[0], c[1], c[2], c[3], [1, 1, 1, 1]);
@@ -821,7 +853,7 @@
     //              lightly where it would cut a real corner off the road.
     //   startOf()  where along it the player is, found again every frame, so
     //              the line always begins under the marker and never behind.
-    var ROUTE = { step: 2, heavy: 8, light: 2.2, look: 80, hook: 40, near: 12 };
+    var ROUTE = { step: 2, heavy: 8, light: 3, look: 80, hook: 40, near: 12 };
 
     function resample(p, step) {
         var out = [p[0], p[1]], carry = 0;
@@ -866,10 +898,11 @@
         var heavy = blur(p, ROUTE.heavy, ROUTE.step), light = blur(p, ROUTE.light, ROUTE.step);
         var n = p.length / 2, line = new Float32Array(n * 2), arc = new Float32Array(n);
         for (i = 0; i < n; i++) {
-            // How far the hard smoothing would move this point: a metre or two
-            // is a sidestep being ironed out, more is a corner being cut.
+            // How far the hard smoothing would move this point: up to a couple
+            // of metres is a sidestep or a merge being ironed out, five and
+            // more is a corner being cut off the road.
             var moved = Math.hypot(heavy[i * 2] - p[i * 2], heavy[i * 2 + 1] - p[i * 2 + 1]);
-            var t = Math.min(1, Math.max(0, (moved - 1.0) / 2.5)), w = t * t * (3 - 2 * t);
+            var t = Math.min(1, Math.max(0, (moved - 2.0) / 3.0)), w = t * t * (3 - 2 * t);
             line[i * 2] = heavy[i * 2] * (1 - w) + light[i * 2] * w;
             line[i * 2 + 1] = heavy[i * 2 + 1] * (1 - w) + light[i * 2 + 1] * w;
             if (i) arc[i] = arc[i - 1] + Math.hypot(line[i * 2] - line[i * 2 - 2], line[i * 2 + 1] - line[i * 2 - 1]);

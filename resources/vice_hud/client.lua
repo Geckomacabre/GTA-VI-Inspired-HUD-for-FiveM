@@ -1000,6 +1000,13 @@ local radarWanted = nil     -- the last thing we ASKED for, which is not the sam
 local hudHiddenForDeath = false -- debounces the SetHudVisible message below to one send per transition
 local function setRadar(on)
     on = on and true or false
+    -- The game takes its own radar away for a cutscene, a character switch and
+    -- a faded-out screen. The drawn map is not the game's to take away, and
+    -- neither are the frame and the panels that sit on it, so the same three
+    -- are asked here and answered for all of them.
+    if on and (IsCutscenePlaying() or IsPlayerSwitchInProgress() or IsScreenFadedOut()) then
+        on = false
+    end
     -- The drawn minimap (client_map3d.lua) stands in for the engine's radar
     -- whenever it can. Whether a map belongs on screen is still decided by the
     -- callers; this only settles which of the two answers. `engine` is what
@@ -1021,8 +1028,15 @@ local function setRadar(on)
     if on ~= radarShown then
         radarShown = on
         ui('mapRect', { visible = on })
+        -- For whatever stands beside the map without being part of this HUD --
+        -- a speed-limit sign, a seatbelt light: it comes and goes with the map.
+        TriggerEvent('vice_hud:minimap', on)
     end
 end
+
+--- Is the minimap up right now? False on the pause menu, in the inventory, in
+--- a cutscene, while dead, and on foot for a player who hides it there.
+exports('IsMinimapShown', function() return radarShown == true end)
 
 -- DISPLAY_RADAR is a single global flag with no owner: the LAST script to call
 -- it wins, and any resource may call it on any frame. This resource asks for

@@ -710,6 +710,13 @@ What to know about it:
   it, changing over gradually at dusk and dawn by the game's clock
   (`night`, `nightHours`, `paintNight`).
 - The pause map and the big map are the engine's and are untouched.
+- **It goes when the game's radar would**: a cutscene, a character switch, a
+  faded-out screen, as well as the pause menu and the inventory.
+- **Things that stand beside the map can follow it.** `vice_hud:minimap` is
+  raised with `true` or `false` each time the minimap comes or goes, and
+  `exports.vice_hud:IsMinimapShown()` answers the same at any time: enough
+  for a speed-limit sign or a seatbelt light in another resource to hide
+  when the map does.
 - `/hudmap3d` switches between it and the game's radar for that player.
 
 `Config.Map3D.view` has the zoom, the tilt, where the player sits on the panel
