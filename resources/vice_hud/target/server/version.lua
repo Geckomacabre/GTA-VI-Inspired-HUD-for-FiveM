@@ -11,6 +11,12 @@
 
 local API = 'https://api.github.com/repos/%s/releases/latest'
 
+-- A repository that has never published a release still says what is current:
+-- the `version` line of the manifest on its default branch. Without this a
+-- fork that ships by pushing, not by cutting releases, would check itself and
+-- never hear anything.
+local MANIFEST = 'https://raw.githubusercontent.com/%s/HEAD/fxmanifest.lua'
+
 ---Split a version string into comparable numeric parts.
 local function parse(version)
   local parts = {}
@@ -55,22 +61,39 @@ CreateThread(function()
   local repo = repository(resource)
   if not repo then return end
 
-  PerformHttpRequest(API:format(repo), function(status, body)
-    if status ~= 200 or not body then return end
+  -- GitHub's API rejects requests that send no User-Agent.
+  local headers = { ['User-Agent'] = ('%s/%s'):format(resource, installed) }
 
-    local ok, release = pcall(json.decode, body)
-    if not ok or type(release) ~= 'table' then return end
-
-    -- Prereleases are opt-in, not something to nag a running server about.
-    if release.prerelease or type(release.tag_name) ~= 'string' then return end
-
-    local latest = release.tag_name:match('%d+[%d%.]*')
+  local function report(latest, url)
     if not latest or not isNewer(latest, installed) then return end
 
     print(('^3[osm-target] ' .. Locale('version_outdated') .. '^7'):format(latest, installed))
-    if type(release.html_url) == 'string' then
-      print(('^3[osm-target] %s^7'):format(release.html_url))
+    if url then print(('^3[osm-target] %s^7'):format(url)) end
+  end
+
+  PerformHttpRequest(API:format(repo), function(status, body)
+    if status == 200 and body then
+      local ok, release = pcall(json.decode, body)
+      if not ok or type(release) ~= 'table' then return end
+
+      -- Prereleases are opt-in, not something to nag a running server about.
+      if release.prerelease or type(release.tag_name) ~= 'string' then return end
+
+      report(release.tag_name:match('%d+[%d%.]*'),
+        type(release.html_url) == 'string' and release.html_url or nil)
+      return
     end
-  -- GitHub's API rejects requests that send no User-Agent.
-  end, 'GET', '', { ['User-Agent'] = ('%s/%s'):format(resource, installed) })
+
+    -- 404 is GitHub saying this repository has no release at all. Anything
+    -- else (rate limit, outage) is not worth a second request.
+    if status ~= 404 then return end
+
+    PerformHttpRequest(MANIFEST:format(repo), function(code, text)
+      if code ~= 200 or type(text) ~= 'string' then return end
+
+      -- The line that starts with `version`, which `fx_version` does not.
+      local declared = (string.char(10) .. text):match(string.char(10) .. 'version%s+%p([%d%.]+)%p')
+      report(declared, ('https://github.com/%s'):format(repo))
+    end, 'GET', '', headers)
+  end, 'GET', '', headers)
 end)
