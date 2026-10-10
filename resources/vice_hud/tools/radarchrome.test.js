@@ -27,6 +27,8 @@ const L = lauxlib.luaL_newstate();
 lualib.luaL_openlibs(L);
 const radar = [];   // every DisplayRadar call
 const sent = [];    // every ui() push
+const told = [];    // every vice_hud:minimap event
+const game = { cutscene: false, switching: false, faded: false };
 const push = (n, f) => { lua.lua_pushjsfunction(L, f); lua.lua_setglobal(L, to_luastring(n)); };
 push('DisplayRadar', (S) => { radar.push(lua.lua_toboolean(S, 1)); return 0; });
 push('ui', (S) => {
@@ -35,6 +37,10 @@ push('ui', (S) => {
   sent.push({ action, visible: lua.lua_toboolean(S, -1) });
   return 0;
 });
+push('TriggerEvent', (S) => { told.push({ name: lua.lua_tojsstring(S, 1), shown: lua.lua_toboolean(S, 2) }); return 0; });
+push('IsCutscenePlaying', (S) => { lua.lua_pushboolean(S, game.cutscene); return 1; });
+push('IsPlayerSwitchInProgress', (S) => { lua.lua_pushboolean(S, game.switching); return 1; });
+push('IsScreenFadedOut', (S) => { lua.lua_pushboolean(S, game.faded); return 1; });
 
 if (lauxlib.luaL_loadstring(L, to_luastring(chunk)) !== lua.LUA_OK)
   throw new Error('load: ' + lua.lua_tojsstring(L, -1));
@@ -70,6 +76,40 @@ ok(sent.length === 1 && sent[0].visible === true, 'a transition pushes exactly o
 sent.length = 0;
 call(false);
 ok(sent.length === 1 && sent[0].visible === false, 'and again on the way back', sent);
+
+// Whatever stands beside the map (a speed-limit sign, a seatbelt light) is told
+// the same thing the page is, at the same moments and no others.
+ok(told.length === 3 && told.every((t) => t.name === 'vice_hud:minimap') && told.map((t) => t.shown).join() === 'false,true,false',
+   'vice_hud:minimap is raised once per transition, with the new state', told);
+
+// The game hides its own radar for these three. The drawn map, the frame and
+// the panels are not the game's to hide, so setRadar answers for them.
+for (const [what, label] of [['cutscene', 'a cutscene'], ['switching', 'a character switch'], ['faded', 'a faded-out screen']]) {
+  call(true);
+  sent.length = 0; told.length = 0;
+  game[what] = true;
+  call(true);
+  ok(radar[radar.length - 1] === false && sent.length === 1 && sent[0].visible === false && told.length === 1 && told[0].shown === false,
+     label + ' takes the map down even though the HUD still wants it', { radar: radar[radar.length - 1], sent, told });
+  game[what] = false;
+  call(true);
+  ok(sent.length === 2 && sent[1].visible === true, 'and it comes back after', sent);
+  call(false);
+}
+
+// The drawn map standing in: the page still shows a map, the engine's is hidden.
+if (lauxlib.luaL_dostring(L, to_luastring('shows = {}; ViceMap3D = { owns = function() return true end, show = function(on) shows[#shows + 1] = on end }')) !== lua.LUA_OK)
+  throw new Error(lua.lua_tojsstring(L, -1));
+sent.length = 0;
+call(true);
+lua.lua_getglobal(L, to_luastring('shows')); lua.lua_rawgeti(L, -1, 1);
+const drawn = lua.lua_toboolean(L, -1); lua.lua_pop(L, 2);
+ok(radar[radar.length - 1] === false && sent[0].visible === true && drawn === true,
+   'with the drawn map standing in, the engine\'s radar is hidden and the page still has a map', { radar: radar[radar.length - 1], sent, drawn });
+if (lauxlib.luaL_dostring(L, to_luastring('ViceMap3D.owns = function() error("boom") end')) !== lua.LUA_OK)
+  throw new Error(lua.lua_tojsstring(L, -1));
+call(true);
+ok(radar[radar.length - 1] === true, 'and a fault in it puts the engine\'s radar back rather than taking the HUD down');
 
 console.log(fails ? '\n' + fails + ' check(s) failed' : '\nall checks passed');
 process.exit(fails ? 1 : 0);
