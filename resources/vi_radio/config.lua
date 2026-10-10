@@ -124,6 +124,23 @@ Config.Hud = {
 -- Stations not listed here still appear (using their raw name) as long as the
 -- game reports them unlocked. Add hidden = true to drop one from the wheel.
 Config.IncludeOff = true        -- include the "Radio Off" entry
+
+-- Audio scenes that take the game radio down with them.
+--
+-- A common way to quieten the city (distant sirens, alarms) is to leave
+-- CHARACTER_CHANGE_IN_SKY_SCENE running for the whole session; that is what
+-- qbx_smallresources' `disable.ambience = true` does. It is the mix the game
+-- uses while the camera is up in the sky during a character switch, and in
+-- that mix the car radio is silent as well: the station is on, the HUD says
+-- so, and nothing comes out.
+--
+-- Any scene listed here is stopped while a station is actually playing in the
+-- vehicle you are sat in, and started again the moment it is not (radio off,
+-- muted, out of the car), so the city stays as quiet as it was the rest of
+-- the time. Empty the list to leave audio scenes alone.
+Config.RadioMutingScenes = {
+    'CHARACTER_CHANGE_IN_SKY_SCENE',
+}
 Config.OffLabel   = 'RADIO OFF'
 
 Config.Stations = {
@@ -155,6 +172,29 @@ Config.Stations = {
     ['RADIO_36_AUDIOPLAYER']           = { label = 'Media Player',              logo = 'MediaPlayer.png',            genre = 'Custom' },
     ['RADIO_37_MOTOMAMI']              = { label = 'MOTOMAMI Los Santos',       logo = 'MOTOMAMI.png',               genre = 'Latin' },
 }
+
+-- GTA VI station names and carousel tiles, worn by the GTA V station nearest
+-- each in kind. Only the name and the tile change: the music and the DJs are
+-- still the GTA V station's, so a DJ will still say the old name on air.
+-- false leaves every station as itself; take a line out to leave that one.
+Config.GTA6Stations = true
+Config.GTA6Skin = {
+    ['RADIO_06_COUNTRY']    = { label = 'Back Country Radio',   logo = 'BackCountryRadio.png' },     -- Rebel Radio
+    ['RADIO_09_HIPHOP_OLD'] = { label = 'Dirty South Classics', logo = 'DirtySouthClassics.png' },   -- West Coast Classics
+    ['RADIO_02_POP']        = { label = 'Flash FM',             logo = 'FlashFM.png' },              -- Non-Stop-Pop FM
+    ['RADIO_08_MEXICAN']    = { label = 'Cocoteo FM',           logo = 'CocoteoFM.png' },            -- East Los FM
+    ['RADIO_13_JAZZ']       = { label = 'Afrobank FM',          logo = 'AfrobankFM.png' },           -- Worldwide FM
+    ['RADIO_04_PUNK']       = { label = 'The Chamber 106.6',    logo = 'TheChamber106.6.png' },      -- Channel X
+}
+if Config.GTA6Stations then
+    for id, skin in pairs(Config.GTA6Skin) do
+        local station = Config.Stations[id]
+        if station then
+            station.label = skin.label or station.label
+            station.logo = skin.logo or station.logo
+        end
+    end
+end
 
 -- ---------------------------------------------------------------------------
 -- On Demand

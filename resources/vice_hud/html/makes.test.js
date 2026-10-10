@@ -243,6 +243,321 @@ msg({ action: 'vehicle', show: false });
 ok($('vehicle').classList.contains('slot-out') || $('vehicle').classList.contains('hidden'),
    'leaving the vehicle takes the whole thing away');
 
+console.log('\n-- the collapsed row is about CHANGE: lit, then dim, then gone --');
+// A pip lights when its reading changes, drops back to quiet a few seconds
+// after the last change, and the row goes if nothing changes for a while
+// longer. The clock is the page's Date.now, stepped by hand here.
+const cssN = fs.readFileSync(base + 'style.css', 'utf8');
+let clock = window.Date.now() + 60000;
+window.Date.now = () => clock;
+const later = (ms) => { clock += ms; };
+const LIT = 4000, DIM = 6000;
+
+let car = { make: 'Karin', model: 'Sultan' };
+const newCar = (model) => { msg({ action: 'vehicle', show: false }); car = { make: 'Karin', model }; };
+const drive = (extra) => msg(Object.assign({
+  action: 'vehicle', show: true, collapsed: true, fuel: 70, engineOn: true, engineHealth: 1000 }, car, extra));
+const cls = (id, c) => $(id).classList.contains(c);
+const up = (id) => !cls(id, 'hidden');
+const lit = (id) => up(id) && !cls(id, 'quiet');
+const quiet = (id) => up(id) && cls(id, 'quiet');
+const nitroHidden = () => cls('pip-nitrous', 'hidden');
+const panelGone = () => cls('vehicle', 'slot-out') || cls('vehicle', 'hidden');
+const kit = (level, more) => Object.assign(
+  { installed: true, level: level, active: false, ready: true }, more);
+const state = () => ['pip-tracker', 'pip-engine', 'pip-fuel', 'pip-nitrous']
+  .map((id) => (!up(id) ? '-' : lit(id) ? 'LIT' : 'dim')).join(' ');
+
+ok(ring('pip-nitrous'), 'the nitrous pip has a ring -- the tank is a quantity');
+ok($('pip-nitrous').querySelector('.pip-glyph') && !$('pip-nitrous').textContent.trim(),
+   'and a drawn glyph, not a typed one');
+
+console.log('\n   getting in');
+newCar('Sultan');
+drive({ collapsed: false });
+ok(state() === '- LIT LIT -', 'engine running: the plate shows engine and fuel lit', state());
+ok(nitroHidden(), 'no kit: no nitrous pip, even on the plate');
+drive({ collapsed: false, nitrous: { installed: false, level: 0 } });
+ok(nitroHidden(), 'installed:false is no kit either');
+newCar('Sultan RS');
+drive({ collapsed: false, engineOn: false, nitrous: kit(1) });
+ok(state() === '- dim dim dim', 'engine OFF: the same plate shows them dim, nitrous included', state());
+ok(pct('pip-fuel') === '70.0', 'the reading is still kept underneath');
+later(800);
+drive({ collapsed: false, nitrous: kit(1) });
+ok(state() === '- LIT LIT LIT', 'turn the key and they light', state());
+newCar('Kuruma');
+drive({ engineOn: false, trackerState: 'spotted' });
+ok(lit('pip-tracker') && quiet('pip-engine') && quiet('pip-fuel'),
+   'the tracker is the police, not the car: it lights with the engine off', state());
+
+console.log('\n   lit, then dim, then gone');
+newCar('Futo');
+drive({});
+ok(state() === '- LIT LIT -', 'a car just entered is all news', state());
+later(LIT - 100); drive({});
+ok(state() === '- LIT LIT -', 'still lit just inside the window', state());
+later(200); drive({});
+ok(state() === '- dim dim -', 'then both drop back to dim', state());
+ok(!panelGone(), 'the row is still there while it is dim');
+later(DIM); drive({});
+ok(panelGone() && state() === '- - - -', 'and with nothing changing it goes away entirely', state());
+ok(!cls('pip-fuel', 'quiet') && !cls('pip-engine', 'quiet'), 'leaving nothing marked quiet behind it');
+later(60000); drive({});
+ok(panelGone(), 'and stays away for as long as nothing moves');
+
+console.log('\n   what counts as a change');
+drive({ fuel: 68 });
+ok(panelGone(), 'fuel creeping down two points is not news', state());
+drive({ fuel: 65 });
+ok(state() === '- dim LIT -', 'five points down is: fuel lights, engine sits dim beside it', state());
+ok(pct('pip-fuel') === '65.0', 'with its ring at the real reading', pct('pip-fuel'));
+later(LIT + DIM + 100); drive({ fuel: 65 });
+ok(panelGone(), 'and the row goes again');
+drive({ fuel: 67 });
+ok(state() === '- dim LIT -', 'two points UP is a refuel: lit', state());
+later(LIT + DIM + 100); drive({ fuel: 67 });
+drive({ fuel: 67, engineHealth: 960 });
+ok(panelGone(), 'a scratch (40 health) is not news', state());
+drive({ fuel: 67, engineHealth: 940 });
+ok(state() === '- LIT dim -', 'a real knock is: engine lights', state());
+later(LIT + DIM + 100); drive({ fuel: 67, engineHealth: 940 });
+drive({ fuel: 24, engineHealth: 940 });
+ok(lit('pip-fuel') && cls('pip-fuel', 'warn'), 'crossing into the amber band lights the pump amber', $('pip-fuel').className);
+later(LIT + 100); drive({ fuel: 24, engineHealth: 940 });
+ok(quiet('pip-fuel'), 'and a warning that has been said goes dim like anything else', $('pip-fuel').className);
+later(DIM); drive({ fuel: 24, engineHealth: 940 });
+ok(panelGone(), 'then away: lit means it just moved, not that it is bad');
+drive({ fuel: 24, engineHealth: 940, trackerState: 'searching' });
+ok(state() === 'LIT dim dim -', 'the tracker changing state brings the row back', state());
+later(LIT + 100); drive({ fuel: 24, engineHealth: 940, trackerState: 'searching' });
+ok(state() === 'dim dim dim -', 'and dims with the rest when it stops changing', state());
+drive({ fuel: 24, engineHealth: 940, trackerState: 'spotted' });
+ok(lit('pip-tracker') && cls('pip-tracker', 'bad'), 'spotted is a change: lit again, red');
+drive({ fuel: 24, engineHealth: 940, trackerState: 'clear' });
+ok(!up('pip-tracker'), 'clear takes the tracker out of the row altogether');
+
+console.log('\n   nitrous: the ring is the tank');
+newCar('Elegy');
+drive({}); later(LIT + DIM + 100); drive({});
+ok(panelGone(), '(a healthy car, settled: nothing showing)');
+drive({ nitrous: kit(1) });
+ok(state() === '- dim dim LIT', 'a kit being fitted lights the nitrous pip and brings engine and fuel in dim', state());
+ok(cls('pip-nitrous', 'nitro'), 'in its own tone rather than green', $('pip-nitrous').className);
+ok(pct('pip-nitrous') === '100.0', 'a full tank reads full', pct('pip-nitrous'));
+ok([...$('veh-pips').children].map((n) => n.id).join(' ')
+     === 'pip-tracker pip-engine pip-fuel pip-nitrous', 'in the reference order, nitrous last');
+ok(/\.pip\.quiet \.pip-ring \{[^}]*display:\s*none/.test(cssN),
+   'a quiet pip has no ring: one gauge in the row, not three');
+later(LIT + 100); drive({ nitrous: kit(1) });
+ok(state() === '- dim dim dim', 'an untouched tank goes dim too', state());
+later(DIM); drive({ nitrous: kit(1) });
+ok(panelGone(), 'and the row goes: a full tank nobody is using is not news');
+
+drive({ nitrous: kit(0.6, { active: true }) });
+ok(state() === '- dim dim LIT', 'boosting brings it straight back, lit, the others dim', state());
+ok(pct('pip-nitrous') === '60.0', 'and drains the ring', pct('pip-nitrous'));
+ok($('pip-nitrous').className === 'pip nitro gauge',
+   'and changes nothing else -- the ring is the boost indicator', $('pip-nitrous').className);
+ok(!/#pip-nitrous[^{]*\{[^}]*animation/.test(cssN) && !/@keyframes nitro/.test(cssN),
+   'no animation on the pip or its glyph, boosting or not');
+ok(/#pip-nitrous \.pip-fill \{ transition: stroke-dashoffset [^,;]*; \}/.test(cssN),
+   'the ring\'s dash offset is the one thing that transitions');
+
+// The fast path: the tank moves ten times a second and the vehicle push only
+// four, so the row is run again between them.
+later(100);
+msg(Object.assign({ action: 'nitrous' }, kit(0.25, { active: true })));
+ok(pct('pip-nitrous') === '25.0' && lit('pip-nitrous'), 'a nitrous push repaints between vehicle pushes',
+   pct('pip-nitrous'));
+msg(Object.assign({ action: 'nitrous' }, kit(0, { ready: false })));
+ok(pct('pip-nitrous') === '0.0', 'run dry reads zero', pct('pip-nitrous'));
+ok(ring('pip-nitrous').getAttribute('data-empty') === '1', 'with no dot left at twelve o\'clock');
+ok(lit('pip-nitrous') && cls('pip-nitrous', 'unknown'), 'locked out: lit because it is moving, grey because it cannot be used',
+   $('pip-nitrous').className);
+later(1500);
+msg(Object.assign({ action: 'nitrous' }, kit(0.45, { ready: false })));
+ok(pct('pip-nitrous') === '45.0' && lit('pip-nitrous') && cls('pip-nitrous', 'unknown'),
+   'the ring refills while still locked out', pct('pip-nitrous'));
+later(1500);
+msg(Object.assign({ action: 'nitrous' }, kit(1)));
+ok(pct('pip-nitrous') === '100.0' && cls('pip-nitrous', 'nitro'), 'and comes back in colour once it is usable again',
+   $('pip-nitrous').className);
+later(LIT + 100); drive({ nitrous: kit(1) });
+ok(state() === '- dim dim dim', 'full again and left alone: dim', state());
+later(DIM); drive({ nitrous: kit(1) });
+ok(panelGone(), 'then gone');
+// The fast path alone is enough to bring a hidden row back: no waiting for
+// the next vehicle push.
+msg(Object.assign({ action: 'nitrous' }, kit(0.9, { active: true })));
+ok(!panelGone() && state() === '- dim dim LIT', 'a nitrous push on its own brings the row straight back', state());
+
+drive({ nitrous: { installed: true, level: 0.5 } });
+ok(cls('pip-nitrous', 'nitro'), 'no `ready` field means ready, not locked out', $('pip-nitrous').className);
+drive({ nitrous: kit(1.4) });
+ok(pct('pip-nitrous') === '100.0', 'over-full clamps to 100', pct('pip-nitrous'));
+drive({ nitrous: { installed: true } });
+ok(pct('pip-nitrous') === '0.0', 'a missing level is an empty tank, not NaN', pct('pip-nitrous'));
+drive({});
+ok(nitroHidden(), 'the kit coming off takes the pip out of the row');
+
+console.log('\n   a different car is all news');
+later(LIT + DIM + 100); drive({});
+ok(panelGone(), '(settled)');
+newCar('Jester');
+drive({});
+ok(state() === '- LIT LIT -', 'getting into another car lights everything again', state());
+msg({ action: 'vehicle', show: false });
+
+console.log('\n-- the glyph is the reference mark: a big chevron over a small one --');
+{
+  const paths = [...$('pip-nitrous').querySelectorAll('.pip-glyph path')]
+    .map((p) => p.getAttribute('d').match(/-?\d+(\.\d+)?/g).map(Number));
+  const width = (n) => { const xs = n.filter((_, i) => i % 2 === 0); return Math.max(...xs) - Math.min(...xs); };
+  const top = (n) => Math.min(...n.filter((_, i) => i % 2 === 1));
+  ok(paths.length === 2, 'two chevrons');
+  ok(top(paths[0]) < top(paths[1]), 'the first is the upper one');
+  ok(width(paths[0]) > width(paths[1]) * 1.6, 'and the upper one is much the larger',
+     width(paths[0]) + ' vs ' + width(paths[1]));
+}
+
+console.log('\n-- every glyph is centred on its disc --');
+// Two things had to be true and were not, and both are pinned here.
+//
+// 1. ONE SVG PER PIP. The ring and the glyph used to be separate elements, and
+//    the browser rounds each element to whole pixels on its own -- so a glyph
+//    the layout called centred was painted up to a pixel off its ring. Inside
+//    one SVG there is a single coordinate system, 36 units to the disc.
+// 2. THE PUMP IS BALANCED BY WEIGHT, ACROSS. Every glyph has equal space
+//    above and below it and equal space either side -- except the pump,
+//    whose outline runs out to a thin nozzle on the right while nearly all of
+//    its ink is the body on the left. Centred on that outline it reads as
+//    sitting left, so across it goes on its centre of mass instead.
+//
+// jsdom has no layout, so this is the geometry itself: the middle of each
+// glyph in its own 24-unit art, pushed through the transform that places it,
+// has to land on (18, 18).
+{
+  const CENTRE = 18;
+  const place = (g) => {
+    const t = g.getAttribute('transform');
+    const tr = t.match(/translate\(\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\)/).slice(1).map(Number);
+    const sc = Number(t.match(/scale\(\s*(-?[\d.]+)\s*\)/)[1]);
+    return (p) => [tr[0] + p[0] * sc, tr[1] + p[1] * sc];
+  };
+  // Straight-edged polygons only (M x y x y ... Z): the pairs are the corners,
+  // and the middle is the middle of everything they span.
+  const middle = (g) => {
+    const xs = [], ys = [];
+    g.querySelectorAll('path').forEach((p) => {
+      const n = p.getAttribute('d').match(/-?\d+(\.\d+)?/g).map(Number);
+      for (let i = 0; i + 1 < n.length; i += 2) { xs.push(n[i]); ys.push(n[i + 1]); }
+    });
+    return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+  };
+  const near = (p) => Math.abs(p[0] - CENTRE) < 0.05 && Math.abs(p[1] - CENTRE) < 0.05;
+  const inner = (id) => $(id).querySelector('.pip-glyph > g');
+
+  ['pip-tracker', 'pip-engine', 'pip-fuel', 'pip-nitrous'].forEach((id) => {
+    const art = $(id).querySelectorAll('svg');
+    ok(art.length === 1 && art[0].getAttribute('viewBox') === '0 0 36 36'
+       && art[0].querySelector('.pip-glyph'),
+       id + ': ring and glyph share one 36-unit svg', art.length);
+  });
+  ok(['pip-engine', 'pip-fuel', 'pip-nitrous'].every((id) =>
+       $(id).querySelector('svg .pip-ring .pip-fill')
+       && /rotate\(-90 18 18\)/.test($(id).querySelector('.pip-ring').getAttribute('transform'))),
+     'the ring is in that svg too, turned about the same centre');
+  ok(/\.pip-art \{[^}]*inset:\s*0;[^}]*width:\s*100%;[^}]*height:\s*100%/.test(cssN.replace(/\n/g, ' ')),
+     'and the svg is the disc: it fills the pip exactly');
+  // (?<![-\w]) so that stroke-width does not count as a width.
+  ok(!/\.pip-glyph \{[^}]*(?<![-\w])(width|height|left|top):/.test(cssN.replace(/\n/g, ' ')),
+     'the glyph is no longer a box of its own for the browser to round');
+
+  const nit = place(inner('pip-nitrous'))(middle(inner('pip-nitrous')));
+  ok(near(nit), 'nitrous: the chevrons have equal space all round',
+     nit.map((v) => v.toFixed(3)).join(', '));
+  const tipMark = $('nitro-hint-icon').querySelector('.nitro-hint-mark');
+  const tip = place(tipMark)(middle(tipMark));
+  ok($('nitro-hint-icon').tagName.toLowerCase() === 'svg'
+     && $('nitro-hint-icon').querySelector('circle.nitro-hint-disc') && near(tip),
+     'and the same in the tip, whose disc and mark are one svg as well',
+     tip.map((v) => v.toFixed(3)).join(', '));
+
+  // The engine and the pump are bitmaps, so where their ink is was measured
+  // off the files rather than worked out. Both have their ink's bounding box
+  // in the middle of the canvas (the 24-unit square the image is drawn in).
+  // The pump's alpha-weighted centre of mass is 8.9% of the canvas LEFT of
+  // that. Re-measure and update the markup and this line if the art changes.
+  const FUEL_WEIGHT_X = 12 - 0.089 * 24;
+  const eng = place(inner('pip-engine'))([12, 12]);
+  ok(near(eng), 'engine: equal space all round', eng.map((v) => v.toFixed(3)).join(', '));
+  const fuel = place(inner('pip-fuel'))([FUEL_WEIGHT_X, 12]);
+  ok(near(fuel), 'fuel: balanced on its weight across, equal space above and below',
+     fuel.map((v) => v.toFixed(3)).join(', '));
+  ok(place(inner('pip-fuel'))([12, 12])[0] > CENTRE + 1,
+     'which puts the middle of its outline visibly RIGHT of centre, as it should be');
+  ['pip-engine', 'pip-fuel'].forEach((id) => {
+    const img = $(id).querySelector('mask image');
+    const rect = $(id).querySelector('.pip-glyph rect');
+    ok(img && fs.existsSync(base + img.getAttribute('href'))
+       && rect.getAttribute('fill') === 'currentColor'
+       && rect.getAttribute('mask') === 'url(#' + $(id).querySelector('mask').id + ')',
+       id + ': the reference art masks a currentColor rect, and the file is there');
+  });
+
+  // The tracker is curves, so its extent is read off the art itself: the pin
+  // tops out at y=2.5, and the ring it stands on is an ellipse about
+  // (12, 17.6), 7.6 x 3.1 with a 2.2 stroke, so the two together run
+  // x 3.3..20.7, y 2.5..21.8. Centred on that outline.
+  const stand = inner('pip-tracker').querySelector('ellipse');
+  const half = Number(stand.getAttribute('stroke-width')) / 2;
+  const bottom = Number(stand.getAttribute('cy')) + Number(stand.getAttribute('ry')) + half;
+  const pin = place(inner('pip-tracker'))([Number(stand.getAttribute('cx')), (2.5 + bottom) / 2]);
+  ok(near(pin), 'tracker: the pin and its ring are centred on the disc', pin.map((v) => v.toFixed(3)).join(', '));
+  ok(inner('pip-tracker').querySelector('path[fill-rule="evenodd"]'),
+     'and the pin is the solid one from the reference, hole cut out of the path');
+
+  ok(/#veh-foot \{[^}]*justify-content:\s*center/.test(cssN.replace(/\n/g, ' ')),
+     'and the row itself is centred in the strip');
+}
+
+console.log('\n-- the "Hold [key] to activate nitrous" tip --');
+const hint = $('nitro-hint');
+const hintText = () => hint.textContent.replace(/\s+/g, ' ').trim();
+ok(hint.classList.contains('hidden'), 'hidden until asked for');
+msg({ action: 'nitrousHint', show: true, glyph: 'X', device: 'kbm', holdMs: 0 });
+ok(!hint.classList.contains('hidden'), 'shows');
+ok(hintText() === 'Hold X to activate nitrous', 'reads as the reference does', hintText());
+const cap = () => $('nitro-hint-key');
+ok(cap().classList.contains('key') && cap().getAttribute('data-glyph') === 'X',
+   'the key is a key cap', cap().className);
+ok(cap().querySelectorAll('svg').length === 1 && cap().querySelector('svg .g-face') && cap().querySelector('svg text'),
+   'cap and letter are one drawing, so the letter cannot sit off its cap');
+ok(hint.querySelectorAll('#nitro-hint-icon path').length === 2, 'and the nitrous mark closes the line');
+msg({ action: 'nitrousHint', show: true, glyph: 'LSHIFT', device: 'kbm', holdMs: 0 });
+ok(cap().classList.contains('wide'), 'a long bind gets the wide cap');
+msg({ action: 'nitrousHint', show: true, glyph: 'RMB', device: 'kbm', holdMs: 0 });
+ok(cap().classList.contains('mouse') && cap().querySelector('svg image'),
+   'a mouse bind is drawn as the button');
+msg({ action: 'nitrousHint', show: true, glyph: 'A', device: 'pad', holdMs: 0 });
+ok(cap().classList.contains('pad-a') && cap().querySelector('svg circle.g-face'),
+   'a pad face button is round, like the button on the pad, and gets its colour');
+msg({ action: 'inputDevice', device: 'pad', pad: 'ps' });
+ok(cap().classList.contains('face') && !cap().classList.contains('pad-a')
+   && (cap().querySelector('path.g-ink').getAttribute('d').match(/M/g) || []).length === 2,
+   'on a PlayStation pad the same bind is redrawn as the cross', cap().className);
+ok(!hint.classList.contains('hidden'), 'and the tip stays up while it is');
+msg({ action: 'inputDevice', device: 'pad', pad: 'xbox' });
+msg({ action: 'nitrousHint', show: true, refresh: true, glyph: 'X', device: 'kbm' });
+ok(cap().classList.contains('key') && cap().textContent === 'X',
+   'putting the pad down swaps the button for the key');
+msg({ action: 'nitrousHint', show: true, device: 'kbm', holdMs: 0 });
+ok($('nitro-hint-key').textContent === '' && hintText() === 'Hold to activate nitrous',
+   'no bind: no cap, and the line still reads', hintText());
+msg({ action: 'nitrousHint', show: false });
+ok(hint.classList.contains('hidden'), 'and it can be taken down');
+
 const css2 = fs.readFileSync(base + 'style.css', 'utf8');
 const collapsedRule = css2.slice(css2.indexOf('#vehicle.collapsed {'));
 ok(/background:\s*none/.test(collapsedRule.slice(0, 200)),

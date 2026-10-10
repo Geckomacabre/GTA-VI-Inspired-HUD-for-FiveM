@@ -70,16 +70,32 @@ on entering                          for the rest of the drive
   truncated spawn tokens and all.
 - **Gauge rings** on engine and fuel that fill to the actual reading, so the
   strip answers *how much* rather than only *is it bad yet*.
-- **The pips earn their place.** Fuel and engine show while the panel is
-  announcing the car, then only the ones with something to say stay once it
-  collapses, meaning fuel and engine in the amber or red bands. A healthy car
-  stops drawing a panel at all. The third pip is a tracker that follows the
+- **The icons are about change.** On the name plate you see everything the
+  car has, lit if the engine is running and dim if it is switched off. After
+  that an icon lights only when its reading changes (fuel dropping a step or
+  being topped up, the engine taking a knock, nitrous being used), drops back
+  to dim a few seconds after the last change, and the whole row goes away
+  once nothing has changed for a while. Lit means "this just moved", not
+  "this is bad"; a healthy car that is just driving shows no icons at all. The third pip is a tracker that follows the
   player's wanted state automatically (police have eyes on you: red, still
   hunting: amber, no stars: hidden), and stays hidden the rest of the time.
   Other resources can drive it directly too, with `exports.vice_hud:
   SetVehicleTracker` (clear, searching, spotted), for anything with nothing
   to do with wanted stars. Door lock status lives in qbx_vehiclekeys now, not
   here.
+- **A nitrous pip, only on cars that have nitrous.** A fourth disc carrying
+  the reference's mark — a wide chevron over a small one — whose ring is the
+  tank: it appears when you are driving a car with a kit, drains while you
+  boost, goes grey while locked out after running dry and fills back up as
+  the tank does. The ring is the only thing that moves. On a car with a kit
+  the collapsed row is the reference's row, engine and fuel sitting dim beside
+  it; a car with no kit never draws any of it. vice_hud does not run the
+  nitrous itself — it reads a state bag (`Config.NitrousStateBag`,
+  `customs:nitrous` by default) that whichever resource owns the nitrous
+  writes, or takes it from `exports.vice_hud:SetVehicleNitrous`.
+- **"Hold [key] to activate nitrous."** The one-line tip from the reference,
+  top left, shown once when a kit has just been fitted to the car you are
+  sitting in, with the player's live bind in the key cap.
 - **A parked car goes monochrome.** Green, amber and red on a car nothing is
   burning fuel in is just noise.
 
@@ -105,9 +121,9 @@ on entering                          for the rest of the drive
 | | |
 | --- | --- |
 | **Required** | [`ox_lib`](https://github.com/overextended/ox_lib) |
+| **Required** | [`oxmysql`](https://github.com/overextended/oxmysql) — targeting keeps its `/targetadmin` settings in the database |
 | **Optional** | `ox_inventory` — weapon icons, omitted cleanly if absent |
-| **Optional** | `qbx_core` — the money readout and skill XP persistence |
-| **Optional** | `qbx_honor` — the honor system |
+| **Optional** | `qbx_core` — the money readout, skill XP persistence, and honor (built in, see below) |
 | **Optional** | `speedlimits`, `zseatbelt` — positioned by the editor's *Other resources* rows |
 
 Nothing optional is a hard failure: each is probed with `GetResourceState` and
@@ -202,11 +218,163 @@ exports.vice_hud:AddSkillXp(id, amount)
 exports.vice_hud:GetSkill(id)                      -- { id, xp, level, into, need, frac }
 
 exports.vice_hud:SetVehicleTracker(state)          -- 'clear' | 'searching' | 'spotted' | nil
+exports.vice_hud:SetVehicleNitrous(state)          -- { installed, level, active, ready } | nil
+exports.vice_hud:ShowNitrousHint(opts)             -- { command, key, duration } | nil
+exports.vice_hud:HideNitrousHint()
+
+exports.vice_hud:SetLapTimer(data)                 -- the race HUD; see below
 ```
+
+### Buttons: controller, keyboard and mouse
+
+Every button the HUD draws (action prompts, world prompts, the nitrous tip) is
+the one the player would actually press, on whichever device they touched
+last. Pick up the controller and the prompts become its buttons; touch the
+keyboard and they become key caps and the mouse.
+
+| | |
+| --- | --- |
+| `Config.PadGlyphs = 'xbox'` | A B X Y, LB RB LT RT, Menu / View. The default. |
+| `Config.PadGlyphs = 'playstation'` | cross circle square triangle, L1 R1 L2 R2, Options / touchpad |
+| `/hudpad xbox` / `/hudpad playstation` | a player's own choice, remembered for them; it wins over the config |
+
+A world prompt option can carry `more = true` (three dots on a disc between
+the button and the name: it opens a list) or `dot = true` / `'#rrggbb'` (a
+coloured dot there). `ShowWorldActions(options, coords, opts)` takes
+`{ compact = false }` to keep the name at any distance, `{ centred = true }` to
+put the button on the point itself, and `{ id = 'my_resource' }` so that
+`HideWorldActions('my_resource')` only takes down a prompt that is still that
+resource's. `SetWorldActionsCoords(coords, id)` moves a prompt that is up.
+The merged targeting's walk-up prompts (`Config.Proximity`) are drawn with it.
+
+`ShowActionPrompt` and `ShowWorldActions` take a control id (or an ox_lib
+keybind's `.hash`) as before and need nothing new: the button is resolved from
+the live bind by `client_glyphs.lua`. A prompt with `opts.hold` gets a ring
+round its button that fills as it is held. The targeting rail uses the same
+Xbox / PlayStation setting, so the two cannot disagree.
+
+Not checked in game yet: the mapping from the game's button icon numbers to
+buttons comes from the FiveM docs' instructional-buttons table, whose D-pad
+left / right and stick entries are the ones most worth a look on a real pad.
+
+### The nitrous pip
+
+The pip needs nothing called on it if your nitrous resource writes its state
+to the local player's state bag — that is the default path, and it means the
+two resources never depend on each other or on load order:
+
+```lua
+-- in the resource that owns the nitrous, client side
+LocalPlayer.state:set('customs:nitrous', {
+    installed = true,       -- driving a car with a kit; false (or nil) hides the pip
+    level     = 0.62,       -- tank fill, 0.0 .. 1.0 -- this is the ring
+    active    = false,      -- boosting right now
+    ready     = true,       -- false while locked out after running dry; optional
+    command   = '+nitrous', -- optional: your RegisterKeyMapping command, for the tip
+}, false)
+```
+
+The key is `Config.NitrousStateBag`. Extra fields are ignored, the level is
+clamped, and the pip disappears the moment `installed` goes false, so leaving
+the car is just another write. A resource that would rather push can call
+`SetVehicleNitrous` with the same table instead; that takes the pip over
+until it is called with `nil`, which hands it back to the state bag.
+
+The **tip** shows by itself when the reading goes from "no kit" to "kit"
+while the player is already sitting in the car — a kit being fitted — once
+per car per session, for `Config.NitrousHintMs`. `command` puts the player's
+live bind for that key mapping in the key cap; `key` takes a control id or a
+ready-made label instead. `ShowNitrousHint` shows it on demand, for a resource
+that knows better when a player needs telling. `/hudnitrous` previews it.
+
+### The race HUD
+
+Bottom right, as in the reference: a first row, the chequered plate with your
+position in the field, and the clock. The first row is `PROGRESS` and a
+percentage for a point to point, and `LAP` with the count on a chip (`2/2`)
+for a race that has laps: one or the other, as the reference draws them.
+
+```lua
+exports.vice_hud:SetLapTimer({
+    position  = 1,  racers = 6,    -- "1 / 6" on the plate
+    progress  = 0.30,              -- 0.0 .. 1.0 along the route
+    lap = 1, laps = 1,             -- laps > 1 swaps PROGRESS for "LAP 1/2"
+    cp  = 5, cpTotal = 16,         -- checkpoints this lap / per lap
+    elapsedMs = 30390, running = true,
+})
+exports.vice_hud:SetLapTimer({ show = false })
+```
+
+Only the clock is required. With no `position` the plate shows the checkpoint
+count; with no `progress` the percentage is worked out from the checkpoints.
+`elapsedMs` is a snapshot — push on events and the page runs the clock between
+them. While the block is up, action prompts and the honor toast move above it
+rather than sit underneath. `/hudlaptimer` previews it.
+
+The rest of a race is four more calls, each held on screen for as long as
+the reference holds it and cut in and out with no fade, as it is there:
+
+```lua
+-- before the start: small line, the race's name, small line (1.9 s)
+exports.vice_hud:ShowRaceTitle({
+    series = "HIT 'N' RUN VC", name = 'SALTON TO WANING SANDS', type = 'GROUP RACE',
+})
+
+-- 3, 2, 1, go in Pricedown: a digit a second for 0.3 s each, then "go" for 1.1 s
+exports.vice_hud:ShowRaceCountdown()              -- the whole run from 3, timed by the page
+exports.vice_hud:ShowRaceCountdown({ from = 5 })
+exports.vice_hud:ShowRaceCountdown(3)             -- or one beat at a time: 3, 2, 1, 'go'
+exports.vice_hud:ShowRaceCountdown(false)         -- stop and clear
+
+-- as the last lap starts: FINAL LAP over the lap just finished (3.0 s)
+exports.vice_hud:ShowRaceBanner({ text = 'FINAL LAP', timeMs = 89290 })
+
+-- at the finish: placing over the time to the millisecond (2.0 s)
+exports.vice_hud:ShowRaceResult({ position = 1, timeMs = 88893 })   -- "1ST" / "01:28.893"
+exports.vice_hud:ShowRaceResult({ label = 'DNF' })
+```
+
+`duration` (ms) on the title, the banner and the result overrides how long
+they stay; `0` leaves one up until the same export is called with `nil`.
+`/hudrace` plays the whole sequence, as a two-lap race.
 
 Prompts are cleaned up automatically when the resource that registered them
 stops, so a crashed script cannot strand one on screen — give ids the
 `yourresource:something` form for that to work.
+
+### Screen text and overlays
+
+Each of these is one export, empty until it is called, and measured off the
+reference. Text takes two marks: `**bold**` for a key word and `{braces}` for
+the thing the line is about, which is drawn pink. Durations are in ms; where
+one is optional, `nil` is the element's own default and `0` is "until hidden".
+
+| Export | What it draws |
+| --- | --- |
+| `ShowSubtitle(text, ms)` | one or two lines of speech, bottom centre (4 s) |
+| `ShowObjective(text, ms)` | what to do next, under the subtitle: `'Return to {Lucia}'` (until hidden) |
+| `ShowHelpText(text, ms, { tells = {...} })` | the help box, top left (7 s) |
+| `ShowFeed(text, { icon, duration })` | a line in the feed on the right: `'Crime reported'` (3.5 s) |
+| `ShowTitleCard(text, style, ms)` | `'center'` (PROLOGUE), `'stack'` (one word a line), `'location'` (a place name) |
+| `SetBinocularOverlay(on, { label, key })` | the lens mask; see `resources/vi_binoculars` for the binoculars themselves |
+| `ShowShopItem(data)` / `HideShopItem()` | store, category, price, item, variant, swatches, and why it cannot be bought |
+| `ShowVehicleStats(data)` / `HideVehicleStats()` | make over model, rated bars, the two ratings |
+| `SetCinematicFx(on, { strength, bars, pulse })` | the Focus effect in black with bars; stays up while the HUD is hidden (the crash cam uses it) |
+
+Passing `nil` / `false` as the text hides a text element. `ShowActionPrompt`
+takes `opts.off = true` to show a prompt greyed (there, but not usable right
+now), and while a shop panel is up the prompts lie in a row.
+
+WASTED and BUSTED are not here: they are `resources/vi_wasted`.
+
+`/hudtext`, `/hudtitle [center|stack|location]`, `/hudshop` and `/hudvehstats`
+show samples.
+
+### The top-right corner
+
+Wanted stars, tells, ammo, the weapon and money were re-measured against the
+clips where all of them are up at once, and those sizes are now the base
+styles; the shipped layout no longer scales that corner.
 
 ### The camera tell
 
@@ -406,6 +574,96 @@ scrollable item-select lists actually set (see the comment above its
 text. An earlier version of this file used Belle Sans Extra Condensed Bold,
 a commercial font with no redistributable tier; swapped out for that reason.
 
+## Merged in: targeting and honor
+
+Two resources that used to sit beside this one are part of it now, so there is
+one HUD, one targeting system and one set of prompts instead of three
+resources drawing over each other.
+
+| Folder | Was | What it is |
+| --- | --- | --- |
+| `target/` | `osm-target` | the targeting engine, its *Context Rail* list drawn in the world, `/targetadmin`, `/targetui`, and the `ox_target` / `qb-target` / `qtarget` APIs |
+| `honor/` | `qbx_honor` | the honor stat, its hooks and exports, and the greet / antagonise options on peds |
+
+`vice_hud` `provide`s `osm-target`, `ox_target`, `qb-target`, `qtarget` and
+`qbx_honor`, and none of the five may be installed as a resource of its own
+beside it. What that covers, and what it does not:
+
+| A script that does this | Still works? |
+| --- | --- |
+| `dependency 'ox_target'` (or any of the five) in its manifest | Yes, through `provide` |
+| `exports.ox_target:addBoxZone(...)`, `exports['qb-target']:...`, `exports.qbx_honor:AddHonor(...)` | Yes. `provide` does not alias exports, so the code registers each one under the old name itself (`ExportAs` in `target/client/api/native.lua`, `HonorExport` in `honor/alias.lua`) |
+| `GetResourceState('ox_target') == 'started'` (or `'qbx_honor'`, `'osm-target'`) | **No.** `provide` does not make a name report as started |
+
+For the last row there are two ways out. The resources in this bundle that
+tested a name that way (`gk_basketball`, `qbx_vehiclekeys`) now also accept
+`vice_hud`. For anything else, either change the test the same way, or run a
+manifest-only resource of that name beside `vice_hud` (a folder with nothing
+but an `fxmanifest.lua`) and delete the matching `provide` line from this
+resource's manifest, so the name has one claimant.
+
+What each kind of interaction is drawn by, so nothing is offered twice:
+
+| Interaction | Drawn by |
+| --- | --- |
+| Anything registered through a target API | the rail (`target/`) |
+| Slim Jim / Smash Window on a locked car | the two-button world prompt (`ShowWorldActions`); `qbx_vehiclekeys` leaves its target option unregistered while this resource runs |
+| A single contextual action | an action prompt (`ShowActionPrompt`) |
+| `OpenInteractMenu` | the HUD's own list. Nothing in this bundle calls it; it is kept for scripts that do |
+
+All three parts share one `Config` table: `config.lua`, then
+`target/config.lua`, then `honor/config.lua`. The only name they had in common
+was the debug switch, which is now `Config.Debug` (HUD), `Config.TargetDebug`
+and `Config.HonorDebug`.
+
+What was changed in `target/` to load it from here, and nothing else:
+
+- `config.lua` adds to the shared `Config` instead of replacing it, the debug
+  switch is renamed as above, and the GitHub version check is off (it would
+  compare this resource's version with osm-target's releases);
+- the in-world surfaces load their page from `target/html/`, and the design
+  packs are looked for under `target/designs/`;
+- its screen-space page (admin panel, preferences, sounds) is a frame inside
+  this resource's page, since a resource has one `ui_page`; `client/ui/nui.lua`
+  sends its messages through the HUD page, and `html/index.html` takes the
+  resource name from the frame's own address when the game does not supply it;
+- its controller-brand preference reads and writes the HUD's setting;
+- its exports are also answered under the name `osm-target`;
+- `use_experimental_fxv2_oal` is not carried over, as it would apply to the
+  whole HUD.
+
+Its original manifest is kept as `target/fxmanifest.lua.original`, and
+honor's as `honor/fxmanifest.lua.original`. `tools/split.test.js` loads every
+shared and client script in manifest order, which is the check that the three
+parts still load together.
+
+None of this has been run on a live server from this repository yet.
+
+## The player marker on the minimap
+
+The reference marks the player with a black-ringed disc and a pale arrowhead,
+not GTA V's white arrow. The minimap is a scaleform and that arrow is a vector
+shape inside it, so the marker is made by swapping the shape in a copy of the
+game's own `minimap.gfx`: the game still places it and turns it with you, at
+no cost, and it cannot drift from the map the way a marker drawn over it would.
+
+`tools/minimap_marker/build.py` does the swap and checks that nothing else in
+the file changed. It needs your game build's `minimap.gfx` and JPEXS Free
+Flash Decompiler; the script's own header says where each comes from.
+
+```bash
+python tools/minimap_marker/build.py --ffdec path/to/ffdec-cli.jar --in minimap.gfx --out stream/minimap.gfx
+```
+
+- The built file is not in this repository: it is the game's own file with
+  three shapes changed, and it is different for every game build. Build it
+  from yours, and again after changing `sv_enforceGameBuild`.
+- Its size is **Player arrow** in the HUD editor's map panel (0 is the game's
+  own size).
+- Delete `stream/minimap.gfx` to get the stock arrow back. Only one resource
+  on a server can stream that file.
+- The pause-menu map has its own scaleform and keeps the stock arrow.
+
 ## Licence
 
 [CC BY-NC-SA 4.0](LICENSE) — **non-commercial**. You may use, modify and
@@ -413,6 +671,11 @@ redistribute this resource, including on a server of your own, but not sell it
 or bundle it into anything paid, and a modified version has to carry the same
 licence. This matches the repository's own licence and every other resource in
 it.
+
+`target/` is the exception. It is a modified fork of osm-target by OsmFX Mods
+and stays under the [OsmFX Mods Source-Available License v1.0](target/LICENSE),
+with its own README and notices; being loaded by this resource's manifest does
+not change that. `honor/` is CC BY-NC-SA 4.0 like the rest and keeps its copy.
 
 > [!NOTE]
 > The copyright line in `LICENSE`'s *How to Apply* section is left for you to

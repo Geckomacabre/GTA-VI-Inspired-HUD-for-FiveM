@@ -251,3 +251,12 @@ original author before reusing them elsewhere.
 The nine station logos sourced from Logopedia are Rockstar Games' trademarks,
 included here the same way any GTA fan resource includes them. They are not
 covered by this license either.
+
+## GTA VI station names
+
+`Config.GTA6Stations` (on by default) gives six stations the name and carousel
+tile of the GTA VI station nearest them in kind: Back Country Radio, Dirty
+South Classics, Flash FM, Cocoteo FM, Afrobank FM and The Chamber 106.6.
+`Config.GTA6Skin` in `config.lua` says which GTA V station wears which. Only
+the name and the tile change; the music and the DJs are the GTA V station's.
+The tiles are from the vectorised Rockstar logo library by @GTAGFX.

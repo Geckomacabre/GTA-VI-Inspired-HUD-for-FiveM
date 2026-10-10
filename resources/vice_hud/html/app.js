@@ -27,6 +27,211 @@
     // there is nothing to letter even if we wanted to.
     var MOUSE_GLYPHS = { LMB: 'icons/LMB.png', RMB: 'icons/RMB.png' };
 
+    /* ---- button glyphs -------------------------------------------------------
+       Every button on the HUD is drawn here, from a TOKEN and the device that
+       token belongs to. client_glyphs.lua resolves both from the player's
+       live bind and re-sends them when the player changes device.
+
+         pad    the Xbox NAMES: A B X Y, LB RB LT RT, LS RS, DPAD, START BACK,
+                with _UP _DOWN _LEFT _RIGHT _X _Y on the sticks and the D-pad.
+                `padStyle` decides whether "A" is an Xbox A or a PlayStation
+                cross (Config.PadGlyphs, or the player's own /hudpad).
+         kbm    a key cap carrying the key's own text, an arrow, or the mouse.
+
+       Each button is ONE svg, face and ink together in a 36-unit box centred
+       on (18,18). Separate boxes stacked on top of each other get snapped to
+       the pixel grid one by one, and the ink ends up a pixel off its face.
+       ------------------------------------------------------------------------ */
+    var padStyle = 'xbox';
+    var PAD_TONE = { A: 'pad-a', B: 'pad-b', X: 'pad-x', Y: 'pad-y' };
+
+    var G_DISC = '<circle class="g-face" cx="18" cy="18" r="16.4"/>';
+    var G_KEY = '<rect class="g-face" x="2.4" y="2.4" width="31.2" height="31.2" rx="6.6"/>';
+    var G_LINES = '<path class="g-ink g-s" d="M11.4 12.6h13.2M11.4 18h13.2M11.4 23.4h13.2"/>';
+
+    var G_FACE = {
+        xbox: {
+            A: '<path class="g-ink" d="M11.6 25.2 18 10.8l6.4 14.4M14 20.2h8"/>',
+            B: '<path class="g-ink" d="M12.9 10.8v14.4h6.2a4 4 0 0 0 0-8h-6.2m5.5 0a3.2 3.2 0 0 0 0-6.4h-5.5"/>',
+            X: '<path class="g-ink" d="M12.4 10.8l11.2 14.4M23.6 10.8 12.4 25.2"/>',
+            Y: '<path class="g-ink" d="M12.2 10.8 18 18.6l5.8-7.8M18 18.6v6.6"/>'
+        },
+        ps: {
+            A: '<path class="g-ink" d="M12.3 12.3l11.4 11.4M23.7 12.3 12.3 23.7"/>',
+            B: '<circle class="g-ink" cx="18" cy="18" r="6.9"/>',
+            X: '<rect class="g-ink" x="11.6" y="11.6" width="12.8" height="12.8" rx="0.8"/>',
+            // An equilateral triangle sits in a circle by its centroid, not by
+            // the middle of its bounding box; that is where a pad prints it.
+            Y: '<path class="g-ink" d="M18 9.6 25.39 22.4H10.61Z"/>'
+        }
+    };
+    var G_SHOULDER = {
+        xbox: { LB: 'LB', RB: 'RB', LT: 'LT', RT: 'RT' },
+        ps: { LB: 'L1', RB: 'R1', LT: 'L2', RT: 'R2' }
+    };
+    var G_MENU = {
+        xbox: {
+            START: G_LINES,
+            BACK: '<rect class="g-ink g-s" x="10" y="10.6" width="11.2" height="9" rx="1.2"/>'
+                + '<path class="g-ink g-s" d="M14.8 22.4v1.8a1.2 1.2 0 0 0 1.2 1.2h8.8a1.2 1.2 0 0 0 '
+                + '1.2-1.2v-6.6a1.2 1.2 0 0 0-1.2-1.2h-.9"/>'
+        },
+        ps: {
+            START: G_LINES,
+            BACK: '<rect class="g-ink g-s" x="8.6" y="11.6" width="18.8" height="12.8" rx="3.2"/>'
+        }
+    };
+    // Which way a stick or the D-pad is being asked for. _X is left+right,
+    // _Y is up+down.
+    var G_DIRS = { UP: ['UP'], DOWN: ['DOWN'], LEFT: ['LEFT'], RIGHT: ['RIGHT'],
+                   X: ['LEFT', 'RIGHT'], Y: ['UP', 'DOWN'] };
+    var G_STICK_MARK = { UP: 'M18 3.3l3 3.5h-6z', DOWN: 'M18 32.7l3-3.5h-6z',
+                         LEFT: 'M3.3 18l3.5-3v6z', RIGHT: 'M32.7 18l-3.5-3v6z' };
+    var G_STICK_LETTER = {
+        L: '<path class="g-ink g-s" d="M15.2 13.4v9.2h5.6"/>',
+        R: '<path class="g-ink g-s" d="M14.9 22.6v-9.2h3.5a2.7 2.7 0 0 1 0 5.4h-3.5m3.3 0 2.9 3.8"/>'
+    };
+    var G_DPAD = 'M14.7 7.2h6.6v7.5h7.5v6.6h-7.5v7.5h-6.6v-7.5H7.2v-6.6h7.5z';
+    var G_DPAD_ARM = { UP: 'M14.7 7.2h6.6v7.5h-6.6z', DOWN: 'M14.7 21.3h6.6v7.5h-6.6z',
+                       LEFT: 'M7.2 14.7h7.5v6.6H7.2z', RIGHT: 'M21.3 14.7h7.5v6.6h-7.5z' };
+    var G_ARROW = { UP: 0, RIGHT: 90, DOWN: 180, LEFT: 270 };
+    var G_MOUSE_BODY = '<rect class="g-ink g-t" x="12.2" y="9" width="11.6" height="18" rx="5.8"/>'
+        + '<path class="g-ink g-t" d="M12.2 16.6h11.6"/>'
+        + '<rect class="g-solid" x="16.6" y="10.8" width="2.8" height="4.2" rx="1.4"/>';
+    var G_MOUSE = {
+        MMB: G_MOUSE_BODY,
+        WHEEL_UP: G_MOUSE_BODY + '<path class="g-ink g-t" d="M15.4 23.4l2.6-2.6 2.6 2.6"/>',
+        WHEEL_DOWN: G_MOUSE_BODY + '<path class="g-ink g-t" d="M15.4 21.4l2.6 2.6 2.6-2.6"/>'
+    };
+
+    function glyphEscape(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Capitals are centred on their own height, not on the line box: the
+    // baseline goes half a cap-height (0.35 em in Bahnschrift) below centre.
+    function glyphText(text, cx, cy, size) {
+        return '<text class="g-text" x="' + cx + '" y="' + (cy + size * 0.35).toFixed(2)
+            + '" font-size="' + size + '" text-anchor="middle">' + glyphEscape(text) + '</text>';
+    }
+
+    function glyphMarks(dirs, table, cls) {
+        return (dirs || []).map(function (d) {
+            return '<path class="' + cls + '" d="' + table[d] + '"/>';
+        }).join('');
+    }
+
+    // -> { w, svg, cls } for a button, or null when there is none to draw.
+    // `w` is the width of its box in the same units as the 36 it is tall.
+    function glyphArt(token, device) {
+        var t = token == null ? '' : String(token);
+        if (!t) return null;
+        var style = padStyle === 'ps' ? 'ps' : 'xbox';
+
+        if (device === 'pad') {
+            if (G_FACE[style][t]) {
+                return { w: 36, svg: G_DISC + G_FACE[style][t],
+                         cls: 'pad face' + (style === 'xbox' ? ' ' + PAD_TONE[t] : '') };
+            }
+            if (G_SHOULDER[style][t]) {
+                var trigger = t.charAt(1) === 'T';
+                return { w: 48, cls: 'pad ' + (trigger ? 'trigger' : 'bumper'),
+                         svg: (trigger
+                             ? '<path class="g-face" d="M8.6 29.4V15.2Q8.6 5.6 18.2 5.6h11.6q9.6 0 9.6 '
+                               + '9.6v14.2q0 1-1 1H9.6q-1 0-1-1z"/>'
+                             : '<rect class="g-face" x="3.6" y="8" width="40.8" height="20" rx="7.2"/>')
+                             + glyphText(G_SHOULDER[style][t], 24, trigger ? 18.8 : 18, 13.6) };
+            }
+            var m = /^(LS|RS|DPAD)(?:_(UP|DOWN|LEFT|RIGHT|X|Y))?$/.exec(t);
+            if (m && m[1] === 'DPAD') {
+                var arms = G_DIRS[m[2]];
+                return { w: 36, cls: 'pad dpad',
+                         svg: G_DISC + '<path class="g-solid' + (arms ? ' g-dim' : '') + '" d="' + G_DPAD + '"/>'
+                             + glyphMarks(arms, G_DPAD_ARM, 'g-solid') };
+            }
+            if (m) {
+                return { w: 36, cls: 'pad stick',
+                         svg: G_DISC + '<circle class="g-rim" cx="18" cy="18" r="10.4"/>'
+                             + G_STICK_LETTER[m[1].charAt(0)]
+                             + glyphMarks(G_DIRS[m[2]], G_STICK_MARK, 'g-solid') };
+            }
+            if (G_MENU[style][t]) return { w: 36, svg: G_DISC + G_MENU[style][t], cls: 'pad menu' };
+        }
+
+        // Keyboard and mouse -- and anything a pad token had no drawing for,
+        // which is better shown as its own name on a cap than not at all.
+        if (MOUSE_GLYPHS[t]) {
+            return { w: 36, cls: 'key mouse',
+                     svg: G_KEY + '<image class="g-img" href="' + MOUSE_GLYPHS[t]
+                         + '" x="5.4" y="5.4" width="25.2" height="25.2"/>' };
+        }
+        if (G_MOUSE[t]) return { w: 36, svg: G_KEY + G_MOUSE[t], cls: 'key mouse' };
+        if (G_ARROW[t] != null) {
+            return { w: 36, cls: 'key',
+                     svg: G_KEY + '<path class="g-ink" transform="rotate(' + G_ARROW[t]
+                         + ' 18 18)" d="M18 25.4V10.6M12 16.6l6-6 6 6"/>' };
+        }
+        if (t.length === 1) return { w: 36, svg: G_KEY + glyphText(t, 18, 18, 19.5), cls: 'key' };
+        var w = Math.round(15 + t.length * 9.2);
+        return { w: w, cls: 'key wide',
+                 svg: '<rect class="g-face" x="2.4" y="2.4" width="' + (w - 4.8)
+                     + '" height="31.2" rx="6.6"/>' + glyphText(t, w / 2, 18, 15.5) };
+    }
+
+    // The ring a hold-to-confirm button fills. It follows the button's own
+    // outline -- a circle round a disc, a rounded box round anything else --
+    // and lives in the button's svg, so the two share one centre exactly.
+    // The fill starts at twelve o'clock and runs clockwise; how far is
+    // --prompt-frac, written by onPromptProgress.
+    var G_RING_PAD = 6;
+
+    function glyphRing(art) {
+        var shape;
+        if (/\b(face|stick|dpad|menu)\b/.test(art.cls)) {
+            shape = function (cls, extra) {
+                return '<circle class="' + cls + '" cx="18" cy="18" r="20.4"' + (extra || '') + '/>';
+            };
+            return shape('g-ring-edge') + shape('g-ring-track')
+                + shape('g-ring-fill', ' pathLength="100" transform="rotate(-90 18 18)"');
+        }
+        // A rect's outline starts after its top-left corner, which is close
+        // enough to "the top" that it needs no turning.
+        shape = function (cls, extra) {
+            return '<rect class="' + cls + '" x="-1.6" y="-1.6" width="' + (art.w + 3.2)
+                + '" height="39.2" rx="10.6"' + (extra || '') + '/>';
+        };
+        return shape('g-ring-edge') + shape('g-ring-track') + shape('g-ring-fill', ' pathLength="100"');
+    }
+
+    // Turn `el` into the button for token + device. `base` is the class the
+    // element keeps whatever it is showing ('glyph' unless told otherwise).
+    // `ring` is true for the hold ring round it, or 'space' to leave the
+    // ring's room without drawing one -- which is how a column of prompts,
+    // some held and some pressed, keeps every button on one centre line: the
+    // boxes are all the same size. With nothing to draw the element is left
+    // empty and marked .none, so a row can show its label alone.
+    function setGlyph(el, token, device, base, ring) {
+        var art = glyphArt(token, device);
+        el.textContent = '';
+        el.removeAttribute('data-glyph');
+        el.className = (base || 'glyph') + (art ? ' ' + art.cls : ' none');
+        el.style.removeProperty('--g-w');
+        el.style.removeProperty('--g-s');
+        if (!art) return el;
+
+        var pad = ring ? G_RING_PAD : 0;
+        el.setAttribute('data-glyph', String(token));
+        if (ring === true) el.classList.add('ringed');
+        // The box grows by the ring's margin on every side, so the button
+        // inside it stays exactly the size it is without one.
+        el.style.setProperty('--g-w', (art.w + pad * 2) / 36);
+        el.style.setProperty('--g-s', (36 + pad * 2) / 36);
+        el.innerHTML = '<svg class="g-art" viewBox="' + (-pad) + ' ' + (-pad) + ' '
+            + (art.w + pad * 2) + ' ' + (36 + pad * 2) + '" aria-hidden="true">'
+            + (ring === true ? glyphRing(art) : '') + art.svg + '</svg>';
+        return el;
+    }
+
     function setFill(rowId, value) {
         var row = $(rowId);
         if (!row) return;
@@ -563,28 +768,32 @@
         lapTimerRAF = raf(lapTimerTick);
     }
 
-    function renderLapPips(cur, total) {
-        var track = $('lap-cp-track');
-        if (!track) return;
-        // Checkpoints-per-lap never changes mid-run, so the element count
-        // only needs rebuilding when it actually differs from last time.
-        if (track.childElementCount !== total) {
-            track.innerHTML = '';
-            for (var i = 0; i < total; i++) {
-                var pip = document.createElement('span');
-                pip.className = 'lap-cp-pip';
-                track.appendChild(pip);
-            }
+    /* How far through the race, 0..100, for the PROGRESS chip.
+       `progress` (0..1) wins when the race resource sends one -- it knows the
+       distance along the route, which is what the reference's figure climbs
+       by. Without it the figure is worked out from checkpoints cleared across
+       every lap, which moves in steps but is never wrong. */
+    function lapProgressPct(d) {
+        var p;
+        if (d.progress != null) {
+            p = +d.progress;
+        } else {
+            var laps = Math.max(1, +d.laps || 1);
+            var per = +d.cpTotal || 0;
+            if (!per) return 0;
+            var lap = Math.max(1, +d.lap || 1);
+            p = ((lap - 1) * per + (+d.cp || 0)) / (laps * per);
         }
-        var pips = track.children;
-        for (var j = 0; j < pips.length; j++) {
-            pips[j].classList.toggle('on', j < cur);
-        }
+        if (!(p > 0)) return 0;
+        return Math.round(Math.min(1, p) * 100);
     }
 
     function onLapHud(d) {
         var box = $('lap-hud');
         if (!box) return;
+        // Lifts the prompts and the honor toast clear of the corner this
+        // block takes; see #stage.racing in style.css.
+        if (stage) stage.classList.toggle('racing', !!(d && d.show));
         if (!d || !d.show) {
             show(box, false);
             lapTimerRunning = false;
@@ -592,14 +801,28 @@
             return;
         }
 
+        var laps = d.laps != null ? d.laps : 1;
         var cur = $('lap-cur'), tot = $('lap-total');
         if (cur) cur.textContent = d.lap != null ? d.lap : 1;
-        if (tot) tot.textContent = d.laps != null ? d.laps : 1;
+        if (tot) tot.textContent = laps;
+        // The first row is LAP for a race that has laps and PROGRESS for a
+        // point to point: the reference draws one or the other.
+        show($('lap-badge'), +laps > 1);
+        show($('lap-progress'), !(+laps > 1));
 
+        var pct = $('lap-progress-pct');
+        if (pct) pct.textContent = lapProgressPct(d);
+
+        // The plate is POSITION in the field, as in the reference. A race
+        // resource that sends none (a solo time trial has no field) gets the
+        // checkpoint count there instead, which is what this plate used to be.
+        var hasPos = d.position != null;
         var cpCur = $('lap-cp-cur'), cpTot = $('lap-cp-total');
-        if (cpCur) cpCur.textContent = d.cp != null ? d.cp : 0;
-        if (cpTot) cpTot.textContent = d.cpTotal != null ? d.cpTotal : 0;
-        renderLapPips(d.cp || 0, d.cpTotal || 0);
+        if (cpCur) cpCur.textContent = hasPos ? d.position : (d.cp != null ? d.cp : 0);
+        if (cpTot) {
+            cpTot.textContent = hasPos ? (d.racers != null ? d.racers : d.position)
+                : (d.cpTotal != null ? d.cpTotal : 0);
+        }
 
         if (d.elapsedMs != null) {
             lapTimerBasisMs = d.elapsedMs;
@@ -618,6 +841,119 @@
         }
 
         show(box, true);
+    }
+
+    /* --- race cards and countdown -----------------------------------------
+       The top-centre cards (the title before the start, the placing at the
+       finish) and the 3-2-1-go. Everything here CUTS in and out, as it does
+       in the reference: the only timing is how long each thing stays up. */
+
+    /* 1ST, 2ND, 3RD, 4TH ... 11TH, 12TH, 13TH ... 21ST. */
+    function ordinal(n) {
+        n = Math.max(1, Math.round(+n) || 1);
+        var tens = n % 100;
+        if (tens >= 11 && tens <= 13) return n + 'TH';
+        return n + (['TH', 'ST', 'ND', 'RD'][n % 10] || 'TH');
+    }
+
+    /* A finishing time, to the millisecond: 01:28.893. The running clock in
+       the race block shows hundredths; the result card shows thousandths. */
+    function formatResultTime(ms) {
+        ms = Math.max(0, Math.round(+ms) || 0);
+        var minutes = Math.floor(ms / 60000);
+        var seconds = Math.floor((ms % 60000) / 1000);
+        var millis = ms % 1000;
+        return (minutes < 10 ? '0' : '') + minutes + ':'
+            + (seconds < 10 ? '0' : '') + seconds + '.'
+            + ('00' + millis).slice(-3);
+    }
+
+    var raceCardTimer = null;
+
+    /* kind 'title':  { series, name, type }     chip / big line / chip
+       kind 'result': { position, timeMs }       big line / chip
+       `holdMs` is how long it stays; 0 leaves it up until hidden. */
+    function onRaceCard(d) {
+        var card = $('race-card');
+        if (!card) return;
+        if (raceCardTimer) { clearTimeout(raceCardTimer); raceCardTimer = null; }
+        if (!d || d.show === false) { show(card, false); return; }
+
+        var result = d.kind === 'result';
+        // 'banner' is a line across the top with a time under it: FINAL LAP
+        // over the lap just finished.
+        var banner = d.kind === 'banner';
+        var top = '', main = '', sub = '';
+        if (result) {
+            main = d.label != null ? String(d.label) : ordinal(d.position);
+            if (d.timeMs != null) sub = formatResultTime(d.timeMs);
+        } else if (banner) {
+            main = d.text != null ? String(d.text) : 'Final lap';
+            if (d.timeMs != null) sub = formatResultTime(d.timeMs);
+        } else {
+            top = d.series || '';
+            main = d.name || '';
+            sub = d.type || '';
+        }
+        var set = function (id, text) { var el = $(id); if (el) el.textContent = text; };
+        set('race-card-top', top);
+        set('race-card-main', main);
+        set('race-card-sub', sub);
+        card.classList.toggle('result', result);
+        card.classList.toggle('banner', banner);
+        show(card, true);
+
+        // 1900 ms and 2000 ms are what the reference holds them for.
+        var hold = typeof d.holdMs === 'number' ? d.holdMs : (result ? 2000 : banner ? 3000 : 1900);
+        if (hold > 0) {
+            raceCardTimer = setTimeout(function () {
+                raceCardTimer = null;
+                show($('race-card'), false);
+            }, hold);
+        }
+    }
+
+    var raceCountTimers = [];
+
+    function clearRaceCount() {
+        raceCountTimers.forEach(clearTimeout);
+        raceCountTimers = [];
+    }
+
+    function showRaceCount(text, holdMs) {
+        var el = $('race-count');
+        if (!el) return;
+        el.textContent = text;
+        show(el, true);
+        raceCountTimers.push(setTimeout(function () { show($('race-count'), false); }, holdMs));
+    }
+
+    /* Either one beat -- { value: 3 } or { value: 'go' } -- for a race
+       resource that keeps its own clock, or the whole run -- { from: 3 } --
+       timed here the way the reference times it: a digit every second, each
+       up for 300 ms, then "go" for 1100 ms. */
+    function onRaceCountdown(d) {
+        clearRaceCount();
+        if (!d || d.show === false) { show($('race-count'), false); return; }
+
+        var digitMs = typeof d.digitMs === 'number' ? d.digitMs : 300;
+        var goMs = typeof d.goMs === 'number' ? d.goMs : 1100;
+        var isGo = function (v) { return String(v).toLowerCase() === 'go' || v === 0; };
+
+        if (d.value != null) {
+            showRaceCount(isGo(d.value) ? 'go' : String(d.value), isGo(d.value) ? goMs : digitMs);
+            return;
+        }
+
+        var from = Math.max(1, Math.round(+d.from) || 3);
+        var stepMs = typeof d.stepMs === 'number' ? d.stepMs : 1000;
+        var beat = function (i) {
+            var n = from - i;
+            raceCountTimers.push(setTimeout(function () {
+                showRaceCount(n > 0 ? String(n) : 'go', n > 0 ? digitMs : goMs);
+            }, i * stepMs));
+        };
+        for (var i = 0; i <= from; i++) beat(i);
     }
 
     /* --- interact menu (Phase 1 of the ox_target-replacement project) -----
@@ -725,32 +1061,20 @@
        Window. Not the scrollable #interact list — see the comment on
        #world-actions in index.html for why this is its own component.
 
-       Each option now arrives as { label, glyph, device } -- glyph is the
-       LIVE resolved key (client_overlays.lua's waResolveKey), the same way
-       the Action Prompts row above gets its `glyph`/`device`. This used to
-       take a hand-picked `button: 'triangle'|'circle'` string with nothing
+       Each option arrives as { label, glyph, device } -- glyph is the LIVE
+       resolved button (client_glyphs.lua), the same way an action prompt gets
+       its own, and setGlyph draws it the same way too. This used to take a
+       hand-picked `button: 'triangle'|'circle'` string with nothing
        connecting it to what was actually bound, which is exactly how it went
        stale: the shown icon and the working button drifted apart (see the
        fix note in vice_hud/client_overlays.lua and
        qbx_vehiclekeys/client/slimjim.lua). Deriving the icon FROM the
-       resolved glyph, below, is what makes that drift impossible now. */
-    var WA_BTN_SVG = {
-        triangle: '<svg viewBox="0 0 24 24"><path d="M12 4 L20.5 19.5 L3.5 19.5 Z"/></svg>',
-        circle: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none"/></svg>',
-        square: '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1.5" fill="none"/></svg>',
-        cross: '<svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>'
-    };
-    // GTA's own instructional-button text names pad face buttons with their
-    // Xbox letter (Y/B/X/A) regardless of the player's actual controller
-    // brand -- the same convention PAD_TONE (action prompts, above) keys off.
-    // Mapped to the matching PlayStation shape so a pad player still sees the
-    // outlined icon this component was designed around, derived from the
-    // resolved glyph rather than a separately hand-picked shape.
-    var WA_PAD_SHAPE = { Y: 'triangle', B: 'circle', X: 'square', A: 'cross' };
+       resolved glyph is what makes that drift impossible now. */
 
     function onWorldActions(d) {
         var box = $('world-actions');
         if (!box) return;
+        lastWorldActions = d || null;
         if (!d || !d.show) { show(box, false); return; }
 
         box.innerHTML = '';
@@ -758,37 +1082,24 @@
             var row = document.createElement('div');
             row.className = 'wa-row';
 
-            var btn = document.createElement('span');
-            btn.className = 'wa-btn';
-            var glyph = opt.glyph == null ? '' : String(opt.glyph);
-            var shape = opt.device === 'pad' ? WA_PAD_SHAPE[glyph] : null;
-            if (shape) {
-                // Recognised pad face button: the outlined shape this
-                // component was designed around.
-                // innerHTML alone -- setting .textContent afterward would wipe
-                // the SVG right back out, since it replaces all children.
-                btn.innerHTML = WA_BTN_SVG[shape];
-                btn.classList.remove('wa-btn-text');
-            } else if (MOUSE_GLYPHS[glyph]) {
-                // A mouse button, drawn as the button itself for the same
-                // reason the prompt stack does it (see MOUSE_GLYPHS): there is
-                // no key cap to letter. Same innerHTML-then-append rule as the
-                // pad shape above -- textContent would wipe the image out.
-                btn.innerHTML = '';
-                var mimg = document.createElement('img');
-                mimg.src = MOUSE_GLYPHS[glyph];
-                mimg.alt = glyph;
-                btn.appendChild(mimg);
-                btn.classList.remove('wa-btn-text');
-            } else {
-                // Keyboard, or a pad button with no shape mapping (shoulders,
-                // triggers, D-pad) -- show the resolved key/label as plain
-                // text inside the same circle rather than guessing a shape.
-                btn.innerHTML = '';
-                btn.textContent = glyph;
-                btn.classList.toggle('wa-btn-text', glyph.length > 0);
-            }
+            var btn = setGlyph(document.createElement('span'), opt.glyph, opt.device, 'wa-btn glyph');
             row.appendChild(btn);
+
+            // Between the button and the name: three dots on a dark disc for
+            // an option that opens a list, or a coloured dot.
+            if (opt.more) {
+                var more = document.createElement('span');
+                more.className = 'wa-more';
+                more.innerHTML = '<svg viewBox="0 0 36 36" aria-hidden="true">'
+                    + '<circle class="wa-more-disc" cx="18" cy="18" r="16.4"/>'
+                    + '<circle cx="18" cy="11" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="18" cy="25" r="2"/></svg>';
+                row.appendChild(more);
+            } else if (opt.dot) {
+                var dot = document.createElement('span');
+                dot.className = 'wa-dot';
+                if (typeof opt.dot === 'string' && /^#[0-9a-f]{3,8}$/i.test(opt.dot)) dot.style.background = opt.dot;
+                row.appendChild(dot);
+            }
 
             var label = document.createElement('span');
             label.className = 'wa-label';
@@ -797,6 +1108,7 @@
 
             box.appendChild(row);
         });
+        box.classList.toggle('wa-centred', !!d.centred);
         show(box, true);
     }
 
@@ -1538,55 +1850,220 @@
         return 'unknown';
     }
 
-    /* `expanded` is the vehicle panel's ANNOUNCEMENT state -- the few seconds
-       after you get in, while the make and model are still up. Fuel and
-       engine both show there, because "here is the car you just got into" is
-       exactly when a reading of its condition is worth having, healthy or
-       not. The tracker gets no such courtesy -- it has no reading of its
-       own, only a state something else decided matters, so it is on screen
-       ONLY while actually active, expanded or not.
+    /* Nitrous is the other odd one out, in the opposite direction: it is the
+       only pip that is a CONTROL rather than a warning. `n` is whatever
+       client.lua's Nitrous section last normalised -- { installed, level 0..1,
+       active, ready } -- or nothing at all for a car with no kit.
 
-       Once the panel COLLAPSES to the pip row and stays there for the rest of
-       the drive, the warning rule takes over for fuel/engine too, and only the
-       amber or red bands survive. Same principle either way -- a pip is on
-       screen while it has something to say.
+       Its tone is deliberately off the good / warn / bad scale. Those three
+       answer "is this a problem", and a nitrous tank is never a problem, only
+       more or less available: usable, or locked out refilling. The second
+       borrows 'unknown', the same grey a parked car's gauges use, for the
+       same reason -- the reading is real and nothing can currently act on it.
 
-       Returns whether anything is left, so the caller can drop the panel
-       rather than leave an empty box on the map. */
+       `active` (boosting right now) deliberately changes NOTHING here. The
+       ring draining is the boost indicator, as it is in the reference; the
+       disc and the mark do not light up, pulse or move. */
+    function nitroInstalled(n) { return !!(n && n.installed); }
+
+    function nitroTone(n) {
+        if (!nitroInstalled(n)) return 'unknown';
+        return n.ready === false ? 'unknown' : 'nitro';
+    }
+
+    function nitroPct(n) {
+        var level = n && +n.level;
+        // NaN from a missing or malformed level reads as an empty tank rather
+        // than reaching the ring as a dash offset of NaN.
+        return level > 0 ? level * 100 : 0;
+    }
+
+    /* The fast path. The vehicle push carries the same table four times a
+       second; this arrives whenever the tank actually changes -- ten times a
+       second mid-boost. It writes the new reading into the last vehicle
+       payload and runs the panel again, so the ring moves between ticks and a
+       row that had gone quiet and away comes straight back the moment the
+       tank starts to move, rather than up to a quarter of a second later. */
+    var lastVehicle = null;
+
+    function onNitrous(d) {
+        if (!lastVehicle || !lastVehicle.show) return;
+        lastVehicle.nitrous = nitroInstalled(d)
+            ? { installed: true, level: d.level, active: d.active, ready: d.ready }
+            : null;
+        onVehicle(lastVehicle);
+    }
+
+    /* The "Hold [key] to activate nitrous" tip. client.lua decides WHEN (a kit
+       was just fitted, or something called ShowNitrousHint) and resolves the
+       key; this draws it and takes it down again after `holdMs`. The cap is
+       built the way renderPrompts builds one, so a mouse bind is a picture
+       and a pad face button gets its colour. No glyph at all hides the cap
+       and the line reads "Hold to activate nitrous". */
+    var nitroHintTimer = null;
+
+    function onNitrousHint(d) {
+        var el = $('nitro-hint');
+        if (!el) return;
+        if (d && d.refresh && el.classList.contains('hidden')) return;
+        if (nitroHintTimer && !(d && d.refresh)) { clearTimeout(nitroHintTimer); nitroHintTimer = null; }
+        if (!d || d.show === false) { show(el, false); return; }
+
+        lastNitrousHint = { glyph: d.glyph, device: d.device };
+        var cap = $('nitro-hint-key');
+        if (cap) setGlyph(cap, d.glyph, d.device);
+        // A device swap while the tip is up: the same tip with a new button
+        // on it, and the clock it is already running on.
+        if (d.refresh) return;
+
+        show(el, true);
+        var hold = typeof d.holdMs === 'number' ? d.holdMs : 7000;
+        if (hold > 0) {
+            nitroHintTimer = setTimeout(function () {
+                nitroHintTimer = null;
+                show($('nitro-hint'), false);
+            }, hold);
+        }
+    }
+
+    /* ---- change-driven pips --------------------------------------------------
+       The collapsed row is about CHANGE, not about state.
+
+         a reading changes        its pip lights up: its colour, its ring
+         PIP_LIT_MS later         it drops back to QUIET (dim, grey, no ring)
+         PIP_DIM_MS after that    with nothing else changing, the row goes
+
+       Why not "lit while there is a warning", which is what this used to do:
+       the reference shows a pump with a part-drained green ring on the name
+       plate and, a minute later, the same pump dim and ringless beside a
+       nitrous ring that is being used. Read as state that is a contradiction
+       -- is the tank low or not? Read as change it is not one: the plate is
+       an announcement (everything lit), the nitrous is what is changing now
+       (lit), and the fuel has not moved lately (dim). A dim pip never means
+       "fine" and a lit one never means "bad"; lit means "this just moved".
+
+       What counts as moving is per pip, because fuel creeps down all the time
+       and an icon that relights for every tenth of a percent is an icon that
+       never goes dim:
+         fuel      5 points down or 2 up since it last lit, or a change of band
+         engine    50 health either way, a change of band, or the key turning
+         tracker   any change of state
+         nitrous   any change at all: fitted, burning, locked out, level        */
+    var PIP_LIT_MS = 4000;
+    var PIP_DIM_MS = 6000;
+    var FUEL_STEP_DOWN = 5, FUEL_STEP_UP = 2, ENGINE_STEP = 50, NITRO_STEP = 0.005;
+
+    /* What each pip looked like when it last lit, and when that was. Kept per
+       vehicle: a different car is all news, and so is the same car again. */
+    var pipMemory = null;
+
+    function pipSlots(d) {
+        var key = (d.make || '') + '|' + (d.model || '');
+        if (!pipMemory || pipMemory.key !== key) pipMemory = { key: key };
+        return pipMemory;
+    }
+
+    /* Milliseconds since `name` last changed. The stored sample only moves
+       when `differs` says so, which is what lets a slow drain add up to a
+       step instead of being forgotten a tick at a time. */
+    function pipAge(mem, name, sample, differs) {
+        var now = Date.now();
+        var prev = mem[name];
+        if (!prev || differs(prev.sample, sample)) prev = mem[name] = { sample: sample, at: now };
+        return now - prev.at;
+    }
+
+    function fuelMoved(a, b) {
+        return a.band !== b.band || a.v - b.v >= FUEL_STEP_DOWN || b.v - a.v >= FUEL_STEP_UP;
+    }
+    function engineMoved(a, b) {
+        return a.band !== b.band || Math.abs(a.v - b.v) >= ENGINE_STEP;
+    }
+    function trackerMoved(a, b) { return a !== b; }
+    function nitroMoved(a, b) {
+        return a.inst !== b.inst || a.act !== b.act || a.rdy !== b.rdy
+            || Math.abs(a.lvl - b.lvl) >= NITRO_STEP;
+    }
+
     function setPips(d, expanded) {
         var fuel = d.fuel == null ? 0 : d.fuel;
         var running = !!d.engineOn;
+        var health = d.engineHealth == null ? 1000 : d.engineHealth;
 
         var fuelTone = !running ? 'unknown'
             : fuel <= 10 ? 'bad' : fuel <= 25 ? 'warn' : 'good';
         var engTone = !running ? 'unknown' : engineTone(d.engineHealth);
         var trackTone = trackerTone(d.trackerState);
+        var n = d.nitrous;
+        var hasTrack = pipShows(trackTone);   // searching or spotted
+        var hasNitro = nitroInstalled(n);
 
-        /* The RING keeps its real reading whenever the pip is shown at all --
-           it is a measurement, and a warning disc with no figure behind it
-           just says "something". */
+        var mem = pipSlots(d);
+        var ageFuel = pipAge(mem, 'fuel', { v: fuel, band: fuelTone }, fuelMoved);
+        var ageEng = pipAge(mem, 'engine', { v: health, band: engTone }, engineMoved);
+        var ageTrack = pipAge(mem, 'tracker', d.trackerState || '', trackerMoved);
+        var ageNitro = pipAge(mem, 'nitrous', {
+            inst: hasNitro, lvl: nitroPct(n) / 100,
+            act: !!(n && n.active), rdy: !(n && n.ready === false)
+        }, nitroMoved);
+
+        /* The RING keeps its real reading whenever the pip is lit at all --
+           it is a measurement, and a lit disc with no figure behind it just
+           says "something". */
         tone($('pip-fuel'), fuelTone, fuel);
         tone($('pip-engine'), engTone, enginePct(d.engineHealth));
         tone($('pip-tracker'), trackTone);
+        tone($('pip-nitrous'), nitroTone(n), nitroPct(n));
 
-        /* NOTE: tone() above rewrites className wholesale, which drops the
-           `hidden` class -- so these have to run AFTER it, not before. */
-        var anyFuel = expanded || pipShows(fuelTone);
-        var anyEng = expanded || pipShows(engTone);
-        // Unlike fuel/engine, the tracker does NOT get an expanded bypass --
-        // it has no reading to show off on entry, only a state someone else
-        // decided matters. It shows ONLY while actually active (searching or
-        // spotted), announcement or not; 'clear' and unset both stay hidden.
-        var anyTrack = pipShows(trackTone);
-        show($('pip-fuel'), anyFuel);
-        show($('pip-engine'), anyEng);
-        show($('pip-tracker'), anyTrack);
+        /* NOTE: tone() above rewrites className wholesale, which drops both
+           `hidden` and `quiet` -- so everything below has to run AFTER it. */
 
-        /* With every pip hidden the strip is an empty band with a border on
-           it, so drop the whole band. */
-        var any = anyFuel || anyEng || anyTrack;
-        show($('veh-foot'), any);
-        return any;
+        /* A CAR THAT IS SWITCHED OFF IS DIM. Its engine, fuel and nitrous pips
+           are there but quiet, on the name plate and off it, however recently
+           anything moved: lit means the car is doing something, and a parked
+           car is not. Turning the key is itself a change, so they light the
+           moment it starts. The tracker is not the car's -- it is the police
+           -- and keeps its own clock either way. */
+        var asleep = function (id) { return !running && id !== 'pip-tracker'; };
+
+        /* The name plate is an announcement: here is the car, here is the
+           state it is in. Everything it has -- lit if the car is running. */
+        if (expanded) {
+            show($('pip-fuel'), true);
+            show($('pip-engine'), true);
+            show($('pip-tracker'), hasTrack);
+            show($('pip-nitrous'), hasNitro);
+            ['pip-fuel', 'pip-engine', 'pip-nitrous'].forEach(function (id) {
+                if (asleep(id)) $(id).classList.add('quiet');
+            });
+            show($('veh-foot'), true);
+            return true;
+        }
+
+        /* Collapsed. Engine and fuel are always seats in the row; the tracker
+           and nitrous are in it only while there is something to track or a
+           kit on the car. The row is up while ANY of the pips in it has moved
+           recently, and each pip is lit or quiet on its own clock. */
+        var row = [['pip-fuel', ageFuel], ['pip-engine', ageEng]];
+        if (hasTrack) row.push(['pip-tracker', ageTrack]);
+        if (hasNitro) row.push(['pip-nitrous', ageNitro]);
+
+        var freshest = Math.min.apply(null, row.map(function (p) { return p[1]; }));
+        var rowUp = freshest < PIP_LIT_MS + PIP_DIM_MS;
+
+        show($('pip-fuel'), rowUp);
+        show($('pip-engine'), rowUp);
+        show($('pip-tracker'), rowUp && hasTrack);
+        show($('pip-nitrous'), rowUp && hasNitro);
+        if (rowUp) {
+            row.forEach(function (p) {
+                if (p[1] >= PIP_LIT_MS || asleep(p[0])) $(p[0]).classList.add('quiet');
+            });
+        }
+
+        /* With every pip hidden the strip is an empty band, so drop it. */
+        show($('veh-foot'), rowUp);
+        return rowUp;
     }
 
     /* Manufacturer badge ----------------------------------------------------
@@ -1631,7 +2108,9 @@
         var el = $('vehicle');
         if (!el) return;
         setBadge(d.make);
-        if (!d.show) { slotVanish(el); return; }
+        lastVehicle = d.show ? d : null;
+        // Out of the car: the next one, or this one again, is all news.
+        if (!d.show) { pipMemory = null; slotVanish(el); return; }
 
         /* Collapsed: the announcement is over, the readings are not.
            Set BEFORE the names are measured -- fitAll() measures against a box
@@ -2023,7 +2502,6 @@
 
     /* --- action prompts -------------------------------------------------- */
 
-    var PAD_TONE = { A: 'pad-a', B: 'pad-b', X: 'pad-x', Y: 'pad-y' };
     var prompts = {};
     // id -> the .prompt-glyph-wrap element for whichever rows are currently
     // hold-enabled, so a promptProgress tick can write --prompt-frac onto
@@ -2040,45 +2518,33 @@
         Object.keys(prompts).forEach(function (id) {
             var p = prompts[id];
             var row = document.createElement('div');
-            row.className = 'prompt';
+            row.className = 'prompt' + (p.off ? ' off' : '');
 
             var label = document.createElement('span');
             label.className = 'prompt-label';
             label.textContent = p.label || '';
 
-            var g = document.createElement('span');
-            var text = p.glyph == null ? '' : String(p.glyph);
-
-            // A mouse button is drawn as the button ITSELF, not as the letters
-            // "LMB" -- there is no key cap to letter, and the reference sheet
-            // shows the mouse. resolveKey (client.lua) hands these two down as
-            // sentinels precisely so the page can make that swap; every other
-            // glyph stays text in a key cap.
-            var mouse = MOUSE_GLYPHS[text];
-            if (mouse) {
-                g.className = 'glyph mouse';
-                var img = document.createElement('img');
-                img.src = mouse;
-                img.alt = text;
-                g.appendChild(img);
-            } else {
-                g.className = 'glyph'
-                    + (text.length > 1 ? ' wide' : '')
-                    + (p.device === 'pad' && PAD_TONE[text] ? ' ' + PAD_TONE[text] : '');
-                g.textContent = text;
-            }
+            var g = setGlyph(document.createElement('span'), p.glyph, p.device, 'glyph',
+                             p.hold ? true : 'space');
 
             row.appendChild(label);
 
-            if (p.hold) {
+            // No button at all (nothing bound, or a "you cannot do this" row):
+            // the label stands alone.
+            if (g.classList.contains('none')) {
+                row.classList.add('bare');
+            } else {
+                // The cell is what a hold's progress is written onto, and what
+                // keeps a row's height the same with or without a button.
                 var wrap = document.createElement('span');
-                wrap.className = 'prompt-glyph-wrap holdable';
-                wrap.style.setProperty('--prompt-frac', 0);
+                wrap.className = 'prompt-glyph-wrap';
                 wrap.appendChild(g);
                 row.appendChild(wrap);
-                promptGlyphWraps[id] = wrap;
-            } else {
-                row.appendChild(g);
+                if (p.hold) {
+                    wrap.classList.add('holdable');
+                    wrap.style.setProperty('--prompt-frac', 0);
+                    promptGlyphWraps[id] = wrap;
+                }
             }
 
             box.appendChild(row);
@@ -2088,7 +2554,7 @@
     function onPrompt(d) {
         if (!d.id) return;
         if (d.show === false) delete prompts[d.id];
-        else prompts[d.id] = { label: d.label, glyph: d.glyph, device: d.device, hold: !!d.hold };
+        else prompts[d.id] = { label: d.label, glyph: d.glyph, device: d.device, hold: !!d.hold, off: !!d.off };
         renderPrompts();
     }
 
@@ -2102,11 +2568,287 @@
         wrap.style.setProperty('--prompt-frac', Math.max(0, Math.min(1, d.frac || 0)));
     }
 
+    // client_glyphs.lua says which device is in hand and which pad the player
+    // has. The device half arrives with freshly resolved buttons for whatever
+    // is on screen; the pad style does not, so that one redraws from here.
+    var lastWorldActions = null;
+    var lastNitrousHint = null;
+
+    function onInputDevice(d) {
+        var style = d && d.pad === 'ps' ? 'ps' : 'xbox';
+        if (style === padStyle) return;
+        padStyle = style;
+        renderPrompts();
+        if (lastWorldActions && lastWorldActions.show) onWorldActions(lastWorldActions);
+        if (lastBinoculars) onBinoculars(lastBinoculars);
+        if (lastNitrousHint) {
+            onNitrousHint({ show: true, refresh: true,
+                            glyph: lastNitrousHint.glyph, device: lastNitrousHint.device });
+        }
+    }
+
+    /* --- screen text and overlays ------------------------------------------
+       Subtitle, objective, help box, feed, title cards, the binocular mask
+       and the shop item panel. Each is one export in client_overlays.lua
+       and one handler here; none of them animates, they cut in and out as the
+       reference does.
+
+       Text takes two marks: **bold** for a key word, {braces} for the thing
+       the line is about (drawn pink, as the reference draws a destination). */
+    function richText(el, text) {
+        var s = String(text == null ? '' : text)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        s = s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+             .replace(/\{([^}]+)\}/g, '<em>$1</em>')
+             .replace(/\n/g, '<br>');
+        el.innerHTML = s;
+    }
+
+    var overlayTimers = {};
+    // Show `el` now and take it down after `holdMs` (0 or less: until told).
+    function holdFor(key, el, holdMs, fallbackMs, onDown) {
+        if (overlayTimers[key]) { clearTimeout(overlayTimers[key]); overlayTimers[key] = null; }
+        show(el, true);
+        var ms = typeof holdMs === 'number' ? holdMs : fallbackMs;
+        if (ms > 0) {
+            overlayTimers[key] = setTimeout(function () {
+                overlayTimers[key] = null;
+                show(el, false);
+                if (onDown) onDown();
+            }, ms);
+        }
+    }
+    function takeDown(key, el) {
+        if (overlayTimers[key]) { clearTimeout(overlayTimers[key]); overlayTimers[key] = null; }
+        show(el, false);
+    }
+
+    function onSubtitle(d) {
+        var el = $('subtitle');
+        if (!el) return;
+        if (!d || d.show === false || !d.text) { takeDown('subtitle', el); return; }
+        richText(el, d.text);
+        holdFor('subtitle', el, d.holdMs, 4000);
+    }
+
+    function onObjective(d) {
+        var el = $('objective');
+        if (!el) return;
+        var down = function () { if (stage) stage.classList.remove('has-objective'); };
+        if (!d || d.show === false || !d.text) { takeDown('objective', el); down(); return; }
+        richText(el, d.text);
+        if (stage) stage.classList.add('has-objective');
+        holdFor('objective', el, d.holdMs, 0, down);
+    }
+
+    function onHelpText(d) {
+        var el = $('help-text');
+        if (!el) return;
+        if (!d || d.show === false || !d.text) { takeDown('helpText', el); return; }
+        richText(el, d.text);
+        // The reference puts the wanted tells under a line about the police.
+        if (d.tells && d.tells.length) {
+            var row = document.createElement('div');
+            row.className = 'help-tells';
+            renderTells(row, d.tells);
+            el.appendChild(row);
+        }
+        holdFor('helpText', el, d.holdMs, 7000);
+    }
+
+    // One line in the feed on the right: "Crime reported", "+ $6" with the
+    // wallet beside it. Lines stack downward and leave on their own.
+    function onFeed(d) {
+        var box = $('feed');
+        if (!box || !d || !d.text) return;
+        var line = document.createElement('div');
+        line.className = 'feed-line';
+        var text = document.createElement('span');
+        richText(text, d.text);
+        line.appendChild(text);
+        if (d.icon) {
+            var img = document.createElement('img');
+            img.src = d.icon;
+            img.alt = '';
+            line.appendChild(img);
+        }
+        box.appendChild(line);
+        while (box.children.length > 5) box.removeChild(box.firstChild);
+        var ms = typeof d.holdMs === 'number' ? d.holdMs : 3500;
+        if (ms > 0) setTimeout(function () { if (line.parentNode) line.parentNode.removeChild(line); }, ms);
+    }
+
+    var TITLE_SPARKLE = '<svg class="title-sparkle" viewBox="0 0 30 34" aria-hidden="true">'
+        + '<path d="M11 12q1 9 10 10-9 1-10 10-1-9-10-10 9-1 10-10z"/>'
+        + '<path d="M23 0q.6 5.2 5.8 5.8-5.2.6-5.8 5.8-.6-5.2-5.8-5.8 5.2-.6 5.8-5.8z"/></svg>';
+
+    function onTitleCard(d) {
+        var el = $('title-card');
+        if (!el) return;
+        if (!d || d.show === false || !d.text) { takeDown('titleCard', el); return; }
+        var style = d.style === 'stack' || d.style === 'location' ? d.style : 'center';
+        el.className = style;
+        // A stacked card is one word a line unless the caller broke it itself.
+        var text = String(d.text);
+        if (style === 'stack' && text.indexOf('\n') < 0) text = text.split(/\s+/).join('\n');
+        el.textContent = text;
+        if (style === 'location') el.insertAdjacentHTML('beforeend', TITLE_SPARKLE);
+        holdFor('titleCard', el, d.holdMs, 3500);
+    }
+
+    var lastBinoculars = null;
+
+    function onBinoculars(d) {
+        var el = $('binoculars');
+        if (!el) return;
+        // Through binoculars there is the lens, what it is on, the prompts and
+        // any speech; the rest of the HUD waits (see #stage.bino).
+        if (stage) stage.classList.toggle('bino', !!(d && d.show !== false));
+        if (!d || d.show === false) { lastBinoculars = null; show(el, false); return; }
+        lastBinoculars = d;
+        var label = $('bino-label');
+        if (label) {
+            show(label, !!d.label);
+            $('bino-label-text').textContent = d.label || '';
+            setGlyph($('bino-label-btn'), d.glyph, d.device, 'wa-btn glyph');
+        }
+        show(el, true);
+    }
+
+    // { store, category, price, pay: ['bank','cash'], name, variant,
+    //   swatches: [{ color, locked }], selected (1-based), note, afford }
+    var SHOP_PAY = { cash: 'icons/cash.png', bank: 'icons/buckme.png' };
+
+    function onShop(d) {
+        var el = $('shop');
+        if (!el) return;
+        if (!d || d.show === false) {
+            show(el, false);
+            if (stage) stage.classList.remove('shopping');
+            return;
+        }
+        $('shop-store').textContent = d.store || '';
+        $('shop-category').textContent = d.category || '';
+        $('shop-price').textContent = d.price == null ? '' : money(d.price);
+        $('shop-name').textContent = d.name || '';
+        $('shop-variant').textContent = d.variant || '';
+
+        var pay = $('shop-pay');
+        pay.innerHTML = '';
+        (d.pay || ['bank', 'cash']).forEach(function (kind) {
+            if (!SHOP_PAY[kind]) return;
+            var img = document.createElement('img');
+            img.src = SHOP_PAY[kind];
+            img.alt = kind;
+            pay.appendChild(img);
+        });
+
+        var row = $('shop-swatches');
+        row.innerHTML = '';
+        (d.swatches || []).forEach(function (sw, i) {
+            var cell = document.createElement('div');
+            cell.className = 'shop-swatch' + (i + 1 === d.selected ? ' on' : '') + (sw && sw.locked ? ' locked' : '');
+            cell.style.backgroundColor = (sw && sw.color) || '#888';
+            row.appendChild(cell);
+        });
+
+        var cant = d.afford === false;
+        el.classList.toggle('cant', cant);
+        var note = d.note || (cant ? 'Not enough money' : '');
+        show($('shop-note'), !!note);
+        $('shop-note-text').textContent = note;
+
+        if (stage) stage.classList.add('shopping');
+        show(el, true);
+    }
+
+    // { make, model, stats: [{ label, value, max (default 10) }],
+    //   ratings: [{ value, kind: 'offroad' | 'road' }] }
+    var VS_RATING_ICON = {
+        offroad: '<svg viewBox="0 0 28 28" aria-hidden="true"><rect class="vs-tile" width="28" height="28"/>'
+            + '<path class="vs-mark" d="M4 21 10.500 9l4.500 7 3.500-4.500L24 21"/></svg>',
+        road: '<svg viewBox="0 0 28 28" aria-hidden="true"><rect class="vs-tile" width="28" height="28"/>'
+            + '<path class="vs-solid" d="M10.500 4h2l-1 20H6zM15.500 4h2l4.500 20h-5.500z"/></svg>'
+    };
+
+    function onVehStats(d) {
+        var el = $('veh-stats');
+        if (!el) return;
+        if (!d || d.show === false) { show(el, false); return; }
+        $('vs-make').textContent = d.make || '';
+        $('vs-model').textContent = d.model || '';
+
+        var rows = $('vs-rows');
+        rows.innerHTML = '';
+        (d.stats || []).forEach(function (s) {
+            var max = typeof s.max === 'number' && s.max > 0 ? s.max : 10;
+            var value = typeof s.value === 'number' ? s.value : 0;
+            var row = document.createElement('div');
+            row.className = 'vs-row';
+            var label = document.createElement('span');
+            label.className = 'vs-label';
+            label.textContent = s.label || '';
+            var num = document.createElement('span');
+            num.className = 'vs-value';
+            num.textContent = value.toFixed(1);
+            var bar = document.createElement('div');
+            bar.className = 'vs-bar';
+            var fill = document.createElement('div');
+            fill.className = 'vs-fill';
+            fill.style.setProperty('--vs', Math.max(0, Math.min(1, value / max)));
+            bar.appendChild(fill);
+            row.appendChild(label);
+            row.appendChild(num);
+            row.appendChild(bar);
+            rows.appendChild(row);
+        });
+
+        var ratings = $('vs-ratings');
+        ratings.innerHTML = '';
+        (d.ratings || []).forEach(function (r) {
+            var n = document.createElement('span');
+            n.textContent = r.value == null ? '' : String(r.value);
+            ratings.appendChild(n);
+            if (VS_RATING_ICON[r.kind]) ratings.insertAdjacentHTML('beforeend', VS_RATING_ICON[r.kind]);
+        });
+        show($('vs-foot'), (d.ratings || []).length > 0);
+        show(el, true);
+    }
+
+    // { show, strength (0..2), bars (fraction of the screen's height), pulse }
+    function onCineFx(d) {
+        var el = $('cine-fx');
+        if (!el) return;
+        var on = !!(d && d.show);
+        el.classList.toggle('active', on);
+        if (!on) return;
+        var strength = typeof d.strength === 'number' ? Math.max(0, Math.min(2, d.strength)) : 1;
+        var bars = typeof d.bars === 'number' ? Math.max(0, Math.min(0.2, d.bars)) : 0.032;
+        el.style.setProperty('--cine-strength', strength);
+        el.style.setProperty('--cine-bars', (bars * 100) + 'vh');
+        el.classList.toggle('pulse', d.pulse !== false);
+    }
+
+    // Targeting's page is a frame (#target-ui). Its Lua side wraps what it
+    // would have sent to a page of its own in 'target:nui'; the payload goes
+    // through untouched. The frame takes clicks only between a panel opening
+    // and closing.
+    function onTargetNui(d) {
+        var frame = $('target-ui');
+        var msg = d && d.payload;
+        if (!frame || !msg) return;
+        if (msg.action === 'admin:open' || msg.action === 'prefs:open') frame.classList.add('open');
+        if (msg.action === 'admin:close' || msg.action === 'prefs:close') frame.classList.remove('open');
+        if (frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
+    }
+
     function onPromptGlyphs(d) {
         // Device or bindings changed — refresh labels on anything already shown.
+        // `glyphs` is the whole answer for the new device: a prompt missing
+        // from it has no button there, and must not keep the old device's.
         Object.keys(prompts).forEach(function (id) {
-            if (d.glyphs && d.glyphs[id] != null) prompts[id].glyph = d.glyphs[id];
-            if (d.device) prompts[id].device = d.device;
+            if (d.glyphs) prompts[id].glyph = d.glyphs[id] == null ? null : d.glyphs[id];
+            prompts[id].device = (d.devices && d.devices[id]) || d.device || prompts[id].device;
         });
         renderPrompts();
     }
@@ -2324,7 +3066,7 @@
         // panel scales. Scaling it from the panel grew the three discs and left
         // the gap between them alone, which is the "wonky" — the icons need
         // their own spacing, position and scale to stay a proportionate row.
-        ['vehpips',  'Vehicle icons',  '#veh-pips',  'tracker / engine / fuel pips',    'HUD'],
+        ['vehpips',  'Vehicle icons',  '#veh-pips',  'tracker / engine / fuel / nitrous pips', 'HUD'],
         /* The manufacturer badge is its own element for the same reason the pip
            row is: it is behind the names rather than part of them, and the two
            things people will want from it — how big it is and how strongly it
@@ -3500,14 +4242,16 @@
             onDuffle({ value: 4820 });
             onChips({ value: 3450 });
             onZone({ zone: 'Mirror Park', duration: 9e6 });
-            /* Fuel and engine are pushed into their WARNING bands, and the
-               tracker is forced into 'spotted', so all three discs are on
-               screen to be positioned. In normal play each only appears when
-               it has something to say (see setPips), which would otherwise
-               leave the pip row unpositionable in a healthy car. */
+            /* Fuel and engine are pushed into their WARNING bands, the tracker
+               is forced into 'spotted' and the car is given a nitrous kit, so
+               all four discs are on screen to be positioned. In normal play
+               each only appears when it has something to say (see setPips),
+               which would otherwise leave the pip row unpositionable in a
+               healthy car. */
             onVehicle({ show: true, make: 'Nagasaki', model: 'Chimera',
                         fuel: 18, engineOn: true, engineHealth: 420,
-                        trackerState: 'spotted' });
+                        trackerState: 'spotted',
+                        nitrous: { installed: true, level: 0.62, active: false, ready: true } });
             onHonor({ emoji: 'icons/honor_bad.png', terribleEmoji: 'icons/honor_terrible.png',
                       honor: -50, showValue: true,
                       reason: 'Killed a bystander', duration: 9e6, broken: true });
@@ -3953,6 +4697,8 @@
         crossFire: onCrossFire,
         crossKill: onKillMark,
         lapHud: onLapHud,
+        raceCard: onRaceCard,
+        raceCountdown: onRaceCountdown,
         interact: onInteract,
         worldActions: onWorldActions,
         worldActionsPos: onWorldActionsPos,
@@ -3966,6 +4712,8 @@
         nav: onNav,
         navAccent: onNavAccent,
         vehicle: onVehicle,
+        nitrous: onNitrous,
+        nitrousHint: onNitrousHint,
         brandTour: onBrandTour,
         logoCheck: onLogoCheck,
         honor: onHonor,
@@ -3973,6 +4721,17 @@
         prompt: onPrompt,
         promptProgress: onPromptProgress,
         promptGlyphs: onPromptGlyphs,
+        inputDevice: onInputDevice,
+        'target:nui': onTargetNui,
+        subtitle: onSubtitle,
+        objective: onObjective,
+        helpText: onHelpText,
+        feed: onFeed,
+        titleCard: onTitleCard,
+        binoculars: onBinoculars,
+        shop: onShop,
+        cineFx: onCineFx,
+        vehStats: onVehStats,
         police: onPolice,
         policeEditor: onPoliceEditor,
         skills: onSkills,
@@ -3992,7 +4751,7 @@
        quarter-second after the editor opened, so there was nothing to place. */
     var PREVIEW_OWNED = {
         status: 1, wanted: 1, cash: 1, weapon: 1,
-        zone: 1, vehicle: 1, honor: 1, reputation: 1, prompt: 1, nav: 1
+        zone: 1, vehicle: 1, nitrous: 1, honor: 1, reputation: 1, prompt: 1, nav: 1
     };
 
     /* makes.js is a separate file and index.html loads it BEFORE this one. If it
@@ -4057,7 +4816,8 @@
         onNav({ active: true, near: true, street: 'Bayside', remaining: '0.69 mi',
                 instruction: 'Turn Left', dir: 'left', distance: '130 ft' });
         onVehicle({ show: true, make: 'Pegassi', model: 'Bati 801', fuel: 72,
-                    engineOn: true, engineHealth: 900, trackerState: 'searching' });
+                    engineOn: true, engineHealth: 900, trackerState: 'searching',
+                    nitrous: { installed: true, level: 0.7, active: false, ready: true } });
         onHonor({ emoji: 'icons/honor_bad.png', terribleEmoji: 'icons/honor_terrible.png',
                   honor: -50, showValue: true, reason: 'Wanted by police', duration: 999999, broken: true });
         onReputation({ icon: '🗡️', label: 'CRIMINAL', value: 240, tier: 3,

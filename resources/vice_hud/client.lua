@@ -93,6 +93,13 @@ local vehicleTracker = nil
 -- time there actually is a wanted level to report.
 local vehicleTrackerAuto = true
 
+-- Vehicle panel's nitrous pip: the last reading from whatever nitrous resource
+-- is feeding it, already normalised to { installed, level, active, ready }, or
+-- nil for a car with no kit -- in which case the pip is not drawn at all. Up
+-- here with the tracker because the status tick and /hudtest both close over
+-- it; everything that WRITES it is in the Nitrous section further down.
+local vehicleNitrous = nil
+
 -- Forward-declared for the same reason. Defined down in the /movehud section,
 -- next to the caches it clears. /hudtest needs it too: the sample payloads it
 -- pushes bypass the poll loop's change caches, so without a reset the fake
@@ -1051,6 +1058,7 @@ end)
 RegisterNUICallback('uiReady', function(_, cb)
     radarShown = nil        -- next setRadar() re-sends, whatever it decides
     lastRectKey = nil       -- and applyMinimap re-publishes the rect + showFrame
+    ViceGlyphs.announce()   -- which device, and Xbox or PlayStation buttons
     if resetPushCaches then resetPushCaches() end
     cb({ ok = true })
 end)
@@ -1234,7 +1242,8 @@ RegisterCommand('hudtest', function()
     ui('weapon', { armed = true, clip = 20, reserve = 80 })
     ui('zone', { zone = 'TEST ZONE', duration = 15000 })
     ui('vehicle', { show = true, make = 'TESTMAKE', model = 'TESTMODEL', fuel = 70,
-        engineOn = true, engineHealth = 1000, trackerState = 'spotted' })
+        engineOn = true, engineHealth = 1000, trackerState = 'spotted',
+        nitrous = { installed = true, level = 0.6, active = true, ready = true } })
     -- A non-zero `delta` is what fires the centre-screen +/- indicator; without
     -- it /hudtest only ever showed the corner standing panel, so the one piece
     -- of the honor UI most worth eyeballing was the piece it never drew.
@@ -1413,76 +1422,16 @@ end)
 -- Prompt glyphs — resolve the player's LIVE bind, keyboard or pad
 -- =============================================================================
 
--- GetControlInstructionalButton returns GTA button-font ligatures for a pad.
--- Those do not exist in the NUI's fonts, so anything that is not plain printable
--- ASCII is replaced with a neutral marker rather than rendering as tofu.
-local function safeLabel(str)
-    if not str or str == '' then return nil end
+-- The resolving itself lives in client_glyphs.lua (ViceGlyphs), shared with
+-- the interact rows and the nitrous tip so every button on screen agrees and
+-- follows the same device swap. These two names are kept because the rest of
+-- this file is written in them.
+local function usingPad() return ViceGlyphs.usingPad() end
 
-    -- A MULTI-DIGIT number is never a key label. When a control has no text
-    -- glyph, GetControlInstructionalButton hands back a raw internal icon
-    -- index instead, and those are plain ASCII digits -- so the printable
-    -- filter below waves them straight through and the prompt draws "100"
-    -- where the key should be. Rejecting them here (nil = draw the label with
-    -- no key) is the backstop for every control, not just the mouse buttons
-    -- named below.
-    -- Single digits are KEPT: 1-9 are real keyboard keys and a legitimate
-    -- label. That is the whole reason this tests length rather than
-    -- "is it a number".
-    if #str > 1 and str:match('^%d+$') then return nil end
-
-    for i = 1, #str do
-        local b = str:byte(i)
-        if b < 0x20 or b > 0x7E then return '•' end
-    end
-    return str
-end
-
--- IS_USING_KEYBOARD_AND_MOUSE, not IsInputDisabled(2).
---
--- The old check read "control group 2 is disabled => keyboard+mouse", which is
--- the convention other resources here use, but it does not hold on every
--- setup: with a controller merely PLUGGED IN (not in use) it reported a pad,
--- which sent mouse-button prompts down the pad branch. That is what left a
--- raw control icon index on screen, and then an empty glyph box once the
--- index was rejected. This native answers the question directly.
-local function usingPad()
-    local ok, kbm = pcall(IsUsingKeyboardAndMouse, 2)
-    if ok and kbm ~= nil then return not kbm end
-
-    return not IsInputDisabled(2) -- pre-2372 builds without the native
-end
-
--- INPUT_ATTACK (24) / INPUT_AIM (25) are the two control IDs ox_target ever
--- passes as a prompt's `key` (see mouseButton in ox_target/client/main.lua)
--- -- both always mouse-bound on keyboard+mouse. GetControlInstructionalButton
--- has no text glyph for a mouse button the way it does a real keyboard key,
--- so it answers with a raw icon index instead. Named here rather than trusted
--- from the native.
-local MOUSE_BUTTON_LABELS = { [24] = 'LMB', [25] = 'RMB' }
-
-local function resolveKey(key)
-    if type(key) == 'string' then return key end
-    if type(key) ~= 'number' then return nil end
-
-    -- Keyboard+mouse: answer for the mouse buttons ourselves. Conditioned on
-    -- NOT being on a pad rather than on IsInputDisabled(2) being true -- the
-    -- two are meant to be the same question, but written the second way a
-    -- device state that satisfies neither branch (which is what left "100" on
-    -- screen) falls through to the native and gets believed. Asking "are we on
-    -- a pad" leaves no such gap: everything that is not a pad is kb+m.
-    if not usingPad() and MOUSE_BUTTON_LABELS[key] then
-        return MOUSE_BUTTON_LABELS[key]
-    end
-
-    local ok, raw = pcall(GetControlInstructionalButton, 0, key, true)
-    if not ok or not raw then return nil end
-
-    -- safeLabel is the backstop: a pad ligature becomes a neutral marker and a
-    -- multi-digit icon index becomes nil (label only, no key) rather than
-    -- being drawn as a number.
-    return safeLabel(raw:sub(3))
-end
+-- A control id -> the token for the button it is on, and the device that
+-- token belongs to (see ViceGlyphs.control). Two results; a caller that only
+-- wants the token takes the first.
+local function resolveKey(key) return ViceGlyphs.control(key) end
 
 -- =============================================================================
 -- Action prompts
@@ -1491,7 +1440,6 @@ end
 local prompts = {}          -- id -> { label, key, holdMs, onHeld, heldSince, lastFrac, fired }
 local promptCount = 0
 local holdPromptCount = 0   -- how many entries in `prompts` have holdMs set -- gates the poll thread below
-local lastDevice = nil
 
 -- Forward declaration: HideActionPrompt is referenced by the resource-stop
 -- handler below, which is written before the definition.
@@ -1500,15 +1448,17 @@ local ShowActionPrompt, HideActionPrompt
 local function pushPrompt(id)
     local p = prompts[id]
     if not p then return end
+    local glyph, device = resolveKey(p.key)
     ui('prompt', {
         id = id, show = true, label = p.label,
-        glyph = resolveKey(p.key), device = usingPad() and 'pad' or 'kbm',
+        glyph = glyph, device = device,
         hold = p.holdMs ~= nil,
         -- Requirement-explanation feature (2026-09-11, see ox_target's own
         -- deniedReason handling): a lock icon in place of a key cap, no
         -- rumble on appear (see ShowActionPrompt below) -- app.js's
         -- renderPrompts skips the normal glyph rendering entirely for this.
         denied = p.denied or nil,
+        off = p.off or nil,
     })
 end
 
@@ -1569,6 +1519,7 @@ ShowActionPrompt = function(id, label, key, opts)
         holdMs = holdMs, onHeld = opts.onHeld,
         heldSince = nil, lastFrac = 0, fired = false,
         denied = opts.denied and true or nil,
+        off = opts.off and true or nil,     -- shown greyed: there, but not usable right now
     }
     pushPrompt(id)
 end
@@ -1608,20 +1559,14 @@ AddEventHandler('onClientResourceStop', function(res)
     end
 end)
 
--- Re-resolve glyphs when the input device changes, and only then.
-CreateThread(function()
-    while true do
-        Wait(400)
-        if promptCount > 0 then
-            local device = usingPad() and 'pad' or 'kbm'
-            if device ~= lastDevice then
-                lastDevice = device
-                local glyphs = {}
-                for id, p in pairs(prompts) do glyphs[id] = resolveKey(p.key) end
-                ui('promptGlyphs', { device = device, glyphs = glyphs })
-            end
-        end
-    end
+-- Re-resolve every prompt's button when the player changes device, and only
+-- then. `glyphs` is the whole answer for the new device -- a prompt missing
+-- from it has no button there.
+ViceGlyphs.onDevice(function(device)
+    if promptCount == 0 then return end
+    local glyphs, devices = {}, {}
+    for id, p in pairs(prompts) do glyphs[id], devices[id] = resolveKey(p.key) end
+    ui('promptGlyphs', { device = device, glyphs = glyphs, devices = devices })
 end)
 
 -- Polls held-control progress for whichever prompts asked for it. Separate
@@ -1806,8 +1751,19 @@ exports('SetHudOffsetX', function(px) applyOffset(tonumber(px) or 0) end)
 --- message automatically (see hudHiddenForDeath); this export exists for
 --- other callers -- another cutscene resource, say -- that want the same
 --- thing without going through a death state.
+-- Whether a SetHudVisible caller currently has the HUD hidden, and a hook for
+-- anything that was waiting for it to come back. One user so far: the nitrous
+-- tip. A customs shop hides the HUD while its menu is open and fits the kit
+-- inside that menu, so a tip shown the moment the kit appears would spend its
+-- whole seven seconds drawn on a hidden page. It waits here instead.
+local hudHiddenByExport = false
+local onHudShown = nil
+
 exports('SetHudVisible', function(visible)
-    ui('hudVisible', { show = visible ~= false })
+    local show = visible ~= false
+    ui('hudVisible', { show = show })
+    hudHiddenByExport = not show
+    if show and onHudShown then onHudShown() end
 end)
 
 -- =============================================================================
@@ -2272,6 +2228,275 @@ exports('SetVehicleTracker', function(state)
 end)
 
 -- =============================================================================
+-- Nitrous pip
+-- =============================================================================
+-- vice_hud does not RUN a nitrous system, it draws one. The fourth pip on the
+-- vehicle panel is a ring that reads a tank, and the tank belongs to whichever
+-- resource sells the kit and burns it. Two ways in:
+--
+--   1. A state bag on the local player, Config.NitrousStateBag. The resource
+--      that owns the nitrous writes one table there and never has to know this
+--      one exists -- no export call, no dependency, no load order. This is the
+--      default path and the one the customs resource uses.
+--   2. exports.vice_hud:SetVehicleNitrous(state), for a script that would
+--      rather push. A call with a table takes the pip over; nil hands it back
+--      to the state bag.
+--
+-- Either way the table is the same, and only these fields are read:
+--
+--   installed  boolean  the player is driving a car with a kit. false or
+--                       absent hides the pip.
+--   level      number   tank fill, 0.0 .. 1.0. Drives the ring.
+--   active     boolean  boosting right now. Carried to the page, which
+--                       deliberately draws nothing for it -- the ring
+--                       draining is the boost indicator.
+--   ready      boolean  false while locked out after running dry; the ring
+--                       keeps reading the refill, in grey. Absent means ready,
+--                       so a resource with no lockout need not send it.
+--   command    string   optional: the key-mapping command that fires the
+--   key        number|string      nitrous, or a control id / label -- only
+--                       used to put a key cap in the "Hold [key] to activate
+--                       nitrous" tip. See the tip's own comment below.
+--
+-- One `do` block with a single name let out of it, rather than five more
+-- file-level locals: this chunk is within sight of Lua's 200-locals-per-
+-- function ceiling, and the failure when it is crossed is the whole file
+-- refusing to load.
+local syncNitrous
+do
+    local bagKey = Config.NitrousStateBag
+    if bagKey == '' then bagKey = nil end
+
+    -- Whether a SetVehicleNitrous caller currently owns the pip. While it
+    -- does the state bag is not read at all -- two sources taking turns at
+    -- four writes a second each is a ring that flickers between two tanks.
+    local exportOwns = false
+
+    -- Anything that is not a table saying `installed` is "no kit", including
+    -- the nil the bag holds before the nitrous resource has started. The level
+    -- is clamped here so the page never has to wonder what 1.4 of a tank is.
+    local function normalise(v)
+        if type(v) ~= 'table' or not v.installed then return nil end
+        local level = tonumber(v.level) or 0.0
+        if level < 0.0 then level = 0.0 elseif level > 1.0 then level = 1.0 end
+        return {
+            installed = true,
+            level = level,
+            active = v.active == true,
+            ready = v.ready ~= false,
+        }
+    end
+
+    -- ---- the "Hold [key] to activate nitrous" tip --------------------------
+    -- Shown when a kit has JUST been fitted, which from in here looks like:
+    -- the reading goes from "no kit" to "kit" while the player is already
+    -- sitting in the car. Getting into a car that had nitrous all along is
+    -- the same edge, so it is told apart by time -- a kit that is there
+    -- within a moment of the door closing was there before it. Two more
+    -- guards: the very first reading after this resource starts is never a
+    -- fitting (it is a HUD restart mid-drive), and a given car only ever gets
+    -- the tip once a session.
+    --
+    -- The key is whatever the nitrous resource says it is, on the same table:
+    --   command  the RegisterKeyMapping command name ('+nitrous'), resolved to
+    --            the player's LIVE bind -- the right answer for almost everyone
+    --   key      a control id (number) or a ready-made label ('X'), for a
+    --            resource that polls a control instead
+    -- With neither, the tip still shows and simply has no key cap in it.
+    local hintMs = tonumber(Config.NitrousHintMs) or 0
+    local hinted = {}           -- vehicle entity -> true, tip already shown
+    local hintUp = false
+    local seen = false          -- has any reading been stored yet
+    local enteredAt = 0         -- GetGameTimer() when the current car was entered
+    local lastKey, lastCommand  -- newest bind the nitrous resource reported
+    local lastPadKey            -- and the control it polls on a pad, if that differs
+
+    lib.onCache('vehicle', function(value)
+        if value then enteredAt = GetGameTimer() end
+    end)
+
+    -- The bind of a key MAPPING if the nitrous resource named one, else the
+    -- control it polls. Token and device, as resolveKey gives them.
+    local function hintGlyph(key, command)
+        local token, device = ViceGlyphs.mapping(command)
+        if token then return token, device end
+        -- A resource that polls one control on the keyboard and another on a
+        -- pad reports both (key, padKey); the tip shows the one in hand.
+        if lastPadKey ~= nil and key == lastKey and usingPad() then return resolveKey(lastPadKey) end
+        return resolveKey(key)
+    end
+
+    local hintSerial = 0        -- so an older tip's timer cannot clear a newer tip
+    local hintBind = nil        -- { key, command } of the tip that is up, for a device swap
+    local pendingHint = nil     -- { key, command, duration } held for a hidden HUD
+
+    -- A second thing that can be in the way: a menu that leaves the HUD up
+    -- but covers the screen. The customs shop is the case in point -- the kit
+    -- is fitted INSIDE its upgrade menu, and it marks that menu being open
+    -- with a state bag on the local player rather than by hiding the HUD.
+    -- While Config.NitrousHintHoldBag reads true the tip waits, and is shown
+    -- when it goes false.
+    local holdBag = Config.NitrousHintHoldBag
+    if holdBag == '' then holdBag = nil end
+
+    local function inTheWay()
+        if hudHiddenByExport then return true end
+        return holdBag ~= nil and LocalPlayer.state[holdBag] == true
+    end
+
+    local function showHint(key, command, durationMs)
+        -- Nobody can read a tip on a hidden HUD or behind a menu, and its
+        -- timer would run out before they could. Hold it; see onHudShown.
+        if inTheWay() then
+            pendingHint = { key = key, command = command, duration = durationMs }
+            return
+        end
+        local ms = tonumber(durationMs) or hintMs
+        if ms <= 0 then ms = 7000 end
+        hintUp = true
+        hintSerial = hintSerial + 1
+        local serial = hintSerial
+        hintBind = { key = key, command = command }
+        local glyph, device = hintGlyph(key, command)
+        ui('nitrousHint', { show = true, holdMs = ms, glyph = glyph, device = device })
+        -- The page takes it down itself after holdMs; this only keeps hintUp
+        -- honest, so hideHint knows whether there is anything left to hide.
+        SetTimeout(ms, function()
+            if hintSerial == serial then hintUp = false end
+        end)
+    end
+
+    -- Picked up the controller (or put it down) while the tip is showing:
+    -- the same tip, the other device's button, the clock it is already on.
+    ViceGlyphs.onDevice(function()
+        if not hintUp or not hintBind then return end
+        local glyph, device = hintGlyph(hintBind.key, hintBind.command)
+        ui('nitrousHint', { show = true, refresh = true, glyph = glyph, device = device })
+    end)
+
+    local function hideHint()
+        pendingHint = nil
+        if not hintUp then return end
+        hintUp = false
+        ui('nitrousHint', { show = false })
+    end
+
+    -- The HUD is back (the shop menu closed): show whatever was held, as long
+    -- as there is still a kit to talk about.
+    onHudShown = function()
+        local held = pendingHint
+        pendingHint = nil
+        if held and vehicleNitrous then showHint(held.key, held.command, held.duration) end
+    end
+
+    if holdBag then
+        AddStateBagChangeHandler(holdBag, nil, function(bagName, _, value)
+            if value == true then return end
+            if bagName ~= ('player:%s'):format(GetPlayerServerId(PlayerId())) then return end
+            -- A tick later, not now: the handler runs BEFORE the bag takes
+            -- the new value, so asked right here the menu is still "open"
+            -- and the tip would only be held again.
+            SetTimeout(0, onHudShown)
+        end)
+    end
+
+    -- Every write to vehicleNitrous goes through here, so the "just fitted"
+    -- edge is noticed whichever of the three sources produced it.
+    local function store(v)
+        local had = vehicleNitrous ~= nil
+        vehicleNitrous = normalise(v)
+        local has = vehicleNitrous ~= nil
+        if has then lastKey, lastCommand, lastPadKey = v.key, v.command, v.padKey end
+
+        if has and not had then
+            -- Named `car` on purpose. tools/vehpanel.test.js finds the status
+            -- tick's vehicle branch by searching for the line that reads the
+            -- cached vehicle into a local called `vehicle`, and takes the
+            -- FIRST match in the file -- which must stay the tick's.
+            local car = cache.vehicle
+            if seen and hintMs > 0 and car and not hinted[car]
+                and GetGameTimer() - enteredAt > 1500 then
+                hinted[car] = true
+                showHint(lastKey, lastCommand)
+            end
+        elseif had and not has then
+            -- Out of the car, or the kit came off: a tip about a button that
+            -- no longer does anything should not outlive it.
+            hideHint()
+        end
+        seen = true
+    end
+
+    -- Store it, and repaint the pip NOW if there is one on screen.
+    --
+    -- The status tick carries vehicleNitrous to the page four times a second
+    -- and is what shows or hides the pip, so nothing is lost without this
+    -- push. What it buys is the quarter second: a tank mid-boost changes ten
+    -- times a second, and a ring that starts draining a tick after the key
+    -- and then moves in four steps a second reads as lag. A fresh table
+    -- rather than vehicleNitrous itself, because ui() stamps `action` onto
+    -- whatever it is handed.
+    local function set(v)
+        store(v)
+        if vehShown and vehicleNitrous then
+            ui('nitrous', {
+                installed = true,
+                level = vehicleNitrous.level,
+                active = vehicleNitrous.active,
+                ready = vehicleNitrous.ready,
+            })
+        end
+    end
+
+    -- Called from the status tick. Reads the bag outright instead of trusting
+    -- the change handler below to have seen everything: the handler cannot
+    -- report a value that was already there when this resource (re)started,
+    -- and a HUD restart mid-drive would otherwise lose the pip until the tank
+    -- next moved.
+    syncNitrous = function()
+        if exportOwns or not bagKey then return end
+        store(LocalPlayer.state[bagKey])
+    end
+
+    if bagKey then
+        AddStateBagChangeHandler(bagKey, nil, function(bagName, _, value)
+            if exportOwns then return end
+            -- Unfiltered registration, filtered here: the server id is not
+            -- reliably known at the moment this file runs, and a filter built
+            -- from a wrong one would match nothing for the whole session.
+            if bagName ~= ('player:%s'):format(GetPlayerServerId(PlayerId())) then return end
+            set(value)
+        end)
+    end
+
+    --- Drives (or releases) the vehicle panel's nitrous pip directly, for a
+    --- nitrous resource that does not write Config.NitrousStateBag.
+    --- @param state { installed: boolean, level: number, active?: boolean, ready?: boolean }|nil
+    ---        nil releases the pip back to the state bag.
+    exports('SetVehicleNitrous', function(state)
+        exportOwns = state ~= nil
+        set(state)
+        if not exportOwns then syncNitrous() end
+    end)
+
+    --- Shows the "Hold [key] to activate nitrous" tip on demand -- for a
+    --- nitrous resource that knows better than the heuristic above when a
+    --- player needs telling (straight after the purchase, say).
+    --- @param opts { command?: string, key?: number|string, duration?: number }|nil
+    ---        nil reuses the bind last reported on the nitrous table.
+    exports('ShowNitrousHint', function(opts)
+        opts = type(opts) == 'table' and opts or {}
+        showHint(opts.key or lastKey, opts.command or lastCommand, opts.duration)
+    end)
+    exports('HideNitrousHint', hideHint)
+
+    RegisterCommand('hudnitrous', function()
+        print('^3[vice_hud]^7 /hudnitrous — the tip for 7s. The pip itself is in /hudtest.')
+        showHint(lastKey or 'X', lastCommand, 7000)
+    end, false)
+end
+
+-- =============================================================================
 -- Suppress GTA's native HUD
 -- =============================================================================
 -- Nothing in this thread should touch a scaleform (native minimap or
@@ -2354,6 +2579,17 @@ CreateThread(function()
                     BeginScaleformMovieMethod(minimapScaleform, 'SETUP_HEALTH_ARMOUR')
                     ScaleformMovieMethodAddParamInt(3)
                     EndScaleformMovieMethod()
+                    -- The game's own sat-nav strip (a turn arrow and "0.12mi"
+                    -- along the map's bottom edge while a route is set) is a
+                    -- second distance beside the HUD's own, which the
+                    -- reference does not have. Asked to hide every frame,
+                    -- because the game shows it again each time the distance
+                    -- changes. A minimap.gfx built by tools/minimap_marker
+                    -- has it taken out altogether, which cannot flicker.
+                    if Config.HideSatNav ~= false then
+                        BeginScaleformMovieMethod(minimapScaleform, 'HIDE_SATNAV')
+                        EndScaleformMovieMethod()
+                    end
                 end
             end)
             if not ok then
@@ -3175,6 +3411,12 @@ CreateThread(function()
         -- status icons over the map for the rest of the drive. `panelUntil` is
         -- the announcement's deadline, set by the onCache('vehicle') handler so
         -- it re-triggers on every new vehicle.
+        --
+        -- The nitrous reading is refreshed out here, ahead of the branch,
+        -- rather than inside it: tools/vehpanel.test.js lifts the branch out
+        -- whole and runs it against stubs, and it should stay runnable with
+        -- nothing but plain variables to stub.
+        syncNitrous()
         local vehicle = cache.vehicle
         if vehicle then
             veh.fuel = fuelLevel(vehicle)
@@ -3207,6 +3449,7 @@ CreateThread(function()
                 make = veh.make, model = veh.model,
                 fuel = veh.fuel, engineOn = veh.engine,
                 engineHealth = veh.health, trackerState = vehicleTracker,
+                nitrous = vehicleNitrous,
             })
             vehShown = true
         else

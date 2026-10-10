@@ -1,0 +1,155 @@
+/* HeroUI is part of the OsmFX stack but this resource composes every control
+   itself (see components/primitives.tsx), so importing @heroui/styles would
+   ship ~400kB of unused CSS - and its compiled oklch() colours - into a CEF
+   page that renders inside a world texture. The token layer still publishes
+   HeroUI's variable names, so adding a HeroUI component later needs only the
+   import back. */
+/* `source(none)` turns OFF Tailwind's automatic content detection, which roots
+   itself at the nearest git repository. That makes the generated CSS depend on
+   where the tree happens to be checked out: the release staging area has no
+   .git of its own, so detection climbed out of it and scanned unrelated files,
+   emitting most of Tailwind's utility set. Naming the sources here makes the
+   same input produce the same stylesheet everywhere. */
+@import 'tailwindcss' source(none);
+@import './tokens.css';
+
+@source '../';
+@source '../../index.html';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-num: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+}
+
+/* ── CEF TRANSPARENCY ──────────────────────────────────────────────────────
+   The load-bearing, UNLAYERED copy lives in base.css (imported first in
+   main.tsx) so it beats HeroUI's cascade layers. This is the layered mirror. */
+@layer base {
+  :root,
+  :root.dark,
+  :root[data-theme='dark'] {
+    --background: transparent !important;
+    --surface-root: transparent !important;
+    --surface: transparent !important;
+  }
+
+  html, body, #root {
+    background: transparent !important;
+    background-color: transparent !important;
+    color-scheme: unset !important;
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden;
+    color: var(--foreground);
+    font-family: var(--font-ui);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.10); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.20); }
+
+/* ── Input chrome resets ──────────────────────────────────────────────── */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type='number'] { -moz-appearance: textfield; }
+
+/* ── Native range slider (the CEF-safe pattern) ───────────────────────── */
+.osm-range { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 9999px; outline: none; cursor: pointer; width: 100%; }
+.osm-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); border: 2px solid rgba(255, 255, 255, 0.92); cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+.osm-range::-webkit-slider-thumb:hover { transform: scale(1.14); }
+.osm-range::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--accent);
+  border: 2px solid rgba(255, 255, 255, 0.92); cursor: pointer;
+}
+
+/* Native colour input, made to read as a swatch rather than a browser widget. */
+.osm-swatch { -webkit-appearance: none; appearance: none; border: none; background: none; padding: 0; cursor: pointer; width: 100%; height: 100%; }
+.osm-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.osm-swatch::-webkit-color-swatch { border: none; border-radius: 6px; }
+
+/* ── Motion — short, decelerating, no bounce ──────────────────────────── */
+@keyframes osm-fade-up { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes osm-scale-in { from { transform: scale(0.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes osm-pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.animate-fade-up { animation: osm-fade-up 0.2s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; }
+.animate-scale-in { animation: osm-scale-in 0.18s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; }
+.animate-pulse-dot { animation: osm-pulse-dot 2s ease-in-out infinite; }
+
+/* The sheen on an exclusive design's card in the rail. One slow pass every few
+   seconds, at a very low alpha: it should catch the eye once while the owner is
+   reading the list, not pulse at them while they work. */
+@keyframes osm-sheen { 0% { transform: translateX(-140%); } 55%, 100% { transform: translateX(240%); } }
+
+.osm-exclusive::after {
+  content: '';
+  position: absolute;
+  inset: -40% -20%;
+  pointer-events: none;
+  background: linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0) 100%);
+  animation: osm-sheen 5.5s cubic-bezier(0.42, 0, 0.58, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up, .animate-scale-in { animation: none; opacity: 1; transform: none; }
+  .animate-pulse-dot { animation: none; opacity: 1; }
+  .osm-exclusive::after { animation: none; opacity: 0; }
+}
+
+/* ── Utilities ────────────────────────────────────────────────────────── */
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+.t-title   { font-size: 0.9375rem; font-weight: var(--w-bold); letter-spacing: -0.01em; color: var(--foreground); }
+.t-heading { font-size: 0.8125rem; font-weight: var(--w-semibold); color: var(--foreground); }
+.t-body    { font-size: 0.8125rem; font-weight: var(--w-medium); color: var(--foreground); }
+.t-muted   { font-size: 0.75rem;  font-weight: var(--w-regular); color: var(--muted); line-height: 1.55; }
+.t-label   { font-size: 0.5625rem; font-weight: var(--w-bold); text-transform: uppercase; letter-spacing: 0.16em; color: var(--faint); }
+
+/* ── In-world surface root ────────────────────────────────────────────────
+   A DUI page is a fixed-size canvas (1024/256/128 square) that is then drawn
+   at a fraction of screen height, so everything inside is authored MUCH larger
+   than a screen-space UI would be. `.world` is the anchor: its centre is the
+   world point the surface is drawn at, so a design positions relative to it.
+
+   A design lays its content out around that centre. Because most designs put
+   their body to one side of the anchor, each declares an ANCHOR BIAS: the
+   canvas is shifted so the anchor sits off-centre and the design gets most of
+   the texture on the side it actually uses. Lua applies the same bias to the
+   sprite offset, so the two stay in register. */
+.world {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* Only the MENU surface is biased. The indicator and the cursor are small and
+   symmetric, so their world point is simply the middle of their texture - and
+   Lua likewise applies the bias to the menu sprite only.
+
+   Percentages, not vw/vh: a translate percentage resolves against the element's
+   own size, and `.world` is inset:0 inside its container. In-game that is the
+   whole page; in the dev preview it is the fixed-size frame standing in for the
+   texture. Viewport units would only be correct in the first case. */
+.world--biased {
+  transform: translate(calc(var(--t-anchor-x, 0) * -100%), calc(var(--t-anchor-y, 0) * -100%));
+}
+
+.world-anchor {
+  position: relative;
+  width: 0;
+  height: 0;
+  transform: scale(var(--t-scale));
+}

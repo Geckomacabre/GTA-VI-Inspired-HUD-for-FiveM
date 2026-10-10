@@ -1,0 +1,304 @@
+OSMFX MODS SOURCE-AVAILABLE LICENSE
+Version 1.0
+
+Copyright (c) 2026 OsmFX Mods (https://osmfxmods.com).
+All rights not expressly granted are reserved.
+
+This License permits the Software to be operated on game servers, including
+commercially operated game servers, and prohibits the sale or commercial
+distribution of the Software itself. By using, copying, modifying, or
+distributing the Software, You accept these terms.
+
+-------------------------------------------------------------------------------
+1. DEFINITIONS
+-------------------------------------------------------------------------------
+
+1.1  "Software" means the osm-target resource published by the Licensor,
+     including its source code, interface bundles, assets, database schemas,
+     documentation, and any design pack distributed by the Licensor with it.
+
+1.2  "Licensor" means OsmFX Mods, the copyright holder identified above.
+
+1.3  "You" means the individual or entity exercising rights under this License.
+     Where You act for an entity, You represent that You may bind it.
+
+1.4  "Game Server" means a live multiplayer game server instance operated for
+     players, on which the Software runs as part of the gameplay experience.
+
+1.5  "Server Revenue" means revenue arising from the operation of a Game Server,
+     including donations, subscriptions, priority queue access, supporter tiers,
+     in-game currency, cosmetic or gameplay purchases, advertising, and
+     sponsorship. Server Revenue does not include any transaction in which the
+     Software, a Derivative Work, or access to either is the item supplied.
+
+1.6  "Distribute" means to make the Software or a Derivative Work available to a
+     third party by any means, including publication, transmission, hosting, or
+     inclusion in a package, template, or server pack.
+
+1.7  "Marketplace" means any storefront, catalogue, or paid-access channel
+     through which digital goods are supplied to third parties, whether or not
+     related to FiveM or Cfx.re. This includes Tebex, the Cfx.re Creator
+     Program and asset escrow, comparable stores, and membership platforms or
+     communities where files are gated behind payment.
+
+1.8  "Derivative Work" means any work based upon the Software, including any
+     modification, adaptation, port, re-skin, or work incorporating a
+     substantial portion of the Software.
+
+1.9  "Supplemental License" means a separate written grant issued by the
+     Licensor under Section 5.
+
+-------------------------------------------------------------------------------
+2. GRANT OF RIGHTS
+-------------------------------------------------------------------------------
+
+Subject to Your compliance with this License, the Licensor grants You a
+worldwide, royalty-free, non-exclusive, non-transferable, non-sublicensable
+license to:
+
+2.1  Use, run, copy, and study the Software for personal, educational,
+     evaluation, and other non-commercial purposes.
+
+2.2  Install and run the Software on any number of Game Servers You own or
+     operate, including Game Servers that generate Server Revenue. No fee or
+     royalty is payable to the Licensor on account of Server Revenue.
+
+2.3  Create Derivative Works for use on Game Servers You own or operate and for
+     Your own study and testing.
+
+2.4  Distribute verbatim copies of the Software, and Distribute Derivative Works
+     in source form, free of charge and outside any Marketplace, subject to
+     Section 3.
+
+2.5  Submit contributions to the Licensor, subject to Section 6.
+
+-------------------------------------------------------------------------------
+3. CONDITIONS
+-------------------------------------------------------------------------------
+
+The rights in Section 2 are conditional on each of the following.
+
+3.1  You retain this License file, all copyright notices, authorship headers,
+     and resource manifest metadata identifying the Licensor, unaltered, in
+     every copy and Derivative Work.
+
+3.2  Any Derivative Work You Distribute carries a notice stating that You
+     modified the Software, and identifies the Licensor's official distribution
+     at https://osmfxmods.com.
+
+3.3  You do not present the Software or a Derivative Work as Your own original
+     work, or as an official, endorsed, or supported release of the Licensor.
+
+3.4  You Distribute any copy or Derivative Work under this License, without
+     additional or different terms that restrict the recipient's rights.
+
+3.5  You do not Distribute the Software or a Derivative Work in a form that has
+     been obfuscated or escrowed so as to impede inspection, except for the
+     compiled interface bundles as shipped by the Licensor.
+
+-------------------------------------------------------------------------------
+4. RESTRICTIONS
+-------------------------------------------------------------------------------
+
+Except as permitted by a Supplemental License issued to You, You may not, and
+may not permit a third party to:
+
+4.1  Sell, resell, license, sublicense, rent, lease, or otherwise supply the
+     Software or any Derivative Work, in whole or in part, for consideration.
+
+4.2  List or make the Software or any Derivative Work available through any
+     Marketplace, whether for a fee or free of charge.
+
+4.3  Include the Software or any Derivative Work in any paid script, framework,
+     resource bundle, server template, server pack, or managed-hosting offering
+     in which the Software forms part of the value supplied to the customer.
+
+4.4  Condition access to the Software or any Derivative Work on payment,
+     subscription, membership tier, paid role, or comparable consideration.
+
+4.5  Extract, re-implement, or redistribute any design pack, asset, or interface
+     bundle supplied by the Licensor on paid terms, or circumvent any licensing,
+     entitlement, or version verification mechanism in the Software.
+
+4.6  Remove, obscure, or alter any notice required to be retained under
+     Section 3.1, or substitute Your own branding for the Licensor's.
+
+4.7  Use the Software in violation of applicable law, of the Cfx.re Platform
+     Server License Agreement, or of the terms of service of any platform on
+     which the Software is run or Distributed.
+
+In case of doubt as to whether an arrangement falls within Section 2.2 or
+Section 4, the question is determined by whether the recipient is paying, in
+whole or in part, for the Software.
+
+-------------------------------------------------------------------------------
+5. SUPPLEMENTAL LICENSES
+-------------------------------------------------------------------------------
+
+5.1  CREATOR AND STORE LICENSE. The Licensor operates a supplemental licensing
+     programme permitting script creators and store operators to Distribute the
+     Software alongside, or as a dependency of, their own products. This
+     permission is granted free of charge to small and medium-sized stores on
+     request through the Licensor's Discord.
+
+5.2  LARGE CREATOR LICENSE. Where the applicant is a large creator or store, the
+     Licensor assesses the request individually and may grant the permission
+     free of charge or condition it on a royalty or license fee. Classification
+     as small, medium, or large rests with the Licensor, having regard to
+     catalogue size, customer volume, distribution reach, and the extent to
+     which the Software contributes to the applicant's product.
+
+5.3  CONTRIBUTOR LICENSE. A person whose contribution to the Software's code has
+     been merged by the Licensor, and which the Licensor determines to be
+     material, is granted a perpetual, worldwide, royalty-free, non-transferable
+     commercial license on the terms recorded in that grant. Materiality is
+     assessed case by case at the Licensor's discretion. Trivial, cosmetic,
+     automated, or documentation-only changes do not qualify. Nothing in this
+     Section obliges the Licensor to accept a contribution.
+
+5.4  FORM AND EFFECT. A Supplemental License is effective only if made in writing
+     by the Licensor. It is personal to its holder, non-transferable, and does
+     not pass on a change of control or assignment unless it so provides. Where
+     a Supplemental License conflicts with this License, the Supplemental
+     License controls as to its holder, to the extent of the conflict.
+
+-------------------------------------------------------------------------------
+6. CONTRIBUTIONS
+-------------------------------------------------------------------------------
+
+6.1  By submitting a contribution to the Licensor, You grant the Licensor a
+     perpetual, worldwide, non-exclusive, irrevocable, royalty-free,
+     sublicensable license to reproduce, modify, display, distribute, and
+     relicense that contribution as part of the Software. You retain copyright
+     in Your contribution.
+
+6.2  You represent that each contribution is Your original work or that You
+     otherwise hold sufficient rights to grant the license in Section 6.1, and
+     that it does not knowingly infringe the rights of any third party.
+
+6.3  Each contributor grants the Licensor and every recipient of the Software a
+     perpetual, worldwide, non-exclusive, royalty-free, irrevocable patent
+     license to make, use, sell, offer for sale, import, and otherwise transfer
+     the Software, limited to the patent claims necessarily infringed by that
+     contribution alone or in combination with the Software.
+
+6.4  If You institute patent litigation alleging that the Software constitutes
+     patent infringement, the licenses granted to You under this License
+     terminate as of the date the litigation is filed.
+
+-------------------------------------------------------------------------------
+7. AUTHORSHIP AND OWNERSHIP
+-------------------------------------------------------------------------------
+
+7.1  Portions of the Software were authored with the assistance of generative
+     artificial-intelligence tools, directed, reviewed, and tested by the
+     Licensor. The terms of service of those tools assign to, or leave with, the
+     directing user all right, title, and interest the provider may hold in the
+     outputs. Those rights vest in the Licensor. Such assistance does not
+     diminish the Licensor's rights or place any part of the Software in the
+     public domain.
+
+7.2  To the extent any portion of the Software is held not to attract copyright
+     protection in a given jurisdiction, the remainder of the Software, and the
+     Licensor's selection, arrangement, and integration of all portions, remain
+     protected and subject to this License. Sections 3 and 4 bind You as
+     contractual terms independently of copyright.
+
+-------------------------------------------------------------------------------
+8. TERM AND TERMINATION
+-------------------------------------------------------------------------------
+
+8.1  This License is effective until terminated. Your rights terminate
+     automatically if You breach any of its terms.
+
+8.2  Where the breach is capable of cure, Your rights are reinstated on cure,
+     provisionally, and permanently if the Licensor has not notified You of the
+     breach within sixty (60) days after cure. Reinstatement does not apply to a
+     repeated breach of the same term.
+
+8.3  On termination You must cease all use and Distribution of the Software and
+     remove it from every system under Your control. Sections 6, 7, 8.3, 9, 10,
+     11, and 12 survive termination.
+
+-------------------------------------------------------------------------------
+9. DISCLAIMER OF WARRANTY
+-------------------------------------------------------------------------------
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS,
+IMPLIED, OR STATUTORY, INCLUDING THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. THE LICENSOR DOES
+NOT WARRANT THAT THE SOFTWARE WILL BE UNINTERRUPTED, ERROR-FREE, SECURE, OR
+COMPATIBLE WITH ANY PARTICULAR RESOURCE, FRAMEWORK, OR PLATFORM VERSION. THE
+ENTIRE RISK AS TO QUALITY AND PERFORMANCE RESTS WITH YOU.
+
+-------------------------------------------------------------------------------
+10. LIMITATION OF LIABILITY
+-------------------------------------------------------------------------------
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE LICENSOR AND CONTRIBUTORS SHALL NOT
+BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR
+CONSEQUENTIAL DAMAGES, OR FOR LOSS OF PROFITS, REVENUE, GOODWILL, DATA, OR
+SERVER AVAILABILITY, ARISING OUT OF THE USE OF OR INABILITY TO USE THE SOFTWARE,
+ON ANY THEORY OF LIABILITY, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+THE LICENSOR'S TOTAL AGGREGATE LIABILITY UNDER THIS LICENSE SHALL NOT EXCEED THE
+GREATER OF THE AMOUNT YOU PAID THE LICENSOR FOR THE SOFTWARE IN THE TWELVE (12)
+MONTHS PRECEDING THE CLAIM OR TWENTY UNITED STATES DOLLARS (USD 20.00).
+
+NOTHING IN THIS LICENSE EXCLUDES LIABILITY THAT CANNOT LAWFULLY BE EXCLUDED.
+WHERE A JURISDICTION DOES NOT PERMIT THE EXCLUSION OR LIMITATION OF CERTAIN
+WARRANTIES OR LIABILITIES, THE ABOVE APPLIES TO THE MAXIMUM EXTENT PERMITTED
+THERE.
+
+-------------------------------------------------------------------------------
+11. THIRD-PARTY COMPONENTS AND TRADEMARKS
+-------------------------------------------------------------------------------
+
+11.1 The Software interoperates with, and its interface bundles may incorporate,
+     third-party components distributed under their own licenses, including
+     ox_lib, oxmysql, and the libraries listed in the interface build manifests.
+     Those components remain governed by their respective licenses, and nothing
+     in this License limits or modifies the rights You hold under them.
+
+11.2 This License grants no right to use the trade names, trademarks, or logos
+     of the Licensor, except for the attributive use required by Section 3 and
+     nominative use in describing the origin of the Software. "ox_target",
+     "qb-target", "qtarget", "FiveM", "Cfx.re", "Tebex", and other third-party
+     marks are the property of their respective owners and are referenced solely
+     to describe compatibility.
+
+-------------------------------------------------------------------------------
+12. GENERAL
+-------------------------------------------------------------------------------
+
+12.1 RESERVATION OF RIGHTS. All rights not expressly granted are reserved. No
+     rights are granted by implication or estoppel.
+
+12.2 NO WAIVER. A failure or delay in exercising any right under this License is
+     not a waiver of that right.
+
+12.3 SEVERABILITY. If any provision is held unenforceable, it shall be reformed
+     to the minimum extent necessary to make it enforceable, and the remaining
+     provisions continue in force.
+
+12.4 ENTIRE AGREEMENT. This License, together with any Supplemental License
+     issued to You, is the entire agreement between You and the Licensor
+     concerning the Software.
+
+12.5 ASSIGNMENT. You may not assign or transfer this License without the
+     Licensor's prior written consent. A purported assignment in breach of this
+     Section is void.
+
+12.6 LICENSE VERSIONS. The Licensor may publish revised versions of this
+     License. Each copy of the Software is governed by the version distributed
+     with it. You may elect to be governed instead by any later version
+     published by the Licensor.
+
+-------------------------------------------------------------------------------
+13. CONTACT
+-------------------------------------------------------------------------------
+
+Commercial distribution rights, creator and store licenses, and contributor
+licenses are handled through:
+
+  Website:  https://osmfxmods.com
+  Discord:  https://www.osmfxmods.com/discord

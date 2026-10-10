@@ -61,7 +61,8 @@ end
 ---module for a dozen lines would touch smashwindow.lua for no real gain.
 ---@return {durationMultiplier: number, alertChanceMultiplier: number}
 local function getHonorTuning()
-    if GetResourceState('qbx_honor') ~= 'started' then return sjConfig.honor.neutral end
+    -- Honor is the qbx_honor resource, or part of vice_hud.
+    if GetResourceState('qbx_honor') ~= 'started' and GetResourceState('vice_hud') ~= 'started' then return sjConfig.honor.neutral end
 
     local ok, honor = pcall(function() return exports.qbx_honor:GetHonor() end)
     if not ok or type(honor) ~= 'number' then return sjConfig.honor.neutral end

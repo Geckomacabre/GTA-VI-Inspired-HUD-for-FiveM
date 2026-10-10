@@ -141,13 +141,20 @@ end
     fetch this replaced was safe here only by accident, because a round trip to the server
     is always several frames. So the dependency is now explicit.
 ]]
+-- Targeting is ox_target itself, or vice_hud, which has it built in. Tested
+-- by state because `provide 'ox_target'` does not make GetResourceState
+-- report the provided name as started.
+local function targetStarted()
+    return GetResourceState('ox_target') == 'started' or GetResourceState('vice_hud') == 'started'
+end
+
 local function whenTargetReady(fn)
-    if GetResourceState('ox_target') == 'started' then return fn() end
+    if targetStarted() then return fn() end
 
     CreateThread(function()
         local deadline = GetGameTimer() + 20000
 
-        while GetResourceState('ox_target') ~= 'started' do
+        while not targetStarted() do
             if GetGameTimer() > deadline then
                 print('^1[gk_basketball]^7 ox_target never started — no court interaction points')
                 return

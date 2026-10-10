@@ -1,0 +1,101 @@
+/* ============================================================================
+   osm-target TOKEN LAYER.
+
+   Two colour systems live here and they must not be confused:
+
+   1. The CHROME tokens (--canvas, --surface, --accent, ...) style the ADMIN
+      PANEL and the preferences panel. They are the OsmFX house look and they
+      never change per server.
+
+   2. The DESIGN tokens (--t-*) style the IN-WORLD interface. They are written
+      at runtime from the server's stored tunables (see lib/appearance.ts), so
+      an owner's palette, radius, outline and motion settings reach every design
+      through one contract rather than through per-component props.
+
+   Address by ROLE, never by appearance, so a future theme can override cleanly.
+   ============================================================================ */
+
+@layer base {
+.dark,
+[data-theme='dark'],
+:root {
+  /* ── Fonts ──────────────────────────────────────────────────────────── */
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-num: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+  /* ── Weight ladder ──────────────────────────────────────────────────── */
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semibold: 600;
+  --w-bold: 700;
+  --w-extrabold: 800;
+
+  /* ── Chrome: canvas & surfaces ──────────────────────────────────────── */
+  --canvas: #0a0a0b;
+  --surface: #141416;
+  --surface-secondary: #1c1c1f;
+  --overlay: #141416;
+  --wash-1: rgba(255, 255, 255, 0.02);
+  --wash-2: rgba(255, 255, 255, 0.04);
+  --wash-3: rgba(255, 255, 255, 0.06);
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-focus: rgba(255, 255, 255, 0.20);
+  --separator: #202024;
+
+  --foreground: #ececec;
+  --muted: #9a9a9a;
+  /* Used by .t-label, the small-caps field labels. At 0.30 they sat under 3:1
+     on the panel background; 0.48 keeps them subordinate and still readable. */
+  --faint: rgba(255, 255, 255, 0.48);
+
+  /* ── Chrome: the one accent ─────────────────────────────────────────── */
+  --accent: #14b8a6;
+  --accent-foreground: #04201d;
+  --accent-muted: rgba(20, 184, 166, 0.13);
+  --focus: #14b8a6;
+
+  --field-background: #101012;
+  --field-border: #2a2a2e;
+
+  --success: #10b981; --success-muted: rgba(16, 185, 129, 0.12);
+  --warning: #f59e0b; --warning-muted: rgba(245, 158, 11, 0.12);
+  --danger:  #ef4444; --danger-muted:  rgba(239, 68, 68, 0.12);
+  --info:    #3b82f6; --info-muted:    rgba(59, 130, 246, 0.12);
+
+  --default: #1c1c1f;
+  --default-foreground: #ececec;
+  --segment: #1c1c1f;
+  --segment-foreground: #ececec;
+
+  --radius: 0.75rem;
+  --field-radius: 0.625rem;
+
+  --shadow-overlay: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 24px 64px rgba(0, 0, 0, 0.6);
+
+  --cursor-interactive: pointer;
+
+  /* ── Design tokens (overwritten at runtime from the stored tunables) ─── */
+  --t-accent: #14b8a6;
+  --t-accent-soft: rgba(20, 184, 166, 0.16);
+  --t-surface: #0b0d0e;
+  --t-surface-rgb: 11, 13, 14;
+  --t-surface-alpha: 0.88;
+  --t-text: #f2f4f5;
+  --t-text-muted: #8f979c;
+  --t-disabled: #6b7377;
+  --t-outline: rgba(255, 255, 255, 0.14);
+  --t-corner: 12px;
+  --t-shadow: 0 18px 48px rgba(0, 0, 0, 0.40);
+  --t-gradient: none;
+  --t-font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --t-type-scale: 1;
+  --t-type-weight: 600;
+  --t-type-case: none;
+  --t-motion: 1;
+  --t-duration: 1;
+  --t-scale: 1;
+}
+}

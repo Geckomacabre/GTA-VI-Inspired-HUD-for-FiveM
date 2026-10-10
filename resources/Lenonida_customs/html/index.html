@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customs</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div id="app" hidden>
+      <div class="shade"></div>
+      <header id="head"></header>
+      <ul id="menu"></ul>
+      <div id="count"></div>
+      <aside id="card"></aside>
+      <section id="detail"></section>
+      <p id="hint"></p>
+      <p id="objective"></p>
+      <div id="toast" hidden><span>Purchased</span><i class="have"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></i></div>
+      <nav id="prompts"></nav>
+      <section id="dialog" hidden>
+        <h2 id="dialog-title"></h2>
+        <div class="rule"></div>
+        <div id="dialog-body"></div>
+        <nav id="dialog-prompts" class="prompts"></nav>
+      </section>
+      <input type="color" id="picker" tabindex="-1">
+    </div>
+    <!-- spray can colour picker of the paint room -->
+    <section id="spray" hidden>
+      <h2>Custom Paint</h2>
+      <div class="rule"></div>
+      <label>Pick the colour of the spray can <input type="color" id="spray-color" value="#ff0000"></label>
+      <nav class="prompts"><button type="button" id="spray-done"><span>Done</span><i class="key">&#8629;</i></button></nav>
+    </section>
+    <script src="makes.js"></script>
+    <script src="colors.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

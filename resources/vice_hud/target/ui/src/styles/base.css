@@ -1,0 +1,39 @@
+/* ── CEF TRANSPARENCY (critical) — MUST stay UNLAYERED ─────────────────────
+   Both the NUI page and every DUI surface float over the game; html/body/#root
+   must be transparent or a solid rectangle is painted over the player's screen
+   (or, for a DUI, baked into the world texture). These rules live in their OWN
+   stylesheet, imported FIRST in main.tsx, before index.css/HeroUI: any
+   unlayered rule beats every @layer, which is what guarantees they win over
+   HeroUI's layered surface styles. Do not move this into @layer. */
+:root,
+:root.dark,
+:root[data-theme='dark'] {
+  --background: transparent !important;
+  --surface-root: transparent !important;
+  --surface: transparent !important;
+}
+
+html, body, #root,
+html.dark, body.dark,
+html[data-theme='dark'], body[data-theme='dark'] {
+  background: transparent !important;
+  background-color: transparent !important;
+  color-scheme: unset !important;
+  margin: 0; padding: 0; width: 100%; height: 100%;
+  overflow: hidden;
+  color: var(--foreground);
+  font-family: var(--font-ui);
+  box-sizing: border-box;
+}
+
+html, body { -webkit-user-select: none; user-select: none; }
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* ── DEV CANVAS — opaque only in the browser dev-preview, gated on a flag ─ */
+html[data-dev-mode='true'],
+html[data-dev-mode='true'] body,
+html[data-dev-mode='true'] #root {
+  background: #0a0a0b !important;
+  background-color: #0a0a0b !important;
+}

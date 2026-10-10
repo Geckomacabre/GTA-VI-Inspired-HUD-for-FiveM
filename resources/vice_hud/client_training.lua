@@ -216,11 +216,13 @@ CreateThread(function()
     TriggerServerEvent('vice_hud:gym:request')
 end)
 
--- Gym props. Waits for ox_target instead of assuming start order.
+-- Gym props. Targeting is part of this resource now (target/), so what is
+-- waited for is the resource itself having finished starting.
 CreateThread(function()
     local waited = 0
-    while GetResourceState('ox_target') ~= 'started' and waited < 30000 do Wait(500) waited = waited + 500 end
-    if GetResourceState('ox_target') ~= 'started' then
+    local me = GetCurrentResourceName()
+    while GetResourceState(me) ~= 'started' and waited < 30000 do Wait(500) waited = waited + 500 end
+    if GetResourceState(me) ~= 'started' then
         print('^3[vice_hud]^7 ox_target not running: gym targets skipped (commands still work)')
         return
     end

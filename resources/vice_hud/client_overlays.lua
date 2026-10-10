@@ -170,16 +170,30 @@ RegisterCommand('hudkillmark', function(_, args)
 end, false)
 
 -- =============================================================================
--- Race lap / checkpoint HUD
+-- Race HUD
 -- =============================================================================
 -- Fed entirely by whatever race resource is running — sk_streetkings today
 -- (see its race_singleplayer_c.lua / race_multiplayer_c.lua), via plain data.
 -- vice_hud draws it and does not know sk_streetkings exists.
 --
+-- Three rows, bottom right: PROGRESS and a percentage, the chequered plate,
+-- the clock. All of it optional except the clock:
+--
+--   position, racers   place in the field, "1 / 6" on the plate. Leave both
+--                      out (a solo run has no field) and the plate shows the
+--                      checkpoint count instead, as it always used to.
+--   progress           0.0 .. 1.0 along the route, for the PROGRESS figure.
+--                      Left out, it is worked out from lap / cp / cpTotal,
+--                      which is right but moves a checkpoint at a time.
+--   lap, laps          "LAP 1/2", drawn only when laps > 1.
+--   cp, cpTotal        checkpoints cleared this lap, and per lap.
+--
 -- elapsedMs is a snapshot, not a stream: the caller is expected to push this
--- only on real events (run start, a checkpoint hit, finish/abort) — the NUI
--- side ticks the displayed time smoothly on its own between pushes (see
--- onLapHud in app.js) rather than needing this called every frame.
+-- only on real events (run start, a checkpoint hit, a change of position,
+-- finish/abort) — the NUI side ticks the displayed time smoothly on its own
+-- between pushes (see onLapHud in app.js) rather than needing this called
+-- every frame. A resource that does send `progress` will want to push a
+-- little more often than that; a couple of times a second is plenty.
 exports('SetLapTimer', function(data)
     if not data or data.show == false then
         ui('lapHud', { show = false })
@@ -191,16 +205,251 @@ exports('SetLapTimer', function(data)
         laps = data.laps,
         cp = data.cp,
         cpTotal = data.cpTotal,
+        position = data.position,
+        racers = data.racers,
+        progress = data.progress,
         elapsedMs = data.elapsedMs,
         running = data.running,
     })
 end)
 
 RegisterCommand('hudlaptimer', function()
-    exports.vice_hud:SetLapTimer({ lap = 1, laps = 2, cp = 10, cpTotal = 16, elapsedMs = 19950, running = true })
+    exports.vice_hud:SetLapTimer({ position = 1, racers = 6, progress = 0.30,
+        lap = 1, laps = 1, cp = 5, cpTotal = 16, elapsedMs = 30390, running = true })
     print('^3[vice_hud]^7 /hudlaptimer — sample data, /hudlaptimeroff to clear.')
 end, false)
 RegisterCommand('hudlaptimeroff', function() exports.vice_hud:SetLapTimer({ show = false }) end, false)
+
+-- ---- race cards and countdown -------------------------------------------------
+-- The pieces of a race that are not the running block: the title card before
+-- the start, the 3-2-1-go, and the placing at the finish. Plain data in, same
+-- as SetLapTimer; the page holds each one up for as long as the reference does
+-- unless told otherwise, so a race resource can call these and forget them.
+
+--- The title card: a small line, the race's name, a small line.
+--- @param data { series?: string, name: string, type?: string, duration?: number }|nil
+---        duration in ms (default 1900, 0 = until hidden). nil hides it.
+exports('ShowRaceTitle', function(data)
+    if type(data) ~= 'table' then ui('raceCard', { show = false }) return end
+    ui('raceCard', {
+        show = true, kind = 'title',
+        series = data.series, name = data.name, type = data.type,
+        holdMs = tonumber(data.duration),
+    })
+end)
+
+--- The result card: "1ST" over the finishing time.
+--- @param data { position: number, timeMs?: number, label?: string, duration?: number }|nil
+---        label replaces the ordinal ("DNF", "WASTED"). duration in ms
+---        (default 2000, 0 = until hidden). nil hides it.
+exports('ShowRaceResult', function(data)
+    if type(data) ~= 'table' then ui('raceCard', { show = false }) return end
+    ui('raceCard', {
+        show = true, kind = 'result',
+        position = data.position, timeMs = data.timeMs, label = data.label,
+        holdMs = tonumber(data.duration),
+    })
+end)
+
+--- A line across the top with a time under it: FINAL LAP over the lap just
+--- finished. data: { text = 'FINAL LAP', timeMs = last lap, duration = ms
+--- (default 3000) }. nil hides it.
+exports('ShowRaceBanner', function(data)
+    if type(data) ~= 'table' then ui('raceCard', { show = false }) return end
+    ui('raceCard', {
+        show = true, kind = 'banner',
+        text = data.text, timeMs = data.timeMs,
+        holdMs = tonumber(data.duration),
+    })
+end)
+
+--- 3, 2, 1, go.
+---   ShowRaceCountdown()            the whole run from 3, timed by the page
+---   ShowRaceCountdown({ from = 5 })
+---   ShowRaceCountdown(3) / ('go')  one beat, for a resource keeping its own clock
+---   ShowRaceCountdown(false)       stop and clear
+--- "go" appears `from` seconds after the call when the page runs it.
+exports('ShowRaceCountdown', function(data)
+    if data == false then ui('raceCountdown', { show = false }) return end
+    if type(data) == 'table' then
+        ui('raceCountdown', {
+            show = true, from = data.from, value = data.value,
+            stepMs = data.stepMs, digitMs = data.digitMs, goMs = data.goMs,
+        })
+    elseif data ~= nil then
+        ui('raceCountdown', { show = true, value = data })
+    else
+        ui('raceCountdown', { show = true, from = 3 })
+    end
+end)
+
+-- =============================================================================
+-- Screen text and overlays
+-- =============================================================================
+-- Subtitles, the objective line, the help box, the feed, title cards, the
+-- binocular mask and the shop item panel. (WASTED and BUSTED are not here:
+-- they are the vi_wasted resource, taken from fenix-police.) Each is drawn by the page from
+-- one message; nothing here polls. Text takes two marks: **bold** for a key
+-- word and {braces} for the thing the line is about, which is drawn pink.
+--
+-- A duration is in ms. Where one is optional, nil means the element's own
+-- default and 0 means "until hidden"; passing nil / false as the text hides it.
+
+local function textMessage(action, text, durationMs, extra)
+    if text == nil or text == false or text == '' then
+        ui(action, { show = false })
+        return
+    end
+    local data = extra or {}
+    data.show = true
+    data.text = tostring(text)
+    data.holdMs = tonumber(durationMs)
+    ui(action, data)
+end
+
+--- One or two lines of speech, bottom centre. Default 4 s.
+exports('ShowSubtitle', function(text, durationMs)
+    textMessage('subtitle', text, durationMs)
+end)
+
+--- What to do next, under the subtitle: 'Return to {Lucia}'. Stays until
+--- hidden unless a duration is given.
+exports('ShowObjective', function(text, durationMs)
+    textMessage('objective', text, durationMs)
+end)
+
+--- The help box, top left. opts.tells = { 'outfit', 'voice', ... } draws that
+--- row of wanted tells under the text. Default 7 s.
+exports('ShowHelpText', function(text, durationMs, opts)
+    textMessage('helpText', text, durationMs, { tells = type(opts) == 'table' and opts.tells or nil })
+end)
+
+--- A line in the feed on the right ('Crime reported'). opts.icon is an image
+--- in html/ to draw after it; opts.duration defaults to 3.5 s.
+exports('ShowFeed', function(text, opts)
+    if text == nil or text == '' then return end
+    opts = type(opts) == 'table' and opts or {}
+    ui('feed', { text = tostring(text), icon = opts.icon, holdMs = tonumber(opts.duration) })
+end)
+
+--- A title card. style: 'center' (PROLOGUE), 'stack' (NINE MONTHS AGO., one
+--- word a line) or 'location' (a place name at the top). Default 3.5 s.
+exports('ShowTitleCard', function(text, style, durationMs)
+    textMessage('titleCard', text, durationMs, { style = style })
+end)
+
+--- The cinematic overlay: the Focus effect's vignette in black, with bars. It
+--- stays up while the HUD is hidden, which is the point of it. opts:
+--- { strength = 0..2 (default 1), bars = fraction of screen height (default
+--- 0.032, 0 for none), pulse = false for a still vignette }.
+exports('SetCinematicFx', function(active, opts)
+    if not active then ui('cineFx', { show = false }) return end
+    opts = type(opts) == 'table' and opts or {}
+    ui('cineFx', {
+        show = true,
+        strength = tonumber(opts.strength),
+        bars = tonumber(opts.bars),
+        pulse = opts.pulse ~= false,
+    })
+end)
+
+--- The binocular mask. opts: { label = 'PHONE CASES', key = control id for
+--- the button drawn beside the label }. A binocular script does the camera;
+--- this is only the picture (see resources/vi_binoculars).
+exports('SetBinocularOverlay', function(active, opts)
+    if not active then ui('binoculars', { show = false }) return end
+    opts = type(opts) == 'table' and opts or {}
+    local glyph, device
+    if opts.key ~= nil then glyph, device = ViceGlyphs.control(opts.key) end
+    ui('binoculars', { show = true, label = opts.label, glyph = glyph, device = device })
+end)
+
+--- The shop item panel. data: { store, category, price, pay = { 'bank',
+--- 'cash' }, name, variant, swatches = { { color = '#1f8a45', locked = true },
+--- ... }, selected = index, afford = false, note }. BUY / EXIT are ordinary
+--- action prompts; they sit in a row while the panel is up, and
+--- ShowActionPrompt's opts.off greys one that cannot be used.
+exports('ShowShopItem', function(data)
+    if type(data) ~= 'table' then ui('shop', { show = false }) return end
+    data.show = true
+    ui('shop', data)
+end)
+exports('HideShopItem', function()
+    ui('shop', { show = false })
+end)
+
+--- The vehicle stats panel, as shown beside a bike you can rent. data:
+--- { make = 'Maibatsu', model = 'Sanchez',
+---   stats = { { label = 'Speed', value = 4.5 }, ... },   -- value out of 10, or give max
+---   ratings = { { value = 649, kind = 'offroad' }, { value = 520, kind = 'road' } } }
+exports('ShowVehicleStats', function(data)
+    if type(data) ~= 'table' then ui('vehStats', { show = false }) return end
+    data.show = true
+    ui('vehStats', data)
+end)
+exports('HideVehicleStats', function()
+    ui('vehStats', { show = false })
+end)
+
+RegisterCommand('hudvehstats', function()
+    exports.vice_hud:ShowVehicleStats({
+        make = 'Maibatsu', model = 'Sanchez',
+        stats = {
+            { label = 'Speed', value = 4.5 }, { label = 'Acceleration', value = 5.4 },
+            { label = 'Asphalt handling', value = 5.2 }, { label = 'Off-road handling', value = 4.9 },
+            { label = 'Strength', value = 4.0 },
+        },
+        ratings = { { value = 649, kind = 'offroad' }, { value = 520, kind = 'road' } },
+    })
+    SetTimeout(8000, function() exports.vice_hud:HideVehicleStats() end)
+    print('^3[vice_hud]^7 /hudvehstats — sample vehicle stats panel for eight seconds.')
+end, false)
+
+RegisterCommand('hudtext', function()
+    exports.vice_hud:ShowSubtitle('Excuse me, sir. Sir. Owner of the pickup,\ngas needs to go in the tank.', 6000)
+    exports.vice_hud:ShowObjective('Return to {Lucia}', 6000)
+    exports.vice_hud:ShowHelpText('Repeated use of **Zombix** will temporarily have a weaker effect on your health.', 6000)
+    exports.vice_hud:ShowFeed('Crime reported')
+    print('^3[vice_hud]^7 /hudtext — subtitle, objective, help box and a feed line for six seconds.')
+end, false)
+
+RegisterCommand('hudtitle', function(_, args)
+    local style = args[1] or 'center'
+    local text = style == 'stack' and 'Nine months ago.' or style == 'location' and 'Port Gellhorn' or 'Prologue'
+    exports.vice_hud:ShowTitleCard(text, style)
+    print('^3[vice_hud]^7 /hudtitle [center|stack|location] — sample title card.')
+end, false)
+
+RegisterCommand('hudshop', function()
+    exports.vice_hud:ShowShopItem({
+        store = 'Game Horde', category = 'Earbuds', price = 139, name = 'Clef Earbuds', variant = 'Green',
+        swatches = {
+            { color = '#1c1c1e', locked = true }, { color = '#f1eef0', locked = true },
+            { color = '#f4ee2c', locked = true }, { color = '#a51c24', locked = true },
+            { color = '#1f8a45', locked = true }, { color = '#7a45ad', locked = true },
+        },
+        selected = 5, afford = false,
+    })
+    print('^3[vice_hud]^7 /hudshop — sample shop panel. /hudshopoff to clear.')
+end, false)
+RegisterCommand('hudshopoff', function() exports.vice_hud:HideShopItem() end, false)
+
+RegisterCommand('hudrace', function()
+    print('^3[vice_hud]^7 /hudrace — title card, countdown, race block, FINAL LAP, then the result card.')
+    exports.vice_hud:ShowRaceTitle({ series = "HIT 'N' RUN VC", name = 'SALTON TO WANING SANDS', type = 'GROUP RACE' })
+    SetTimeout(5500, function() exports.vice_hud:ShowRaceCountdown() end)
+    SetTimeout(8500, function()
+        exports.vice_hud:SetLapTimer({ position = 8, racers = 14, lap = 1, laps = 2, elapsedMs = 0, running = true })
+    end)
+    SetTimeout(12500, function()
+        exports.vice_hud:SetLapTimer({ position = 7, racers = 14, lap = 2, laps = 2, elapsedMs = 89290, running = true })
+        exports.vice_hud:ShowRaceBanner({ text = 'FINAL LAP', timeMs = 89290 })
+    end)
+    SetTimeout(18500, function()
+        exports.vice_hud:SetLapTimer({ show = false })
+        exports.vice_hud:ShowRaceResult({ position = 1, timeMs = 178893 })
+    end)
+end, false)
 
 -- =============================================================================
 -- World action prompt — a short list of button-glyph + label choices
@@ -232,63 +481,29 @@ RegisterCommand('hudlaptimeroff', function() exports.vice_hud:SetLapTimer({ show
 -- of this file for the established precedent). The icon can no longer
 -- disagree with the binding: it IS the binding, resolved.
 
--- GetControlInstructionalButton returns GTA button-font ligatures for a pad,
--- which do not exist in the NUI's fonts -- see the identical helper and
--- comment in client.lua's Action Prompts section, which this mirrors.
-local function waSafeLabel(str)
-    if not str or str == '' then return nil end
+-- The resolving is ViceGlyphs' (client_glyphs.lua), the same one the action
+-- prompts use, so a world action and a prompt bound to the same control can
+-- never show different buttons.
+local function waUsingPad() return ViceGlyphs.usingPad() end
 
-    -- Multi-digit = a raw internal icon index, not a key label; see the
-    -- identical guard in client.lua's safeLabel for the full reasoning.
-    -- Single digits are kept, because 1-9 are real keys.
-    if #str > 1 and str:match('^%d+$') then return nil end
-
-    for i = 1, #str do
-        local b = str:byte(i)
-        if b < 0x20 or b > 0x7E then return '•' end
-    end
-    return str
-end
-
--- IS_USING_KEYBOARD_AND_MOUSE rather than IsInputDisabled(2) -- see the
--- identical usingPad() in client.lua for why that check was not reliable.
-local function waUsingPad()
-    local ok, kbm = pcall(IsUsingKeyboardAndMouse, 2)
-    if ok and kbm ~= nil then return not kbm end
-
-    return not IsInputDisabled(2)
-end
-
--- Mirrors client.lua's resolveKey exactly -- see its comments. mouseButton
--- (ox_target/client/main.lua) is passed in here too, as ShowWorldActions' own
--- `key` for a prop's world prompt, so this path had the same "100" bug.
-local WA_MOUSE_BUTTON_LABELS = { [24] = 'LMB', [25] = 'RMB' }
-
-local function waResolveKey(key)
-    if type(key) == 'string' then return key end
-    if type(key) ~= 'number' then return nil end
-
-    if not waUsingPad() and WA_MOUSE_BUTTON_LABELS[key] then
-        return WA_MOUSE_BUTTON_LABELS[key]
-    end
-
-    local ok, raw = pcall(GetControlInstructionalButton, 0, key, true)
-    if not ok or not raw then return nil end
-    return waSafeLabel(raw:sub(3))
-end
+-- A control id -> token, device. See ViceGlyphs.control.
+local function waResolveKey(key) return ViceGlyphs.control(key) end
 
 local waOptions = nil     -- the last { label, key } list shown, for the refresh thread
 local waDevice = nil
 
+-- Each option carries the device its OWN button belongs to, which is the
+-- device in hand except for a bind that only exists on the other one.
 local function waResolveAll()
-    local device = waUsingPad() and 'pad' or 'kbm'
     local resolved = {}
     if waOptions then
         for i, opt in ipairs(waOptions) do
-            resolved[i] = { label = opt.label, glyph = waResolveKey(opt.key), device = device }
+            local glyph, device = waResolveKey(opt.key)
+            resolved[i] = { label = opt.label, glyph = glyph, device = device,
+                            more = opt.more and true or nil, dot = opt.dot or nil }
         end
     end
-    return resolved, device
+    return resolved, ViceGlyphs.device()
 end
 
 -- World-anchoring -- closes the gap #world-actions in index.html and the
@@ -308,6 +523,9 @@ end
 -- #world-actions just stays on its own CSS fixed position, unchanged from
 -- before this existed.
 local waCoords = nil
+local waCompact = true    -- the label drops away at range, unless the caller says otherwise
+local waCentred = false   -- the first button sits ON the point instead of beside it
+local waOwner = nil       -- who put the prompt up, when they said (opts.id)
 
 -- Also drives the icon-only-at-range / full-label-up-close split ("both" of
 -- the two prop-prompt options considered): computed locally here each frame
@@ -320,37 +538,52 @@ local WA_COMPACT_DISTANCE = 1.5
 --- options: array of { label, key } -- key is a native GTA control ID
 --- (see PAD::IS_CONTROL_PRESSED's `action` param) or an ox_lib keybind's
 --- own `.hash` field, exactly as ShowActionPrompt's `key` already works.
+--- An option may also carry `more = true` (it opens a list: three dots on a
+--- dark disc between the button and its name, FRIDGE in the reference) and
+--- `dot = true` or a '#rrggbb' (a coloured dot there instead, the reference's
+--- mark for something on sale).
 --- coords (optional): vector3 world point to anchor the prompt to -- see
 --- the world-anchoring comment above. Omit it for the old fixed-position
 --- behaviour.
-exports('ShowWorldActions', function(options, coords)
+--- opts (optional): { compact = false } keeps the label at any distance;
+--- { centred = true } puts the first button on the point itself, as the
+--- reference does, rather than beside it; { id = 'my_resource' } names who
+--- put it up, so that HideWorldActions('my_resource') only takes down a
+--- prompt that is still theirs. There is one world prompt, and the last one
+--- shown is the one on screen.
+exports('ShowWorldActions', function(options, coords, opts)
     waOptions = options or {}
     waCoords = coords
+    waCompact = not (type(opts) == 'table' and opts.compact == false)
+    waCentred = type(opts) == 'table' and opts.centred == true
+    waOwner = type(opts) == 'table' and opts.id or nil
     local resolved, device = waResolveAll()
     waDevice = device
-    ui('worldActions', { show = true, options = resolved })
+    ui('worldActions', { show = true, options = resolved, centred = waCentred })
 end)
-exports('HideWorldActions', function()
+--- Move a prompt that is up to a new point, without rebuilding it (a door
+--- swinging, something being carried). Nothing if no prompt is up.
+exports('SetWorldActionsCoords', function(coords, id)
+    if id ~= nil and waOwner ~= id then return end
+    if waOptions and coords then waCoords = coords end
+end)
+--- id (optional): only hide a prompt put up under that id; another script's
+--- prompt, shown since, is left alone. No id hides whatever is up.
+exports('HideWorldActions', function(id)
+    if id ~= nil and waOwner ~= id then return end
     waOptions = nil
     waCoords = nil
+    waOwner = nil
     ui('worldActions', { show = false })
 end)
 
--- Re-resolve when the input device changes, same pattern as the Action
--- Prompts refresh thread -- so a mid-prompt controller/keyboard swap updates
--- the icon instead of leaving it wrong until the caller happens to re-push.
-CreateThread(function()
-    while true do
-        Wait(400)
-        if waOptions then
-            local device = waUsingPad() and 'pad' or 'kbm'
-            if device ~= waDevice then
-                waDevice = device
-                local resolved = waResolveAll()
-                ui('worldActions', { show = true, options = resolved })
-            end
-        end
-    end
+-- Re-resolve when the input device changes, the same way the action prompts
+-- do -- so a mid-prompt controller/keyboard swap updates the icon instead of
+-- leaving it wrong until the caller happens to re-push.
+ViceGlyphs.onDevice(function(device)
+    if not waOptions then return end
+    waDevice = device
+    ui('worldActions', { show = true, options = (waResolveAll()), centred = waCentred })
 end)
 
 -- The world-anchoring thread itself -- see waCoords's own comment above for
@@ -367,7 +600,7 @@ CreateThread(function()
                 show = onScreen,
                 x = sX,
                 y = sY,
-                compact = #(playerCoords - waCoords) > WA_COMPACT_DISTANCE,
+                compact = waCompact and #(playerCoords - waCoords) > WA_COMPACT_DISTANCE,
             })
             Wait(0)
         else
@@ -383,6 +616,7 @@ RegisterCommand('hudworldactions', function()
     exports.vice_hud:ShowWorldActions({
         { label = 'Slim Jim', key = 47 },
         { label = 'Smash Window', key = 51 },
+        { label = 'Fridge', key = 74, more = true },
     })
     print('^3[vice_hud]^7 /hudworldactions — sample data. /hudworldactionsoff to clear.')
 end, false)
@@ -428,7 +662,7 @@ local lockpickDir = -1  -- -1 = right-to-left (the real pick), 1 = left-to-right
 -- the mockup's centre glyph for visual noise, which this port simplifies
 -- away, see lockpickTick's comment below). INPUT_ATTACK (24) is the same
 -- LMB control already used elsewhere in this file (see
--- WA_MOUSE_BUTTON_LABELS[24] = 'LMB' above) — reused here as the "is the
+-- MOUSE_CONTROLS[24] = 'LMB' in client_glyphs.lua) — reused here as the "is the
 -- mouse player dragging" gate.
 local LOCKPICK_CONTROL_LOOK_LR = 1
 local LOCKPICK_CONTROL_ATTACK  = 24
@@ -496,7 +730,7 @@ local lockpickMouseDx = 0 -- reconstructed net mouse position since LMB was last
 --- position relative to where the hold started, not integrated effort over
 --- time" requirement to the letter.
 --- Mouse: gated on LMB actually being held (waUsingPad()'s counterpart,
---- WA_MOUSE_BUTTON_LABELS[24], is the established "24 = LMB" precedent in
+--- client_glyphs.lua's MOUSE_CONTROLS[24], is the established "24 = LMB" precedent in
 --- this file); while held, LOOK_LR's per-frame delta accumulates into
 --- lockpickMouseDx (see its own comment above); while not held, that
 --- accumulator decays back toward 0 instead of freezing.

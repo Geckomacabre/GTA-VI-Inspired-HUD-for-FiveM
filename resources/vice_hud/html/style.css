@@ -612,10 +612,20 @@ html, body {
      tells  w 1.11%  spacing 1.76%  right 1.82%  top 5.14%
    Star bottom lands at ~5.0%, so the rows sit almost flush — the old 1.55cqh
    gap pushed the tell row far below where it belongs. */
+/* Re-measured at 1080p on the clips where the whole column is up at once
+   (two stars, three tells, ammo, the weapon, one money row), and set as the
+   BASE here rather than reached through editor multipliers:
+     stars   24.4px, 36.9px apart, centre 43.6px down
+     tells   25px discs, 34px apart, centre 80px down
+     ammo    digits 21.3px tall, 17.8px between clip and reserve, centre 117px
+     weapon  63.5 x 41px, centre 165px
+     money   31.5px disc, digits 22.5px tall, 11.6px between them, rows 39px
+             apart; centre 214px under the weapon, 52px when alone
+   and one right edge for all of it, 33px in. */
 #topright {
     position: absolute;
-    right: 1.93cqw;
-    top: 2.96cqh;
+    right: 1.72cqw;
+    top: 2.91cqh;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -627,11 +637,11 @@ html, body {
      spacing  35.5px       = 1.85% centre-to-centre  => gap 0.57%
      right    36px         = 1.88%
      top      32px         = 2.96% */
-#stars { display: flex; gap: calc(0.73 * var(--w)); }
+#stars { display: flex; gap: calc(0.6525 * var(--w)); }
 
 .star {
-    width: calc((calc(1.15 * var(--w))) * var(--ic-topright, 1));
-    height: calc((calc(1.15 * var(--w))) * var(--ic-topright, 1));
+    width: calc((calc(1.271 * var(--w))) * var(--ic-topright, 1));
+    height: calc((calc(1.271 * var(--w))) * var(--ic-topright, 1));
     display: block;
     overflow: visible;
 }
@@ -662,19 +672,19 @@ html, body {
    shared column. */
 #tells {
     display: flex;
-    gap: calc(0.65 * var(--w));
+    gap: calc(0.4725 * var(--w));
     /* The stars and the tell row are separate groups in the reference, with a
        clear break between them — measured at ~0.45x a star's height across two
        reference frames. #topright's shared 0.14cqh row gap alone left them
        almost touching. */
-    margin-top: 0.78cqh;
+    margin-top: 0.93cqh;
     /* Tell row sits a hair further right than the stars (1.82% vs 1.93%).
        Left as raw cqw, NOT converted to --w: unlike the gap/margin-top above,
        this is a horizontal NUDGE of the row's position relative to the shared
        #topright column, not the row's own size -- the same "edge-anchored
        position, leave alone" reasoning the left/right/top offsets elsewhere
        get, even though it is spelled as a margin rather than an inset. */
-    margin-right: -0.11cqw;
+    margin-right: 0;   /* re-measured: one right edge for the whole column */
 }
 
 /* Measured off the reference: ~0.88% of width by ~1.94% of height, so a
@@ -682,8 +692,8 @@ html, body {
 .tell {
     /* Circles, per the GTA6 footage. Both axes use the same unit — the previous
        1.11cqw x 2.31cqh could only be round at one specific aspect ratio. */
-    width: calc((calc(1.25 * var(--w))) * var(--ic-tells, 1));
-    height: calc((calc(1.25 * var(--w))) * var(--ic-tells, 1));
+    width: calc((calc(1.3 * var(--w))) * var(--ic-tells, 1));
+    height: calc((calc(1.3 * var(--w))) * var(--ic-tells, 1));
     border-radius: 50%;
     /* Matched to the plate red baked into the cropped reference PNGs
        (weapon/person/people/vehicle, see TELL_IMG in app.js) so their
@@ -712,7 +722,9 @@ html, body {
     flex-direction: column;
     align-items: flex-end;
     gap: 0.45cqh;
-    margin-top: 1.15cqh;
+    /* Alone in the corner the first disc is centred 52px down, which the
+       column's own row gaps already give it. */
+    margin-top: 0;
 }
 .money-row { display: flex; align-items: center; gap: calc(0.6 * var(--w)); }
 
@@ -723,18 +735,21 @@ html, body {
     font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
     /* 1.62cqw rendered noticeably larger than the reference, which measures
        ~1.2% of screen width for the amount text. */
-    font-size: calc((calc(1.2 * var(--w))) * var(--fs-money, 1));
+    font-size: calc((3.23cqh) * var(--fs-money, 1));
     color: var(--text);
     text-shadow: 0 0.12cqh 0.26cqh rgba(0, 0, 0, 0.92);
     letter-spacing: var(--ls-money, 0.025em);
     line-height: 1;
     /* Digits are tabular so the string doesn't jitter as the amount changes. */
     font-variant-numeric: tabular-nums;
+    /* Pricedown's digits sit below the middle of its line box; this puts
+       their centre on the disc's, as the reference has them. */
+    transform: translateY(-0.075em);
 }
 
 .money-ic {
-    width: calc((calc(1.15 * var(--w))) * var(--ic-money, 1));
-    height: calc((calc(1.15 * var(--w))) * var(--ic-money, 1));
+    width: calc((2.9cqh) * var(--ic-money, 1));
+    height: calc((2.9cqh) * var(--ic-money, 1));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -791,14 +806,17 @@ html, body {
 #ammo {
     display: flex;
     align-items: baseline;
-    gap: calc(0.78 * var(--w));
+    /* Puts the digits' own centre 117px down at 1080p (Pricedown's digits sit
+       low in its line box). */
+    margin-top: 0.41cqh;
+    gap: calc(0.93 * var(--w));
     font-family: var(--ff-ammo, 'Pricedown', 'Segoe UI', Arial, sans-serif);
     line-height: 1;
     color: #d8d8d4;
     text-shadow: 0 0.15cqh 0.2cqh rgba(0, 0, 0, 0.9), 0 0 0.15cqh rgba(0, 0, 0, 0.8);
 }
-#ammo-clip { font-size: calc((2.9cqh) * var(--fs-ammo, 1)); color: #f0f0ec; }
-#ammo-reserve { font-size: calc((2.9cqh) * var(--fs-ammo, 1)); color: #cfcfca; }
+#ammo-clip { font-size: calc((3.03cqh) * var(--fs-ammo, 1)); color: #f0f0ec; }
+#ammo-reserve { font-size: calc((3.03cqh) * var(--fs-ammo, 1)); color: #cfcfca; }
 
 /* Measured 63x43px at 1920x1080 => 3.28% wide, 3.98% tall. */
 #weapon-icon {
@@ -807,6 +825,9 @@ html, body {
     max-height: calc((3.98cqh) * var(--ic-ammo, 1));
     object-fit: contain;
     filter: drop-shadow(0 0.15cqh 0.25cqh rgba(0, 0, 0, 0.85));
+    /* Centre 165px down under the ammo, and the money row 49px below that. */
+    margin-top: 1.14cqh;
+    margin-bottom: 0.84cqh;
 }
 
 /* -----------------------------------------------------------------------------
@@ -837,7 +858,9 @@ html, body {
     bottom: var(--panel-bottom, var(--map-bottom, 17.9cqh));
     display: flex;
     flex-direction: column-reverse; /* first child sits closest to the map */
-    gap: 0.45cqh;
+    /* 8 to 9 px at 1080 between every item in the reference stack: turn bar to
+       map, street label to turn bar, icon strip to street label. */
+    gap: 0.8cqh;
 }
 
 /* Whenever the native radar isn't drawn -- on foot with the map hidden
@@ -939,10 +962,14 @@ html, body {
 
 /* Zone bar */
 #zone {
-    height: 3.11cqh;
+    /* Measured: 40 px tall at 1080, fill #1e1a25 with a thin #37303a border,
+       corners about 6 px (that is the stack's own radius; see the layout). */
+    height: 3.7cqh;
     display: flex;
     align-items: center;
     padding: 0 calc(0.85 * var(--w));
+    background: rgba(30, 26, 37, 0.96);
+    box-shadow: var(--shadow-md), inset 0 0 0 0.12cqh #37303a;
 }
 #zone.water { background: rgba(46, 116, 178, 0.88); }
 #zone-text {
@@ -955,10 +982,11 @@ html, body {
        large as the vehicle name above it reads as a mistake even when each
        is defensible on its own. At 1.15 the label also filled two thirds of
        the bar's own height, which is what made the bar look stuffed. */
-    font-size: calc((calc(0.80 * var(--w))) * var(--fs-zone, var(--fs-slots, 1)) * var(--fit, 1));
-    font-weight: var(--fw-zone, var(--fw-slots, 500));
+    /* 16 px caps at 1080 in the reference, mixed case, regular weight. */
+    font-size: calc((calc(1.19 * var(--w))) * var(--fs-zone, var(--fs-slots, 1)) * var(--fit, 1));
+    font-weight: var(--fw-zone, var(--fw-slots, 400));
     letter-spacing: var(--ls-zone, var(--ls-slots, 0.004em));
-    color: var(--text);
+    color: #e1d6f8;
     text-shadow: var(--ink-shadow);
     white-space: nowrap;
     overflow: hidden;
@@ -967,8 +995,13 @@ html, body {
 
 /* Vehicle make/model panel */
 #vehicle {
-    /* Same radius as the zone bar and the nav bar -- one stack, one corner. */
-    border-radius: calc((var(--r-panel)) * var(--rad-slots, 1));
+    /* Measured off the reference: a SQUARE plate with no border, fill #181722,
+       73 px of names over a 40 px icon strip at 1080. (It used to share the
+       stack's rounded corner and hairline; the street label and the turn bar
+       are rounded in the reference, the name plate is not.) */
+    border-radius: 0;
+    background: rgba(24, 23, 34, 0.96);
+    box-shadow: var(--shadow-md);
     /* The plate's texture and its manufacturer tint are both drawn as
        pseudo-elements rather than as this element's background-image, so they
        can be stacked in a fixed order — see the manufacturer tint block below
@@ -981,7 +1014,7 @@ html, body {
        relative to this box. At 2.4:1 the make/model plus the pip row no longer
        fit, and the top of the make was being clipped. A minimum lets the panel
        grow with its content; at 16:9 it is unchanged. */
-    min-height: 9.34cqh;
+    min-height: 10.46cqh;
     display: flex;
     flex-direction: column;
     /* No padding and no gap here any more: the plate is now two BANDS that meet
@@ -991,7 +1024,16 @@ html, body {
     padding: 0;
 }
 .vname {
-    font-family: var(--ff-vehicle, var(--ff-slots, inherit));
+    /* The reference sets the make and model in a bold CONDENSED face, the same
+       condensed DIN as the race UI, not in the stack's display face. Bahnschrift
+       at its narrowest is the nearest thing Windows ships. */
+    font-family: var(--ff-vehicle, 'Bahnschrift', 'DIN Condensed', 'Oswald', 'Arial Narrow', sans-serif);
+    font-stretch: 75%;
+    /* Even at its narrowest Bahnschrift is wider than the reference's cut:
+       measured against the footage at the same cap height, "ANNIS" and
+       "YAGO'S '90 ELEGY" come out 19% and 12% too wide. 0.85 across splits
+       the two without touching the height. */
+    transform: scaleX(0.85);
     /* --fit is the shrink-to-fit factor, written by app.js when the text is
        wider than the panel. It multiplies rather than replaces, so it composes
        with whatever font size was tuned here. */
@@ -1002,10 +1044,10 @@ html, body {
        pushing the plate open. Smaller type fixes the proportion and the
        height together, and gives --fit more room before a long name has to
        be shrunk at all. */
-    font-size: calc((calc(0.75 * var(--w))) * var(--fs-vehicle, var(--fs-slots, 1)) * var(--fit, 1));
+    /* 18 px caps at 1080 in the reference: 1.34 of the unit in this face. */
+    font-size: calc((calc(1.34 * var(--w))) * var(--fs-vehicle, 1) * var(--fit, 1));
     color: var(--text);
-    /* Tracked out — the reference sets the make/model in wide caps. */
-    letter-spacing: var(--ls-vehicle, var(--ls-slots, 0.075em));
+    letter-spacing: var(--ls-vehicle, 0.02em);
     text-shadow: var(--ink-shadow);
     text-transform: uppercase;
     line-height: 1.1;
@@ -1031,17 +1073,19 @@ html, body {
    the other. GTAArtDeco's three real cuts are declared in the @font-face
    block up top; these ask for two of them by name via a fixed weight, not
    a synthetic in-between the rasteriser would have to fake. */
-#veh-make  { font-weight: var(--fw-vehicle-make, 700); }
-#veh-model { font-weight: var(--fw-vehicle-model, 400); }
+/* Same face, same size, same weight for both lines in the reference; what tells
+   them apart is colour: the make near white, the model grey. */
+#veh-make  { font-weight: var(--fw-vehicle-make, 700); color: #f6e8fb; }
+#veh-model { font-weight: var(--fw-vehicle-model, 700); color: #aba2b1; }
 
-/* The tracker / engine / fuel pips are their own editor element ("Vehicle icons"),
+/* The tracker / engine / fuel / nitrous pips are their own editor element ("Vehicle icons"),
    because scaling them from the panel alone looked wrong: the discs grew and
    the GAP between them did not, so three round icons turned into three round
    icons crowded against each other. Their own spacing, position and scale fix
    that; --sp- is the gap multiplier. */
 #veh-pips {
     display: flex;
-    gap: calc(0.7 * var(--w) * var(--sp-vehpips, 1));
+    gap: calc(0.29 * var(--w) * var(--sp-vehpips, 1));
     /* No margin: the foot band's own padding is the separation now, and a
        margin here would push the discs off centre inside it. */
     margin-top: 0;
@@ -1051,8 +1095,8 @@ html, body {
        their own row keeps rendering exactly as it did. Once the Vehicle icons
        row is touched it takes over, rather than multiplying with the panel and
        giving one visual size two places to come from. */
-    width: calc((calc(1.5 * var(--w))) * var(--ic-vehpips, var(--ic-slots, 1)));
-    height: calc((calc(1.5 * var(--w))) * var(--ic-vehpips, var(--ic-slots, 1)));
+    width: calc((calc(1.667 * var(--w))) * var(--ic-vehpips, var(--ic-slots, 1)));
+    height: calc((calc(1.667 * var(--w))) * var(--ic-vehpips, var(--ic-slots, 1)));
     border-radius: calc(50% * var(--rad-vehpips, 1));
     display: flex;
     align-items: center;
@@ -1072,73 +1116,33 @@ html, body {
     color: var(--tone);
     --tone: rgba(206, 206, 212, 0.82);
 }
-.pip.good    { --tone: #4fc27b; }
-.pip.warn    { --tone: #e0a63a; }
-.pip.bad     { --tone: #d9534f; }
+/* Sampled off the reference: a muted green, an amber, and a pink-red rather
+   than a pure one. They were brighter and more saturated than the footage. */
+.pip.good    { --tone: #6a9a6c; }
+.pip.warn    { --tone: #d9a038; }
+.pip.bad     { --tone: #b85a68; }
 .pip.unknown { --tone: rgba(206, 206, 212, 0.82); }
 
-/* Not emoji. An emoji is drawn by the platform's own font, and Windows
-   renders the padlock orange and the pump red whatever `color` says --
-   these all read `currentColor` instead, so the tone system in `.pip.good`
-   etc above is genuinely the only thing deciding what colour they are. */
-.pip-glyph {
-    /* About 57% of the disc, which is where the reference sits. An emoji came
-       with its own internal margin and a bare glyph does not, so matching the
-       old font-size 1:1 filled the disc edge to edge. */
-    width: 1em;
-    height: 1em;
-    display: block;
-    position: relative;
-}
-
-/* The tracker is inline SVG, stroked rather than filled: a filled glyph
-   needs its counters (the pin's own hole) knocked out in the DISC's colour,
-   which means the icon would have to know what state it is in, where a
-   stroke gets the same reading from one colour for free. */
-#pip-tracker .pip-glyph {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.9;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-/* Engine and fuel are the reference art itself (see README credit),
-   stripped of its own baked-in disc and used as a mask so the shape ships
-   exactly as drawn rather than re-traced -- `background: currentColor`
-   through the mask is what makes it a plain <span> pick up the same tone
-   system the tracker's stroke gets from `currentColor` directly. */
-.pip-glyph-engine,
-.pip-glyph-fuel {
-    background: currentColor;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-    mask-position: center;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-}
-.pip-glyph-engine {
-    -webkit-mask-image: url('icons/badge_engine_glyph.png');
-    mask-image: url('icons/badge_engine_glyph.png');
-}
-.pip-glyph-fuel {
-    -webkit-mask-image: url('icons/badge_fuel_glyph.png');
-    mask-image: url('icons/badge_fuel_glyph.png');
-}
-
 /* -----------------------------------------------------------------------------
-   The gauge rings
+   Pip art: one SVG per pip
    -----------------------------------------------------------------------------
-   Engine and fuel fill a ring around the disc to their real reading, so the
-   panel answers "how much" rather than only "is it bad yet". The tracker has
-   no quantity and deliberately has no ring.
+   The ring and the glyph of a pip are drawn inside ONE svg that fills the
+   disc, 36 units across with its centre at (18, 18).
 
-   --pct is written by app.js, 0..100. pathLength="100" on the circle relabels
-   its own length as 100 units, so the dash offset IS the percentage and nothing
-   here has to know the radius.
+   They used to be two elements: the ring an SVG laid over the disc, the glyph
+   a second box that flexbox centred inside it. That is centred as far as the
+   layout is concerned and not on screen, because the browser paints every
+   element on whole pixels and rounds each one on its own. A disc is under
+   thirty pixels across, so a glyph landing a pixel to one side of its ring is
+   three percent of the icon, and which side it lands on changes with the
+   resolution. One coordinate system has no second box to round.
+
+   Not emoji, either. An emoji is drawn by the platform's own font, and
+   Windows renders the padlock orange and the pump red whatever `color` says.
+   Everything here reads `currentColor`, so the tone classes above are
+   the only thing deciding what colour a pip is.
    -------------------------------------------------------------------------- */
-.pip-ring {
+.pip-art {
     position: absolute;
     top: 0;
     right: 0;
@@ -1147,18 +1151,70 @@ html, body {
     inset: 0;
     width: 100%;
     height: 100%;
+    display: block;
     fill: none;
-    /* From twelve o'clock, clockwise, like every gauge anyone has ever read.
-       An SVG circle starts at three o'clock. */
-    transform: rotate(-90deg);
+    overflow: visible;
 }
+
+/* The glyph. Its place and base size are in the markup, as a transform that
+   puts the middle of the art on the centre of the disc (see index.html).
+   This rule is only the editor's handle on it.
+
+   The Vehicle icons element has two size rows: Icon size scales the disc and
+   Font size scales the glyph inside it. The disc is the SVG's box, so growing
+   the disc grows the glyph with it; dividing one by the other here is what
+   keeps the Font size row meaning "how big is the glyph" on its own. Both
+   unset is a scale of 1. */
+.pip-glyph {
+    transform-origin: 18px 18px;
+    transform: scale(calc(
+        var(--fs-vehpips, var(--fs-slots, 1)) / var(--ic-vehpips, var(--ic-slots, 1))));
+}
+
+/* The tracker is the reference's mark: a SOLID pin standing on a small ring.
+   The hole in the pin's head is cut out of the path itself (fill-rule
+   evenodd), so it shows whatever is behind the pip rather than a colour the
+   icon would have to be told; the ring it stands on is a stroked ellipse in
+   the markup. */
+#pip-tracker .pip-glyph { fill: currentColor; }
+
+/* On the plate the strip is the backing. The reference draws the icons
+   straight onto it, a glyph inside an arc with no disc of its own; the dark
+   discs belong to the collapsed row, where there is nothing else behind them. */
+#vehicle:not(.collapsed) .pip { background: none; }
+
+/* Engine and fuel are the reference art itself (see README credit), stripped
+   of its own baked-in disc and used as a mask over a currentColor rect inside
+   the SVG, so the shape ships exactly as drawn rather than re-traced and
+   still takes the tone. Nothing to style: the mask and the fill are both in
+   the markup. Nitrous is plain filled paths. */
+#pip-nitrous .pip-glyph { fill: currentColor; }
+
+/* -----------------------------------------------------------------------------
+   The gauge rings
+   -----------------------------------------------------------------------------
+   Engine, fuel and nitrous fill a ring around the disc to their real reading,
+   so the panel answers "how much" rather than only "is it bad yet". The
+   tracker has no quantity and deliberately has no ring.
+
+   --pct is written by app.js, 0..100. pathLength="100" on the circle relabels
+   its own length as 100 units, so the dash offset IS the percentage and nothing
+   here has to know the radius. The ring group is turned a quarter back in the
+   markup so the fill starts at the top and runs clockwise, like every gauge
+   anyone has ever read; a circle starts at three on the clock face.
+   -------------------------------------------------------------------------- */
+/* The reference draws NO track: an 80% reading is an 80% arc with nothing in
+   the gap. The element stays (a transparent stroke) so the ring keeps one
+   geometry whether or not a track is ever wanted back. */
 .pip-track {
-    stroke: rgba(255, 255, 255, 0.16);
-    stroke-width: 3.1;
+    stroke: transparent;
+    stroke-width: 2;
 }
 .pip-fill {
     stroke: var(--tone);
-    stroke-width: 3.1;
+    /* 2 of the disc's 36 units: the reference ring is under 2 px on a 32 px
+       disc. It was 3.1, which read as a border rather than a gauge. */
+    stroke-width: 2;
     stroke-linecap: round;
     stroke-dasharray: 100;
     stroke-dashoffset: calc(100 - var(--pct, 0));
@@ -1173,6 +1229,110 @@ html, body {
 /* At zero, `round` linecaps still paint a dot at twelve o'clock -- an empty
    tank would show a pip of fuel. */
 .pip-fill[data-empty="1"] { stroke-linecap: butt; }
+
+/* -----------------------------------------------------------------------------
+   Nitrous
+   -----------------------------------------------------------------------------
+   The fourth pip, and the only one that is a CONTROL rather than a warning: the
+   ring is the tank, and it is on screen for as long as the car has a kit, full
+   or not, because a full tank is exactly the reading you want before you press
+   the button. So it has a tone of its own rather than borrowing good/warn/bad
+   -- an ice blue that is not on the traffic-light scale the other three share,
+   and therefore cannot be misread as "the nitrous is healthy".
+
+     .nitro     kit fitted -- armed or burning, the pip looks the same and the
+                ring is what tells you which
+     .unknown   locked out after running dry: the ring still shows the tank
+                refilling, in the same grey a parked car's gauges use
+
+   THE RING IS THE ONLY THING THAT MOVES. No pulse, no glow, no surge on the
+   glyph while boosting: in the reference the mark sits perfectly still and the
+   ring drains around it, and a second moving thing next to a gauge just makes
+   the gauge harder to read. The ring emptying IS the boost indicator.
+   -------------------------------------------------------------------------- */
+.pip.nitro { --tone: #c4e0f0; }
+
+/* The tank moves in a couple of seconds, not the minutes fuel takes, and is fed
+   faster than the status poll -- 260ms of easing would have the ring visibly
+   trailing the boost it is supposed to be showing. Dash offset ONLY: the
+   base rule also eases the stroke colour, and here a tone change (armed to
+   locked out) is a state, not a motion, so it cuts. */
+#pip-nitrous .pip-fill { transition: stroke-dashoffset 140ms linear; }
+@media (prefers-reduced-motion: reduce) {
+    #pip-nitrous .pip-fill { transition: none; }
+}
+
+/* -----------------------------------------------------------------------------
+   Quiet pips
+   -----------------------------------------------------------------------------
+   On a car with nitrous the row is the reference's row: engine, fuel, nitrous,
+   all three, with the two that have nothing to report sitting dim beside the
+   one that does. A dim disc, a grey glyph and NO ring -- a ring is a reading,
+   and a full green one on each would put three gauges where the reference has
+   one. They pick their ring and colour back up the moment they have a warning
+   to give (see setPips in app.js). A car with no kit is unaffected: its
+   healthy pips are still simply not drawn.
+   -------------------------------------------------------------------------- */
+.pip.quiet {
+    --tone: rgba(168, 164, 174, 0.62);
+    background: rgba(58, 54, 64, 0.46);
+}
+.pip.quiet .pip-ring { display: none; }
+#vehicle.collapsed .pip.quiet { box-shadow: none; }
+
+/* -----------------------------------------------------------------------------
+   Nitrous hint
+   -----------------------------------------------------------------------------
+   "Hold [key] to activate nitrous (icon)". One line in a dark plate, top left,
+   its left edge on the minimap's left edge -- which is where the reference
+   puts it, so the tip and the pip it is talking about share a column. The key
+   cap is the action prompts' own .glyph at the tip's scale; the icon is the
+   pip's mark on a small disc of its own, in the pip's armed tone.
+
+   A plain cut in and out. The ring is the only thing in the nitrous UI that
+   animates, and a tip sliding or fading about would be the one exception.
+   -------------------------------------------------------------------------- */
+#nitro-hint {
+    position: absolute;
+    left: var(--map-left, 1.75cqw);
+    /* The reference has it at about 7% down, on a screen with nothing else in
+       that corner. Here the status bars live there and reach to about 9% with
+       all three rows up, so the tip sits just under them instead of on them. */
+    top: 10.5cqh;
+    display: flex;
+    align-items: center;
+    gap: calc(0.5 * var(--w));
+    padding: calc(0.62 * var(--w)) calc(0.85 * var(--w));
+    border-radius: calc(0.16 * var(--w));
+    background: rgba(18, 18, 24, 0.62);
+    box-shadow: inset 0 0 0 calc(0.06 * var(--w)) rgba(236, 236, 240, 0.10);
+    color: #e6e6ea;
+    font-size: calc(1.28 * var(--w));
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+}
+#nitro-hint.hidden { display: none !important; }
+/* The tip's button is the same drawing as any prompt's, at the tip's scale:
+   the pad's own button on a controller, a key cap on a keyboard. With no bind
+   to show (an unbound command, or a caller that sent none) setGlyph marks it
+   .none and it goes, rather than sitting there as an empty key. */
+#nitro-hint .glyph {
+    --g-h: calc(1.52 * var(--w));
+    filter: none;
+}
+/* Disc and mark are one SVG (see index.html), so this only sizes it. */
+#nitro-hint-icon {
+    width: calc(1.36 * var(--w));
+    height: calc(1.36 * var(--w));
+    margin-left: calc(0.12 * var(--w));
+    display: block;
+    flex: none;
+}
+.nitro-hint-disc { fill: rgba(40, 62, 74, 0.90); }
+.nitro-hint-mark { fill: #a9dbe8; }
 
 /* -----------------------------------------------------------------------------
    Collapsed: just the icons
@@ -1320,7 +1480,7 @@ html, body {
     flex-direction: column;
     align-items: var(--ai-slots, center);
     justify-content: center;
-    gap: 0.35cqh;
+    gap: 0.06cqh;
     padding: 0.55cqh calc(0.5 * var(--w));
     /* Deliberately NOT a stacking context -- position without a z-index. The
        badge inside it has to stay UNDER #vehicle::after, and a stacking context
@@ -1339,7 +1499,7 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0.45cqh 0;
+    padding: 0.37cqh 0;
     /* Both of these are deliberately faint. The band and its barrier used to
        be strong enough to read as a second panel welded under the first; in
        the reference the pips sit in a barely-there compartment on the same
@@ -1580,116 +1740,517 @@ html, body {
 /* -----------------------------------------------------------------------------
    Contextual action prompts (bottom-right)
    -------------------------------------------------------------------------- */
-/* Sized/positioned in --w (the aspect-independent reference unit, see its
-   definition above), NOT raw cqw. This block used cqw for the inset, the
-   row gap and the whole glyph while the LABEL was already on --w -- so on
-   anything wider than 16:9 the glyph and the inset grew while the text
-   didn't, throwing off both where the row sat and how it was proportioned.
-   Everything here scales off one unit now, so it reads identically at 16:9
-   and on ultrawide. */
+/* Measured off the reference at 1080p: a bold condensed capital label 15.5px
+   to the cap, a 30px button to its right, rows 52px apart, the column 25px in
+   from the right edge and 40px up from the bottom. A hold ring round a
+   button takes it to 42px, and the cell every button sits in is that size
+   whether or not there is a ring, so a column of them shares one centre line.
+
+   Horizontal measures are in --w (the aspect-independent reference unit, see
+   its definition above), not raw cqw, so the corner inset is the same on an
+   ultrawide as on 16:9. */
 #prompts {
     position: absolute;
-    right: calc(2 * var(--w));
-    bottom: 4cqh;
+    right: calc(1.31 * var(--w));
+    bottom: 3.75cqh;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.8cqh;
+    gap: 1cqh;
 }
 .prompt {
     display: flex;
     align-items: center;
-    gap: calc(0.58 * var(--w));
-    font-size: calc((calc(1.1 * var(--w))) * var(--fs-prompts, 1));
-    font-weight: var(--fw-prompts, 600);
-    letter-spacing: var(--ls-prompts, 0);
-    color: #f4f0e8;
-    /* A hard 1px black outline, not just a soft drop shadow -- an
-       interaction prompt has to stay readable against a white wall and a
-       night street alike, and a blurred shadow alone disappears on light
-       backgrounds. Same treatment the reference textui uses. */
-    text-shadow:
-        -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
-        0 0 0.1cqh rgba(0, 0, 0, 0.95), 0 2px 0.35cqh rgba(0, 0, 0, 0.65);
+    gap: 0.5cqh;
 }
-/* A rounded-SQUARE keycap, not a circle: a circle reads as a gamepad face
-   button, which is wrong for a keyboard key and forced the wide-label case
-   below into being a separate shape. One shape for both now, just wider
-   when the label needs it. */
-.glyph {
-    min-width: calc((1.46 * var(--w)) * var(--ic-prompts, 1));
-    height: calc((1.46 * var(--w)) * var(--ic-prompts, 1));
-    border-radius: calc((0.26 * var(--w)) * var(--rad-prompts, 1));
-    background: #f4f0e8;
-    box-shadow:
-        0 0 1px rgba(0, 0, 0, 0.95),
-        0 0 2px rgba(0, 0, 0, 0.9),
-        0 2px 3px rgba(0, 0, 0, 0.45);
-    color: #212529;
+.prompt-label,
+.wa-label {
+    font-size: calc(2.07cqh * var(--fs-prompts, 1));
+    font-weight: var(--fw-prompts, 700);
+    font-stretch: 86%;
+    letter-spacing: var(--ls-prompts, 0.012em);
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: #f6f2ee;
+    /* A hard black outline, not just a soft drop shadow -- a prompt has to
+       stay readable against a white wall and a night street alike, and the
+       reference outlines its labels the same way. */
+    text-shadow:
+        -0.13cqh -0.13cqh 0 #000, 0.13cqh -0.13cqh 0 #000,
+        -0.13cqh 0.13cqh 0 #000, 0.13cqh 0.13cqh 0 #000,
+        0 -0.13cqh 0 #000, 0 0.13cqh 0 #000, -0.13cqh 0 0 #000, 0.13cqh 0 0 #000,
+        0 0.18cqh 0.35cqh rgba(0, 0, 0, 0.6);
+}
+/* A row with no button at all keeps the cell's height, so it lines up with
+   the rows around it. */
+.prompt.bare { min-height: calc(3.89cqh * var(--ic-prompts, 1)); }
+.prompt-glyph-wrap {
+    flex: 0 0 auto;
+    /* As wide as a ringed button's box (a third wider than a plain one), so
+       ringed and plain rows centre on the same line to the pixel. */
+    min-width: calc(4.067cqh * var(--ic-prompts, 1));
+    height: calc(3.89cqh * var(--ic-prompts, 1));
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: calc((calc(0.82 * var(--w))) * var(--fs-prompts, 1));
-    font-weight: var(--fw-prompts, 700);
+}
+
+/* -----------------------------------------------------------------------------
+   Screen text and full-screen overlays
+   -----------------------------------------------------------------------------
+   Measured at 1080p on the reference clips. cqh is 10.8px there.
+
+     subtitle    regular rounded sans, capitals 25.6px, lines 47px apart, centred,
+                 last baseline 90px above the bottom
+     objective   the same face in extra bold, capitals 18.3px, baseline 58px
+                 above the bottom; the thing to go to is pink
+     help box    32px in, 289px down, 420px wide, 16px of padding, capitals
+                 17.4px, key words bold, on a dark plate
+     feed        right-aligned 38px in, first line 428px down, lines 40px
+                 apart, capitals 16px
+   -------------------------------------------------------------------------- */
+@font-face {
+    font-family: 'ViceText';
+    src: url('fonts/PlusJakartaSans-Variable.ttf') format('truetype-variations');
+    font-weight: 200 800;
+    font-style: normal;
+    font-display: swap;
+}
+
+#subtitle, #objective, #help-text, #feed {
+    position: absolute;
+    font-family: 'ViceText', 'Segoe UI', Roboto, Arial, sans-serif;
+    color: #ececf0;
+    pointer-events: none;
+}
+#subtitle, #objective {
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 62cqw;
+    text-align: center;
+    text-shadow:
+        -0.14cqh -0.14cqh 0 rgba(8, 8, 10, 0.9), 0.14cqh -0.14cqh 0 rgba(8, 8, 10, 0.9),
+        -0.14cqh 0.14cqh 0 rgba(8, 8, 10, 0.9), 0.14cqh 0.14cqh 0 rgba(8, 8, 10, 0.9),
+        0 0 0.5cqh rgba(0, 0, 0, 0.75);
+}
+#subtitle {
+    bottom: 7.47cqh;
+    font-size: 3.21cqh;
+    font-weight: 400;
+    line-height: 1.352;
+}
+#objective {
+    bottom: 4.9cqh;
+    font-size: 2.3cqh;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+}
+#objective em, #subtitle em, #help-text em { font-style: normal; color: #e8869f; }
+
+#help-text {
+    left: var(--map-left, 1.67cqw);
+    top: 26.76cqh;
+    width: 39cqh;
+    box-sizing: border-box;
+    padding: 1.2cqh 1.48cqh;
+    font-size: 2.15cqh;
+    font-weight: 400;
+    line-height: 1.25;
+    background: rgba(38, 34, 46, 0.82);
+    border-radius: 0.28cqh;
+    box-shadow: inset 0 0 0 0.09cqh rgba(255, 255, 255, 0.14);
+}
+#help-text b, #subtitle b, #feed b { font-weight: 700; }
+#help-text .help-tells { display: flex; gap: 0.5cqh; margin-top: 0.7cqh; }
+#help-text .help-tells .tell { width: 2.1cqh; height: 2.1cqh; }
+
+#feed {
+    right: 1.98cqw;
+    top: 38.5cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1.72cqh;
+    font-size: 1.98cqh;
+    font-weight: 400;
+    line-height: 1;
+    text-shadow:
+        -0.12cqh -0.12cqh 0 rgba(8, 8, 10, 0.9), 0.12cqh -0.12cqh 0 rgba(8, 8, 10, 0.9),
+        -0.12cqh 0.12cqh 0 rgba(8, 8, 10, 0.9), 0.12cqh 0.12cqh 0 rgba(8, 8, 10, 0.9),
+        0 0 0.4cqh rgba(0, 0, 0, 0.7);
+}
+.feed-line { display: flex; align-items: center; gap: 1cqh; white-space: nowrap; }
+.feed-line img { height: 1.75cqh; width: auto; display: block; filter: drop-shadow(0 0 0.15cqh rgba(0, 0, 0, 0.8)); }
+
+/* Title cards. Three shapes in the reference:
+     stack     "NINE MONTHS AGO." -- very large capitals 96px tall, one word a
+               line, 160px apart, starting 613px in and 407px down
+     center    "PROLOGUE" -- capitals 124px tall, tracked out, centred 702px down
+     location  "PORT GELLHORN" -- a place name, capitals 45px tall, centred
+               136px down, with a pair of sparkles after it
+   All cut in and out, like the race cards. */
+#title-card {
+    position: absolute;
+    color: #f6f2f4;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: pre-line;
+    pointer-events: none;
+}
+#title-card.stack {
+    left: 31.9cqw;
+    top: 34.7cqh;
+    font-size: 12.7cqh;
+    line-height: 1.165;
+    letter-spacing: 0.05em;
+    transform: scaleX(1.12);
+    transform-origin: 0 0;
+}
+#title-card.center {
+    left: 50%;
+    top: 65cqh;
+    transform: translate(-50%, -50%);
+    font-size: 16.4cqh;
+    font-stretch: 75%;
+    letter-spacing: 0.03em;
+    text-shadow: 0 0 1.2cqh rgba(255, 200, 215, 0.35);
+    white-space: nowrap;
+}
+#title-card.location {
+    left: 50%;
+    top: 12.5cqh;
+    /* The reference letters this by hand, tall and very narrow: 13 characters
+       in 258px at a 45px cap. Squeezed to that width rather than spaced. */
+    transform: translate(-50%, -50%) scaleX(0.62);
+    display: flex;
+    align-items: center;
+    gap: 1.4cqh;
+    font-size: 5.83cqh;
+    font-stretch: 75%;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 0.9cqh rgba(255, 255, 255, 0.45), 0 0.2cqh 0.5cqh rgba(0, 0, 0, 0.55);
+    white-space: nowrap;
+}
+#title-card .title-sparkle { height: 0.95em; width: auto; flex: 0 0 auto; fill: currentColor; filter: drop-shadow(0 0 0.5cqh rgba(255, 255, 255, 0.5)); }
+
+/* Binoculars. A lens-shaped opening with a soft dark edge and the rest of the
+   screen black; a hairline reticle; the thing being looked at named bottom
+   left, button first; ZOOM is an ordinary action prompt bottom right. */
+#binoculars { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+#stage.bino > *:not(#binoculars):not(#prompts):not(#subtitle):not(#objective) { visibility: hidden !important; }
+#bino-lens {
+    position: absolute;
+    left: 2.6cqw;
+    right: 2.6cqw;
+    top: 2.2cqh;
+    bottom: 6.2cqh;
+    border-radius: 46cqh;
+    box-shadow:
+        0 0 0 200cqw #000,
+        inset 0 0 6cqh 3.4cqh rgba(0, 0, 0, 0.92),
+        inset 0 0 16cqh 2cqh rgba(0, 0, 0, 0.55);
+}
+#bino-reticle { position: absolute; inset: 0; width: 100%; height: 100%; }
+#bino-reticle path { fill: none; stroke: rgba(18, 18, 20, 0.6); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+#bino-label {
+    position: absolute;
+    left: calc(0.62 * var(--w));
+    bottom: 1.2cqh;
+    display: flex;
+    align-items: center;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    gap: 0.6cqh;
+}
+
+/* Shop item panel. Top left: the store dimmed, a slash, and under it what is
+   being browsed. Bottom left: how it is paid for and the price (dimmed when it
+   cannot be afforded), the item, the variant, a row of 110px swatches with the
+   chosen one outlined, and under a hairline the reason it cannot be bought.
+   The BUY / EXIT buttons are action prompts, laid in a row while this is up. */
+#shop { position: absolute; inset: 0; pointer-events: none; }
+#shop-head {
+    position: absolute;
+    left: 1.77cqw;
+    top: 2.3cqh;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    font-stretch: 80%;
+    text-transform: uppercase;
+    line-height: 1;
+    text-shadow: 0 0.15cqh 0.4cqh rgba(0, 0, 0, 0.6);
+}
+#shop-store { font-size: 3.3cqh; color: rgba(214, 212, 226, 0.58); }
+#shop-store:not(:empty)::after { content: ' /'; }
+#shop-category { margin-top: 0.75cqh; font-size: 4.23cqh; color: #f6f2f4; }
+#shop-item {
+    position: absolute;
+    left: 1.82cqw;
+    bottom: 3.1cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    color: #f2f0ea;
+}
+#shop-price-row { display: flex; align-items: center; gap: 1.2cqh; }
+#shop-pay { display: flex; gap: 1.2cqh; }
+#shop-pay img { height: 3.2cqh; width: auto; display: block; }
+#shop-price {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    font-size: 4.27cqh;
+    line-height: 1;
+    transform: translateY(-0.075em);
+    text-shadow: 0 0.14cqh 0.3cqh rgba(0, 0, 0, 0.9);
+}
+#shop.cant #shop-price { color: #8f8c98; }
+#shop-name {
+    margin-top: 1.17cqh;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    font-stretch: 80%;
+    font-size: 3.57cqh;
+    line-height: 1;
+    text-transform: uppercase;
+    text-shadow:
+        -0.12cqh -0.12cqh 0 #000, 0.12cqh -0.12cqh 0 #000, -0.12cqh 0.12cqh 0 #000, 0.12cqh 0.12cqh 0 #000,
+        0 0.2cqh 0.4cqh rgba(0, 0, 0, 0.6);
+}
+#shop-variant {
+    margin-top: 2.85cqh;
+    font-family: 'ViceText', 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 2.47cqh;
+    line-height: 1;
+    text-shadow: 0 0.12cqh 0.3cqh rgba(0, 0, 0, 0.85);
+}
+#shop-variant:empty, #shop-swatches:empty { display: none; }
+#shop-swatches { display: flex; gap: 0.99cqh; margin-top: 2.2cqh; }
+.shop-swatch {
+    position: relative;
+    width: 10.19cqh;
+    height: 10.19cqh;
+    box-sizing: border-box;
+    box-shadow: inset 0 0 0 0.1cqh rgba(255, 255, 255, 0.28);
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 45%);
+}
+.shop-swatch.on { box-shadow: inset 0 0 0 0.3cqh #f6f2f4; }
+.shop-swatch.locked::after, .shop-cant {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    color: #e0303a;
+    text-shadow: -0.1cqh -0.1cqh 0 #f6f2f4, 0.1cqh -0.1cqh 0 #f6f2f4, -0.1cqh 0.1cqh 0 #f6f2f4, 0.1cqh 0.1cqh 0 #f6f2f4;
     line-height: 1;
 }
-/* A multi-character label ("SPACE", "MOUSE1") just needs room to breathe --
-   same keycap shape as above, only wider. */
-.glyph.wide {
-    width: auto;
-    padding: 0 calc(0.35 * var(--w));
-    font-size: calc((calc(0.72 * var(--w))) * var(--fs-prompts, 1));
+.shop-swatch.locked::after { content: '$'; position: absolute; right: 0.9cqh; bottom: 0.7cqh; font-size: 2.9cqh; }
+#shop-note {
+    display: flex;
+    align-items: center;
+    gap: 1.6cqh;
+    margin-top: 2.74cqh;
+    padding-top: 1.7cqh;
+    min-width: 52.4cqh;
+    box-shadow: inset 0 0.1cqh 0 rgba(255, 255, 255, 0.22);
+    font-family: 'ViceText', 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 2.47cqh;
+    line-height: 1;
+    text-shadow: 0 0.12cqh 0.3cqh rgba(0, 0, 0, 0.85);
 }
-/* Mouse buttons are drawn as the button itself (see MOUSE_GLYPHS in app.js).
-   The cap keeps its size and shape -- only the contents change from a letter
-   to a picture -- so a mouse prompt still lines up with the key caps above and
-   below it in a multi-row prompt stack. 72% leaves the same optical margin the
-   lettered caps get from their font metrics; filling the cap edge to edge
-   makes the mouse read noticeably larger than a letter beside it. */
-.glyph.mouse img {
-    width: 72%;
-    height: 72%;
-    object-fit: contain;
-    display: block;
-}
-.glyph.pad-a { background: #6ec06e; color: #10240f; }
-.glyph.pad-b { background: #d9585c; color: #2a0d0e; }
-.glyph.pad-x { background: #6fa8dc; color: #0b1a26; }
-.glyph.pad-y { background: #e8c95a; color: #2a2208; }
+.shop-cant { font-size: 3cqh; margin-left: 0.6cqh; }
+#stage.shopping #prompts { flex-direction: row; align-items: center; gap: 1.67cqh; }
 
-/* Hold-to-confirm prompts (client.lua's ShowActionPrompt opts.hold) get a
-   ring that fills clockwise AROUND the glyph as the key is held -- matches
-   the real RDR2/GTA VI-trailer hold-prompt look (a circle closing around
-   the button icon), not a bar under the label. --prompt-frac is written
-   directly per promptProgress push -- see app.js's onPromptProgress for why
-   that's a direct style write rather than a renderPrompts() rebuild. */
-.prompt-glyph-wrap {
-    position: relative;
-    display: inline-flex;
+/* A prompt that is on screen but cannot be used right now: the reference greys
+   both the word and the button. */
+.prompt.off .prompt-label { color: #8a8794; }
+.prompt.off .g-face { fill: #76727f; }
+.prompt.off .g-ink, .prompt.off .g-text, .prompt.off .g-solid { opacity: 0.55; }
+
+/* Vehicle stats panel. Measured on the bike rental at 1080p: 418px wide,
+   32px in from the right, 505px down. A dark band with the make over the
+   model (72px), a grey body of five rows 60px apart -- a bold condensed
+   label, the figure on a dark chip at the right, and under them a 12px bar
+   filled to value/10 with a small marker on the end -- and a dark band at
+   the foot with the two ratings (47px). */
+#veh-stats {
+    position: absolute;
+    right: 1.67cqw;
+    top: 46.76cqh;
+    width: 38.7cqh;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    font-stretch: 80%;
+    text-transform: uppercase;
+    line-height: 1;
+    color: #f6f2f4;
+    pointer-events: none;
+}
+#vs-head, #vs-foot { background: rgba(52, 47, 62, 0.95); display: flex; align-items: center; }
+#vs-head { position: relative; height: 6.65cqh; padding: 0 1.3cqh; overflow: hidden; }
+#vs-names { display: flex; flex-direction: column; justify-content: center; gap: 0.62cqh; height: 100%; }
+#vs-line { display: flex; align-items: center; gap: 0.6cqh; }
+#vs-icon { width: 2.7cqh; height: 2.12cqh; flex: 0 0 auto; fill: #f6f2f4; }
+#vs-icon .vs-key { fill: rgba(52, 47, 62, 1); }
+#vs-make { font-size: 2.09cqh; }
+#vs-model { font-size: 2.09cqh; color: #d6cbe6; font-weight: 600; }
+#vs-road { position: absolute; right: 1.2cqh; bottom: 0; height: 5.6cqh; width: auto; fill: rgba(255, 255, 255, 0.12); }
+#vs-rows {
+    background: rgba(150, 140, 160, 0.72);
+    padding: 1.26cqh 1.16cqh 1.52cqh 1.14cqh;
+    display: flex;
+    flex-direction: column;
+    gap: 1.48cqh;
+}
+.vs-row { display: grid; grid-template-columns: 1fr auto; align-items: center; row-gap: 0.1cqh; }
+.vs-label {
+    font-size: 2.2cqh;
+    text-shadow:
+        -0.11cqh -0.11cqh 0 #1d1a24, 0.11cqh -0.11cqh 0 #1d1a24,
+        -0.11cqh 0.11cqh 0 #1d1a24, 0.11cqh 0.11cqh 0 #1d1a24;
+}
+.vs-value {
+    min-width: 3.57cqh;
+    height: 2.87cqh;
+    box-sizing: border-box;
+    padding: 0 0.5cqh;
+    display: flex;
     align-items: center;
     justify-content: center;
+    background: rgba(52, 47, 62, 1);
+    font-size: 2.2cqh;
+    font-variant-numeric: tabular-nums;
 }
-.prompt-glyph-wrap.holdable {
-    padding: calc((0.16 * var(--w)) * var(--ic-prompts, 1));
-    border-radius: calc((0.38 * var(--w)) * var(--rad-prompts, 1));
+.vs-bar {
+    grid-column: 1 / -1;
+    position: relative;
+    height: 1.1cqh;
+    background: rgba(120, 110, 128, 0.9);
+    box-shadow: 0 0 0 0.13cqh #1d1a24;
 }
-.prompt-glyph-wrap.holdable::before {
+.vs-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--vs, 0) * 100%); background: #f1e8f5; }
+.vs-fill::after {
     content: '';
     position: absolute;
-    inset: 0;
-    /* Slightly rounder than the keycap it wraps, so the fill reads as a
-       track AROUND the key rather than a second key behind it -- matching
-       the keycap's own switch from a circle to a rounded square. */
-    border-radius: calc((0.38 * var(--w)) * var(--rad-prompts, 1));
-    background: conic-gradient(
-        var(--nav-accent, var(--nav-accent-gender-default, #47aba7)) calc(var(--prompt-frac, 0) * 360deg),
-        rgba(240, 240, 238, 0.28) 0deg
-    );
-    /* No transition -- client.lua's poll thread already pushes a frac every
-       tick while a key is held, a CSS transition on top of that would just
-       add lag between the real hold progress and what's drawn. */
+    right: -0.37cqh;
+    top: -0.38cqh;
+    width: 0.74cqh;
+    height: 1.86cqh;
+    box-sizing: border-box;
+    background: #fbf7fc;
+    border: 0.13cqh solid #1d1a24;
 }
-.prompt-glyph-wrap .glyph { position: relative; z-index: 1; }
+#vs-foot { height: 4.38cqh; padding: 0 1.14cqh; justify-content: space-between; }
+#vs-foot-label { font-size: 2.09cqh; }
+#vs-ratings { display: flex; align-items: center; gap: 0.9cqh; font-size: 2.09cqh; font-variant-numeric: tabular-nums; }
+#vs-ratings svg { width: 2.7cqh; height: 2.7cqh; display: block; margin-right: 0.5cqh; }
+#vs-ratings svg:last-child { margin-right: 0; }
+#vs-ratings .vs-tile { fill: #fbf7fc; }
+#vs-ratings .vs-mark { fill: none; stroke: #1d1a24; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+#vs-ratings .vs-solid { fill: #1d1a24; }
+
+/* Cinematic overlay (SetCinematicFx; the crash cam uses it). The same
+   construction as #focus-fx -- a vignette that closes the edges in, an inner
+   shadow, a slow breathe -- in black rather than Focus's purple, plus the two
+   bars. It cuts in and out with the shot; nothing fades. vh, not cqh: it sits
+   outside the stage so that it survives the HUD being hidden. */
+#cine-fx {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    display: none;
+    background:
+        radial-gradient(ellipse 150% 135% at 50% 50%,
+            transparent 40%,
+            rgba(10, 8, 14, calc(0.34 * var(--cine-strength, 1))) 72%,
+            rgba(4, 3, 8, calc(0.74 * var(--cine-strength, 1))) 100%);
+    box-shadow: inset 0 0 14vh rgba(0, 0, 0, calc(0.5 * var(--cine-strength, 1)));
+}
+#cine-fx.active { display: block; }
+#cine-fx.active.pulse { animation: cineFxPulse 2600ms ease-in-out infinite; }
+@keyframes cineFxPulse {
+    0%, 100% { transform: scale(1); filter: brightness(1); }
+    50%      { transform: scale(1.04); filter: brightness(1.18); }
+}
+.cine-bar { position: absolute; left: -5%; right: -5%; height: var(--cine-bars, 3.2vh); background: #000; }
+.cine-top { top: 0; }
+.cine-bottom { bottom: 0; }
+@media (prefers-reduced-motion: reduce) {
+    #cine-fx.active.pulse { animation: none; }
+}
+
+/* Targeting's own page, hosted as a frame over the HUD (see index.html). It is
+   transparent and takes no clicks until one of its panels opens. */
+#target-ui {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color-scheme: normal;
+    pointer-events: none;
+    z-index: 900;
+}
+#target-ui.open { pointer-events: auto; }
+
+/* -----------------------------------------------------------------------------
+   Buttons
+   -----------------------------------------------------------------------------
+   One element, one SVG (setGlyph in app.js): a controller button as the
+   player's own pad prints it, a key cap, or the mouse. --g-h is the height of
+   a plain button and is the only thing a context has to set; --g-w and --g-s
+   come from setGlyph and say how wide the button's box is and how much a hold
+   ring adds round it.
+
+   The disc is 32.8 of the box's 36 units, so --g-h of 3.05cqh is the
+   reference's 30px button at 1080p.
+   -------------------------------------------------------------------------- */
+.glyph {
+    --g-h: calc(3.05cqh * var(--ic-prompts, 1));
+    flex: 0 0 auto;
+    display: block;
+    width: calc(var(--g-h) * var(--g-w, 1));
+    height: calc(var(--g-h) * var(--g-s, 1));
+    line-height: 0;
+    filter: drop-shadow(0 0.14cqh 0.22cqh rgba(0, 0, 0, 0.5));
+}
+.glyph.none { display: none; }
+.g-art { display: block; width: 100%; height: 100%; overflow: visible; }
+.g-face { fill: #f4f0ea; stroke: rgba(14, 12, 18, 0.92); stroke-width: 1.3; }
+.g-ink { fill: none; stroke: #1f2126; stroke-width: 2.7; stroke-linecap: round; stroke-linejoin: round; }
+.g-ink.g-s { stroke-width: 2.2; }
+.g-ink.g-t { stroke-width: 1.7; }
+.g-solid { fill: #1f2126; }
+.g-solid.g-dim { fill: #b9b4bd; }
+.g-rim { fill: none; stroke: rgba(31, 33, 38, 0.5); stroke-width: 1.5; }
+.g-text {
+    fill: #1f2126;
+    font-family: 'Bahnschrift', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    font-stretch: 88%;
+}
+/* An Xbox pad prints its four face buttons in colour; a PlayStation one does
+   not, and neither does the reference. */
+.glyph.pad-a .g-face { fill: #6ec06e; }
+.glyph.pad-b .g-face { fill: #de6165; }
+.glyph.pad-x .g-face { fill: #6fa8dc; }
+.glyph.pad-y .g-face { fill: #e8c95a; }
+
+/* Hold-to-confirm (ShowActionPrompt's opts.hold): a ring round the button,
+   grey until held, filling clockwise from the top as the hold runs. The
+   reference shows it both ways -- empty and grey round a button nobody is
+   holding, solid white round one that is. --prompt-frac is written straight
+   onto the cell by onPromptProgress; nothing here is rebuilt per tick. */
+.g-ring-edge { fill: none; stroke: rgba(14, 12, 18, 0.92); stroke-width: 6.6; }
+.g-ring-track { fill: none; stroke: #a49cb2; stroke-width: 3.8; }
+.g-ring-fill {
+    fill: none;
+    stroke: #f4f0ea;
+    stroke-width: 3.8;
+    stroke-dasharray: 100;
+    stroke-dashoffset: calc(100 - var(--prompt-frac, 0) * 100);
+}
 
 /* -----------------------------------------------------------------------------
    Aim crosshair
@@ -2490,8 +3051,8 @@ html, body {
    rows ~40% further apart than the reference. */
 #status    { gap: calc(0.28 * var(--w) * var(--sp-status, 1)); }
 #topright  { gap: calc(0.14cqh * var(--sp-topright, 1)); }
-#tells     { gap: calc(0.65 * var(--w) * var(--sp-tells, 1)); }
-#money     { gap: calc(0.45cqh * var(--sp-money, 1)); }
+#tells     { gap: calc(0.4725 * var(--w) * var(--sp-tells, 1)); }
+#money     { gap: calc(0.38cqh * var(--sp-money, 1)); }
 #slots     { gap: calc(0.45cqh * var(--sp-slots, 1)); }
 #wanted    { gap: calc(1.1cqh  * var(--sp-wanted, 1)); }
 #honor     { gap: calc(0.8 * var(--w) * var(--sp-honor, 1)); }
@@ -2499,7 +3060,7 @@ html, body {
 #money-pop { gap: calc(0.35 * var(--w) * var(--sp-moneypop, 1)); }
 #reputation     { gap: calc(0.8 * var(--w) * var(--sp-reputation, 1)); }
 #reputation-pop { gap: calc(0.35 * var(--w) * var(--sp-reputationpop, 1)); }
-#prompts   { gap: calc(0.8cqh  * var(--sp-prompts, 1)); }
+#prompts   { gap: calc(1cqh    * var(--sp-prompts, 1)); }
 .srow      { gap: calc(0.145 * var(--w) * var(--sp-status, 1)); }   /* reference: 4px on a 162px bar */
 
 /* -----------------------------------------------------------------------------
@@ -2541,7 +3102,7 @@ html, body {
 #money-pop { -webkit-font-smoothing: var(--sm-moneypop, antialiased); }
 #reputation     { font-family: var(--ff-reputation, inherit);     -webkit-font-smoothing: var(--sm-reputation, antialiased); }
 #reputation-pop { font-family: var(--ff-reputationpop, inherit);  -webkit-font-smoothing: var(--sm-reputationpop, antialiased); }
-#prompts   { font-family: var(--ff-prompts, inherit);   -webkit-font-smoothing: var(--sm-prompts, antialiased); }
+#prompts   { font-family: var(--ff-prompts, 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif);   -webkit-font-smoothing: var(--sm-prompts, antialiased); }
 #map-frame { -webkit-font-smoothing: var(--sm-mapframe, antialiased); }
 
 /* -----------------------------------------------------------------------------
@@ -3599,81 +4160,284 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 #skills-list::-webkit-scrollbar-track { background: transparent; }
 
 /* -----------------------------------------------------------------------------
-   Race lap / checkpoint HUD
+   Race HUD
    -----------------------------------------------------------------------------
    Fed by exports.vice_hud:SetLapTimer -- sk_streetkings is the one resource
-   calling it today, but this has no idea that resource exists. First pass:
-   placement is a reasonable guess (roughly where the reference frames show
-   it, lower-left-of-centre), not pixel-measured the way the minimap was --
-   worth an eyeball pass in a real race with /hudlaptimer once this exists
-   in game.
+   calling it today, but this has no idea that resource exists.
+
+   Measured off the reference race footage (1902x1066), bottom right, three
+   right-aligned rows:
+
+     PROGRESS [30%]    cap height 24px; the figure sits in a 90x36 dark chip
+     [  1 / 6  |]      109x64 plate, chequered in two dark greys with 21px
+                       squares, a 5px pink bar down its right edge
+     00:30.39          cap height 38px, unboxed
+
+   A race with laps has LAP [2/2] as its first row instead. That row, the
+   plate's figures and where the block stands were re-measured on the
+   dirt-bike race (1920x1080), which is over bright ground and so shows how
+   much of each piece is see-through; the numbers are with each rule.
+
+   Every size below is one of those numbers as a share of the frame, in cqh so
+   the block holds its proportions on an ultrawide instead of stretching.
+
+   The face is a condensed DIN. None of the fonts this resource ships is one,
+   and FiveM is Windows-only, so this asks for Bahnschrift -- a DIN variable
+   font that has been part of Windows since 10 -- at its condensed width
+   rather than adding a font file for three rows of digits.
    -------------------------------------------------------------------------- */
 #lap-hud {
     position: absolute;
-    left: 30cqw;
-    bottom: 11cqh;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.7cqh;
-    pointer-events: none;
-    color: #f2f2ef;
-}
-#lap-hud.hidden { display: none !important; }
-
-#lap-badge {
-    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
-    font-size: calc(0.85 * var(--w));
-    letter-spacing: 0.03em;
-    text-shadow: 0 0.12cqh 0.2cqh rgba(0, 0, 0, 0.9);
-}
-#lap-badge span { font-variant-numeric: tabular-nums; }
-
-#lap-cp-plate {
-    background: rgba(20, 20, 22, 0.55);
-    box-shadow: var(--hairline);
-    border-radius: calc(0.3 * var(--w));
-    padding: 0.55cqh calc(0.7 * var(--w));
+    right: 1.67cqw;
+    bottom: 3.13cqh;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.4cqh;
-    min-width: calc(6.5 * var(--w));
-}
-#lap-cp-row {
-    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
-    font-size: calc(0.8 * var(--w));
+    gap: 1.58cqh;
+    pointer-events: none;
+    color: #f4eff2;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Oswald', 'Arial Narrow', sans-serif;
+    font-stretch: 75%;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
+    line-height: 1;
+    /* The label and the clock are white with a hard dark line round them. */
+    --lap-line: #2e2d3a;
+    --lap-outline:
+        -0.17cqh -0.17cqh 0 var(--lap-line), 0.17cqh -0.17cqh 0 var(--lap-line),
+        -0.17cqh 0.17cqh 0 var(--lap-line), 0.17cqh 0.17cqh 0 var(--lap-line),
+        0 -0.17cqh 0 var(--lap-line), 0 0.17cqh 0 var(--lap-line),
+        -0.17cqh 0 0 var(--lap-line), 0.17cqh 0 0 var(--lap-line);
 }
+#lap-hud.hidden { display: none !important; }
 
-/* One pip per checkpoint in the current lap. A discrete stand-in for the
-   reference's checkered progress bar -- see the section comment above for
-   why that texture wasn't attempted pixel-for-pixel. Rebuilt only when the
-   pip COUNT changes (see renderLapPips in app.js); the ON/OFF state is a
-   cheap class toggle on every push. */
-#lap-cp-track {
-    width: 100%;
+/* The first row: a label, then its figure on a dark chip. LAP 2/2 for a race
+   with laps, PROGRESS 30% for a point to point (see onLapHud).
+
+   The lap row is measured on the dirt-bike race at 1080p: the chip is
+   84 x 40px and stops 32px short of the right edge, its figure has 22px
+   capitals, and LAP (24px capitals) stands 26px to its left. */
+#lap-badge,
+#lap-progress {
     display: flex;
-    gap: 2px;
+    align-items: center;
+    gap: 0.9cqh;
+    font-size: 3.1cqh;
+    letter-spacing: 0.02em;
 }
-.lap-cp-pip {
-    flex: 1 1 0;
-    height: calc(0.32 * var(--w));
-    min-width: 2px;
-    border-radius: 1px;
-    background: rgba(255, 255, 255, 0.16);
+#lap-badge.hidden,
+#lap-progress.hidden { display: none; }
+#lap-badge { gap: 2.15cqh; font-size: 3.16cqh; }
+/* The face's capitals sit a little low in their line; the padding puts them
+   level with the middle of the chip, as they are in the reference. */
+#lap-badge-label,
+#lap-progress-label { padding-bottom: 0.08em; text-shadow: var(--lap-outline); }
+#lap-progress-chip,
+#lap-badge-chip {
+    min-width: 8.4cqh;
+    height: 3.4cqh;
+    padding: 0 0.6cqh;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* The chip is not a rectangle: its left edge leans, 0.47 of a unit over
+       its 3.67 height, it is lighter at that end than at the square one, and
+       it has a fine line round it. Read off a vectorised copy of the race
+       block, which shows what the footage blurs. */
+    background: rgba(36, 34, 44, 0.9) linear-gradient(90deg, rgba(70, 68, 86, 0.5), rgba(70, 68, 86, 0) 48%, rgba(6, 6, 8, 0.42));
+    box-shadow: inset 0 0 0 0.1cqh #343341;
+    clip-path: polygon(0.47cqh 0, 100% 0, 100% 100%, 0 100%);
 }
-.lap-cp-pip.on {
-    background: linear-gradient(90deg, #e8467a, #ff7fac);
-    box-shadow: 0 0 0.2cqh rgba(232, 70, 122, 0.7);
+#lap-badge-chip {
+    min-width: 7.76cqh;
+    height: 3.7cqh;
+    /* The extra on the left is the letter-spacing after the last figure, so
+       the count stays in the middle of the chip. */
+    padding: 0 1.05cqh 0.3cqh calc(1.35cqh + 0.125em);
+    font-size: 2.9cqh;
+    letter-spacing: 0.125em;
 }
 
-#lap-timer {
-    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
-    font-size: calc(1.7 * var(--w));
-    font-variant-numeric: tabular-nums;
-    text-shadow: 0 0.15cqh 0.25cqh rgba(0, 0, 0, 0.9);
+/* The chequered plate: 130 x 62.5px for "7 / 14", three 21px squares tall
+   starting light in its top left corner, darker towards the top, a 1px dark
+   line round it and a 5px pink bar inside that line down its right edge.
+   One conic gradient per 2x2 block keeps the squares square at any size --
+   the reference's flag is a texture, and a gradient is the same pattern
+   without a file to ship. */
+#lap-cp-plate {
+    position: relative;
+    min-width: 10.2cqh;
+    height: 5.79cqh;
+    padding: 0 1.96cqh 0.03cqh 1.09cqh;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(38, 36, 54, 0.64);
+    background-image:
+        linear-gradient(to bottom, rgba(22, 16, 32, 0.6), rgba(22, 16, 32, 0) 72%),
+        conic-gradient(
+            transparent 0 25%, rgba(190, 175, 178, 0.27) 0 50%,
+            transparent 0 75%, rgba(190, 175, 178, 0.27) 0);
+    background-size: auto, 3.86cqh 3.86cqh;
+    background-position: 0 0, left top;
+    box-shadow: inset 0 0 0 0.1cqh rgba(24, 16, 24, 0.9);
 }
+/* The pink bar. The nav tile's own accent, so a character whose route and turn
+   tile are teal gets a teal bar rather than a second, unrelated colour. */
+#lap-cp-plate::after {
+    content: '';
+    position: absolute;
+    top: 0.1cqh;
+    right: 0.1cqh;
+    bottom: 0.1cqh;
+    width: 0.46cqh;
+    background: var(--nav-accent, var(--nav-accent-gender-default, #f68baf));
+}
+/* 33px figures, a third smaller than the clock's. */
+#lap-cp-row {
+    font-size: 4.32cqh;
+    word-spacing: -0.06em;
+    white-space: nowrap;
+}
+
+/* 38.5px figures with the dark line round them, stopping 12px short of the
+   plate's right edge. */
+#lap-timer {
+    font-size: 4.95cqh;
+    /* Its line box is taller than its figures: this closes the gap under
+       the plate to the 21px of the reference. */
+    margin-top: -0.54cqh;
+    margin-right: 1.02cqh;
+    text-shadow: var(--lap-outline);
+}
+
+/* The race block takes the corner the action prompts and the honor toast
+   normally stand in. While a race is up they stand on top of it instead of
+   under it -- app.js puts .racing on the stage for exactly as long as the
+   block is shown. */
+#stage.racing #prompts,
+#stage.racing #honor { bottom: 27cqh; }
+
+/* -----------------------------------------------------------------------------
+   Race cards
+   -----------------------------------------------------------------------------
+   Top centre, measured off the reference race footage at 1902x1066. The title
+   card before the start and the result card at the finish are the same three
+   rows -- chip, big line, chip -- with different rows filled in:
+
+     row          y in the frame     size
+     top chip     95 .. 135 px       40 px tall, 22 px caps
+     big line     148 .. 206 px      58 px caps
+     bottom chip  220 .. 260 px      40 px tall, 22 px caps
+
+   The result card has no top chip and its big line starts at 108 px, which is
+   where the same box lands when the first row is simply absent, so there is
+   no second layout to keep in step. Same condensed DIN as the race block.
+
+   No transition anywhere: both cards cut in and cut out in the reference.
+   -------------------------------------------------------------------------- */
+#race-card {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 8.9cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25cqh;
+    pointer-events: none;
+    color: #dedce0;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Oswald', 'Arial Narrow', sans-serif;
+    font-stretch: 75%;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+#race-card.hidden { display: none !important; }
+.race-chip {
+    height: 3.75cqh;
+    padding: 0 0.95cqh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(34, 33, 42, 0.62);
+    font-size: 2.9cqh;
+    letter-spacing: 0.01em;
+}
+/* A row with nothing in it is a row that is not there. */
+.race-chip:empty { display: none; }
+#race-card-main {
+    font-size: 7.7cqh;
+    letter-spacing: 0.01em;
+    text-shadow: 0 0.12cqh 0.4cqh rgba(0, 0, 0, 0.55);
+    /* The reference sets this line in a narrower cut than Bahnschrift has:
+       measured against the footage at the same cap height, "SALTON TO WANING
+       SANDS" comes out 26% too wide and "1ST" 39% too wide at the face's
+       narrowest width. 0.76 across splits the two (4% under on one, 5% over
+       on the other) without touching the height the layout is built on. */
+    transform: scaleX(0.76);
+}
+#race-card-main:empty { display: none; }
+/* The time under a finishing position is set a touch larger than the chips on
+   the title card: 24 px caps in a 42 px chip. */
+#race-card.result .race-chip {
+    height: 3.95cqh;
+    font-size: 3.2cqh;
+    margin-top: 0.3cqh;
+}
+/* FINAL LAP. Measured at 1080p: capitals 55px tall and 257px across starting
+   121px down, white with a 2px dark line round them, and 18px under them the
+   lap just finished on a 143 x 42px slate chip in 26px figures that stand
+   closer together than this face sets them. */
+#race-card.banner { top: 9.91cqh; gap: 0; }
+#race-card.banner #race-card-main {
+    font-size: 7.13cqh;
+    transform: scaleX(0.823);
+    color: #f6f3fa;
+    text-shadow:
+        -0.18cqh -0.18cqh 0 #2b2c3f, 0.18cqh -0.18cqh 0 #2b2c3f,
+        -0.18cqh 0.18cqh 0 #2b2c3f, 0.18cqh 0.18cqh 0 #2b2c3f,
+        0 -0.18cqh 0 #2b2c3f, 0 0.18cqh 0 #2b2c3f,
+        -0.18cqh 0 0 #2b2c3f, 0.18cqh 0 0 #2b2c3f;
+}
+#race-card.banner .race-chip {
+    height: 3.86cqh;
+    box-sizing: border-box;
+    margin-top: 0.92cqh;
+    padding: 0 1.135cqh 0.19cqh 0.985cqh;
+    font-size: 3.305cqh;
+    letter-spacing: -0.034em;
+    color: #dcdcf2;
+    background: rgba(66, 67, 86, 0.9);
+    box-shadow: inset 0 0 0 0.1cqh rgba(28, 28, 44, 0.85);
+}
+
+/* 3, 2, 1, go: one glyph in Pricedown, slanted, light with a dark outline and
+   a hard offset shadow, 125 .. 258 px down the reference frame. Pricedown is
+   the face (it is GTA's own, already shipped here for the money rows); the
+   slant is the browser's, since Pricedown has no italic cut. */
+#race-count {
+    position: absolute;
+    left: 50%;
+    top: 10.6cqh;
+    transform: translateX(-50%);
+    pointer-events: none;
+    font-family: 'Pricedown', 'Arial Black', sans-serif;
+    font-weight: 400;
+    font-style: italic;
+    font-size: 14cqh;
+    line-height: 1;
+    text-transform: lowercase;
+    color: #e6e4e8;
+    -webkit-text-stroke: 0.95cqh #26242d;
+    paint-order: stroke fill;
+    text-shadow: -0.35cqh 0.4cqh 0 #26242d;
+}
+#race-count.hidden { display: none !important; }
 
 /* -----------------------------------------------------------------------------
    Interact menu  (Phase 1 of the ox_target-replacement project)
@@ -3813,45 +4577,41 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
    a label rather than two different things swapping. */
 #world-actions.wa-compact .wa-label { display: none; }
 
+/* The reference's world prompt is a prompt row turned round: the button
+   first, then the same bold condensed capitals (.wa-label shares the action
+   prompts' label rule). The button itself is a .glyph, drawn by setGlyph. */
 .wa-row {
     display: flex;
     align-items: center;
-    gap: calc(0.6 * var(--w));
-    color: #f2f2ef;
-    text-shadow: 0 0.12cqh 0.2cqh rgba(0, 0, 0, 0.85);
+    /* 13px from the edge of a 36px button to its name in the reference stills. */
+    gap: 0.8cqh;
 }
-.wa-btn {
+.wa-btn { flex: 0 0 auto; }
+/* An option that opens a list: three dots on a dark disc, the size of the
+   button, between it and the name (FRIDGE in the reference). */
+.wa-more {
     flex: 0 0 auto;
-    width: calc(1.6 * var(--w));
-    height: calc(1.6 * var(--w));
+    width: calc(3.05cqh * var(--ic-prompts, 1));
+    height: calc(3.05cqh * var(--ic-prompts, 1));
+}
+.wa-more svg { display: block; width: 100%; height: 100%; fill: #f6f2ee; }
+.wa-more .wa-more-disc { fill: rgba(40, 38, 46, 0.94); }
+/* A coloured dot in the same place: the reference's mark for something on sale. */
+.wa-dot {
+    flex: 0 0 auto;
+    width: 1.7cqh;
+    height: 1.7cqh;
+    margin: 0 0.35cqh;
     border-radius: 50%;
-    border: 2px solid #f2f2ef;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.35);
+    background: #e8659f;
 }
-.wa-btn svg { width: 60%; height: 60%; fill: none; stroke: #f2f2ef; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-/* Mouse button (see MOUSE_GLYPHS in app.js). INVERTED, unlike the same image
-   in the prompt stack: the art is black line work, which reads correctly on
-   the prompt's light key cap but would vanish into this button's dark fill.
-   60% matches the pad shapes above so a mouse and a face button are the same
-   size in the same circle. */
-.wa-btn img { width: 60%; height: 60%; object-fit: contain; display: block; filter: invert(1); }
-/* Keyboard (or an unmapped pad button, e.g. a shoulder/trigger/D-pad bind):
-   the resolved key text sits plainly in the same circle rather than a
-   guessed shape -- see WA_PAD_SHAPE in app.js for which pad letters get a
-   shape instead of landing here. */
-.wa-btn-text {
-    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
-    font-weight: 700;
-    font-size: calc(0.8 * var(--w));
-    line-height: 1;
+/* The first button sits on the point the prompt is about, its name running
+   off to the right, as the reference draws it. */
+#world-actions.wa-centred {
+    transform: translate(calc(-1.525cqh * var(--ic-prompts, 1)), calc(-1.525cqh * var(--ic-prompts, 1)));
 }
-.wa-label {
-    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
-    font-size: calc(0.95 * var(--w));
-    letter-spacing: 0.02em;
+#world-actions {
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
 }
 
 /* -----------------------------------------------------------------------------

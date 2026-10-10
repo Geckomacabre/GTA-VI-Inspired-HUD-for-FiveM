@@ -103,7 +103,9 @@ included here.
   [KnoWay](https://github.com/Geckomacabre/KnoWay-Autonomous-Vehicles), for
   the same paint and livery as the KnoWays in traffic.
 
-- **`qbx_honor`**: An RDR2-style persistent honor stat, purpose-built to
+- **Honor** (part of `vice_hud` now, in `vice_hud/honor/`; it was the
+  separate `qbx_honor` resource, and `vice_hud` still answers to that
+  name): An RDR2-style persistent honor stat, purpose-built to
   draw its standing panel and centre-screen indicator on vice_hud's NUI
   (see its own `README.md`'s "vice_hud" section). Every deed is tagged
   `good` / `bad` / `terrible`, and the two halves of the HUD answer different
@@ -176,6 +178,80 @@ included here.
   step 3 for the exact entry and artwork to copy in. Depends on `ox_lib`,
   `ox_target`, `ox_inventory`, `qbx_core`, OneSync.
 
+- **`vi_crashcam`**: The GTA VI crash cam. Hit something hard enough and
+  the hit plays out in slow motion from where you were looking, then the game
+  cuts to a camera standing well back from the car, the edges of the screen
+  closed in and the HUD gone, and a little over three seconds later cuts back
+  to exactly the view you had, with time running back up to normal. A crash
+  is speed lost in almost no time (80 km/h or more, 45 of it gone inside a
+  tenth of a second by default), so braking never triggers it; `/crashcam`
+  plays the shot without one. Standalone, no dependencies. With `vice_hud`
+  running the overlay is its Focus effect in black with thin bars; without it
+  only the bars are drawn. Thresholds, timing, the overlay and where the
+  camera can stand are in its `config.lua`; see
+  `resources/vi_crashcam/README.md`.
+
+- **`vi_binoculars`**: Binoculars with a smooth zoom on the mouse wheel or the
+  triggers, mouse and controller look that slows as you zoom in, and a ped
+  that takes the stance and turns with the view. With `vice_hud` running the
+  lens mask, the `ZOOM` / `EXIT` prompts and the label naming what is being
+  looked at are its own. `/binoculars`, an optional key, or an inventory item.
+  No dependencies; see `resources/vi_binoculars/README.md`.
+
+- **`vi_wasted`**: The WASTED and BUSTED screens: slow motion, a camera
+  pulling back, a red wash and the word in Pricedown. Lifted out of the
+  [fenix-police fork](https://github.com/Geckomacabre/fenix-police) so they
+  can be used without it; it stands down when fenix-police itself is running.
+  WASTED plays when `qbx_medical` reports a death, BUSTED when a script asks
+  for it. GPL-3.0, like the resource it comes from; see
+  `resources/vi_wasted/README.md`.
+
+- **Targeting** (part of `vice_hud` now, in `vice_hud/target/`; it was the
+  separate `osm-target` resource): World-space targeting with the *Context
+  Rail* design — the look-at-it-and-choose interaction list, drawn in the
+  world rather than on the screen. The code is
+  [Geckomacabre/osm-target](https://github.com/Geckomacabre/osm-target)
+  (commit `8ad0a70`, with option layers), which is itself a **modified fork** of
+  [osm-target by OsmFX Mods](https://github.com/OsmFX-Mods/osm-target) and
+  not an official, endorsed or supported OsmFX Mods release; the original
+  and its support are at <https://osmfxmods.com>. `vice_hud` therefore
+  `provide`s `osm-target`, `ox_target`, `qb-target` and `qtarget`: run it
+  **instead of** all four, not beside them. Everything in this bundle that
+  lists **ox_target** as a dependency is satisfied by it, and the
+  `patches/ox_target` theme is then not needed. Its settings are tuned in
+  game with `/targetadmin` and saved to the database; its controller
+  buttons follow the HUD's one Xbox / PlayStation setting. `target/` stays
+  under its own licence, not this repository's: see [License](#license).
+
+- **`Lenonida_customs`**: The mod shop — a GTA VI styled upgrade menu,
+  server-side pricing, and the nitrous kits whose tank `vice_hud` draws as
+  its nitrous pip. A copy of
+  [Geckomacabre/Lenonida_customs](https://github.com/Geckomacabre/Lenonida_customs)
+  (commit `26e769a`), built on
+  [renzu_customs](https://github.com/renzuzu/renzu_customs) by renzuzu and
+  GPL-3.0 like it. Needs ESX, QBCore or Qbox, `oxmysql` and OneSync; it
+  creates its own database table on first start. With `sk_streetkings`
+  running its menu sells StreetKings' nitrous tiers instead of its own
+  kits. See `resources/Lenonida_customs/README.md` and the install notes
+  below before starting it.
+
+- **`sk_streetkings`**: The racing resource — routes, time trials,
+  multiplayer lobbies, leaderboards and `/racemaker`, plus the car meet,
+  meet night, nitrous, manual gearbox, drift, stunt jumps, speed cameras
+  and the rest of the StreetKings systems, ported onto Qbox. A copy of the
+  server's own resource. Its race screens are `vice_hud`'s: the lap /
+  position / clock block, the title card before a time trial, the
+  3-2-1-GO, and the placing-over-time card at the finish; and with
+  `vice_hud` running its nitrous is the ring on the vehicle panel rather
+  than a second bar. Without `vice_hud` it falls back to drawing its own.
+  Needs `qbx_core`, `ox_lib`, `oxmysql` and `sql/install.sql` run once; see
+  `resources/sk_streetkings/README.md`.
+
+- **`streetkings_audio`**: StreetKings' own sound set, used by
+  `sk_streetkings` when present (it falls back to stock sounds without it).
+  From [streetkings](https://github.com/streetkings-fivem/streetkings),
+  Apache-2.0.
+
 ### `patches/`
 
 Overlays for resources you install separately:
@@ -237,29 +313,50 @@ its own.
 
 ## Installing (drag-and-drop resources)
 
-1. Copy `resources/vice_hud`, `resources/um_gigs`, `resources/qbx_honor`,
+1. Copy `resources/vice_hud`, `resources/um_gigs`,
    `resources/qbx_vehiclekeys`, `resources/gk_pausemenu`,
-   `resources/qbx_relog`, `resources/vi_radio`, and/or
-   `resources/gk_basketball` into your server's `resources/` folder.
+   `resources/qbx_relog`, `resources/vi_radio`,
+   `resources/gk_basketball`, `resources/vi_crashcam`,
+   `resources/vi_binoculars`, `resources/vi_wasted`,
+   `resources/Lenonida_customs`, `resources/streetkings_audio` and/or
+   `resources/sk_streetkings` into your
+   server's `resources/` folder. Keep the folder names as they are.
 2. Add them to `server.cfg`:
    ```
    ensure vice_hud
    ensure um_gigs
-   ensure qbx_honor
    ensure qbx_vehiclekeys
    ensure gk_pausemenu
    ensure qbx_relog
    ensure vi_radio
    ensure gk_basketball
+   ensure vi_crashcam
+   ensure vi_binoculars
+   ensure vi_wasted
+   ensure Lenonida_customs
+   ensure streetkings_audio
+   ensure sk_streetkings
    ```
+   `vice_hud` goes first because it stands in for `ox_target` (and for
+   `osm-target` and `qbx_honor`), which several of the others wait for.
+   If you ran `osm-target`, `ox_target`, `qb-target`, `qtarget` or
+   `qbx_honor` as resources of their own, take them out of `server.cfg`
+   and out of `resources/`: `vice_hud` is all of them now, and two
+   resources answering to one name is an error. Exports and `dependency`
+   lines under those names keep working; a script that tests
+   `GetResourceState('ox_target') == 'started'` does not see a provided
+   name, and `resources/vice_hud/README.md` ("Merged in") says what to do
+   about it.
 3. Make sure the dependencies each one needs are already installed and
    started *before* it in `server.cfg`:
-   - `vice_hud` needs **ox_lib**.
+   - `vice_hud` needs **ox_lib** and **oxmysql** (targeting keeps its
+     `/targetadmin` settings in the database). Its honor part needs
+     **qbx_core** and simply does not load without it. `/targetadmin`
+     is behind the ace `osm_target.admin`.
    - `um_gigs` needs **ox_lib**, **ox_target**, **qbx_core**, **lb-phone**.
      Optional: [KnoWay](https://github.com/Geckomacabre/KnoWay-Autonomous-Vehicles),
      installed as a folder named `knoway`, for the AI pickup's KnoWay livery
      (without it the car is just painted white).
-   - `qbx_honor` needs **qbx_core**, **ox_target**.
    - `qbx_vehiclekeys` needs **qbx_core**, **ox_target**, **ox_inventory**.
      Its Slim Jim ring only shows up while `vice_hud` is also running.
    - `gk_pausemenu` needs **ox_lib**.
@@ -271,6 +368,25 @@ its own.
    - `gk_basketball` needs **ox_lib**, **ox_target**, **ox_inventory**,
      **qbx_core**, and OneSync on. The `basketball` item also needs
      registering in `ox_inventory` — see `resources/gk_basketball/README.md`.
+   - `vi_crashcam`, `vi_binoculars` and `vi_wasted` have no dependency.
+     Skip `vi_wasted` if you run fenix-police: it plays the same two
+     screens itself.
+   - `sk_streetkings` needs **qbx_core**, **ox_lib**, **oxmysql**, and
+     `sql/install.sql` from its folder run once. `streetkings_audio` is
+     optional beside it.
+   - `Lenonida_customs` needs **oxmysql**, a framework (ESX, QBCore, or Qbox
+     through its qb-core bridge) and OneSync on. Before the first start:
+     - `Config.JobPermissionAll` is `true` by default, which means only a
+       shop's own job can open the upgrade menu; set it to `false` for a
+       public mod shop;
+     - it ships `carcols_gen9` / `carmodcols` data files for chameleon
+       paints. If another resource on your server ships the same files,
+       keep only one set.
+
+     Renaming its folder on a live server makes it forget fitted nitrous
+     kits (they are stored per resource name), and anything that calls
+     `exports.renzu_customs:...` needs the folder to be `renzu_customs`
+     instead. `vice_hud` does not care what it is called.
 4. Restart the resource (or the server) and confirm it starts clean in the
    server console.
 
@@ -437,9 +553,43 @@ that's a term of the upstream license these two resources are built on, not
 a choice made here. GPL-3.0 is still copyleft, though: it still stays open
 and it still can't be relicensed as closed/proprietary — the only guarantee
 above that doesn't carry over to these two specifically is "can't be sold."
+`resources/vi_wasted` is GPL-3.0 as well: its code is taken from the
+[fenix-police fork](https://github.com/Geckomacabre/fenix-police), and it
+keeps that licence and its own `LICENSE`.
+`resources/Lenonida_customs` is in the same position for the same reason: it
+is built on [renzu_customs](https://github.com/renzuzu/renzu_customs) by
+[renzuzu](https://github.com/renzuzu), keeps its own `LICENSE`, and stays
+GPL-3.0.
 
-`resources/vice_hud`, `resources/qbx_honor`, and `resources/gk_basketball`
-each carry their own copy of that same CC BY-NC-SA 4.0 licence, so they stay
+`resources/vice_hud/target` is under neither of those. It is the code of a
+modified fork of [osm-target](https://github.com/OsmFX-Mods/osm-target) by
+**OsmFX Mods**, taken from
+[Geckomacabre/osm-target](https://github.com/Geckomacabre/osm-target) and
+distributed here under the
+[OsmFX Mods Source-Available License v1.0](resources/vice_hud/target/LICENSE)
+and only that licence — nothing in this repository adds to or changes its
+terms, and being loaded by `vice_hud`'s manifest does not put it under
+`vice_hud`'s licence. In short: it may be run on servers (including ones
+that make money) and passed on free of charge, but it may not be sold,
+listed on Tebex or any other marketplace, put behind a paywall or paid
+role, or included in a paid bundle or server pack, and its licence file and
+copyright notices have to stay as they are. Its original manifest is kept
+beside it as `fxmanifest.lua.original`. What was changed to load it from
+inside `vice_hud` is listed in `resources/vice_hud/README.md`. It is not an
+official, endorsed or supported OsmFX Mods release; the original script and
+official support are at <https://osmfxmods.com>. Read the licence itself
+before redistributing it.
+
+`resources/streetkings_audio` is from
+[streetkings](https://github.com/streetkings-fivem/streetkings) by
+919DESIGN & Envi-Scripts and keeps its Apache-2.0 `LICENSE`.
+`resources/sk_streetkings` is this server's own resource: its StreetKings
+modules are ports of that same Apache-2.0 project, and its car meet module
+is built on Randolio's `randol_carmeet`. It does not carry a licence file
+of its own yet.
+
+`resources/vice_hud` (its `honor/` folder included) and
+`resources/gk_basketball` each carry their own copy of that same CC BY-NC-SA 4.0 licence, so they stay
 correctly licensed if someone takes one of those folders on its own.
 `resources/vi_radio` is different again: it's licensed under the
 [PolyForm Noncommercial License 1.0.0](resources/vi_radio/LICENSE.md), its own
