@@ -124,6 +124,23 @@ Config.Hud = {
 -- Stations not listed here still appear (using their raw name) as long as the
 -- game reports them unlocked. Add hidden = true to drop one from the wheel.
 Config.IncludeOff = true        -- include the "Radio Off" entry
+
+-- Audio scenes that take the game radio down with them.
+--
+-- A common way to quieten the city (distant sirens, alarms) is to leave
+-- CHARACTER_CHANGE_IN_SKY_SCENE running for the whole session; that is what
+-- qbx_smallresources' `disable.ambience = true` does. It is the mix the game
+-- uses while the camera is up in the sky during a character switch, and in
+-- that mix the car radio is silent as well: the station is on, the HUD says
+-- so, and nothing comes out.
+--
+-- Any scene listed here is stopped while a station is actually playing in the
+-- vehicle you are sat in, and started again the moment it is not (radio off,
+-- muted, out of the car), so the city stays as quiet as it was the rest of
+-- the time. Empty the list to leave audio scenes alone.
+Config.RadioMutingScenes = {
+    'CHARACTER_CHANGE_IN_SKY_SCENE',
+}
 Config.OffLabel   = 'RADIO OFF'
 
 Config.Stations = {
