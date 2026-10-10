@@ -4,6 +4,7 @@ use as the vehicle panel's watermark.
 
     pip install pillow
     python tools/fetch_logos.py
+    python tools/fetch_logos.py --local-only     # only the marks in tools/logos_local/, no network
 
 Build tooling, like tools/make_masks.py. Run it when the roster in
 tools/make_makes.py gains a manufacturer, or when a better mark turns up on
@@ -375,15 +376,26 @@ def main():
     if not os.path.isdir(dest):
         os.makedirs(dest)
 
+    # --local-only: redo just the hand-supplied marks and leave the wiki alone.
+    # Those are also written into tools/logos_raw/, the originals
+    # normalize_logos.py reads from once that folder exists -- without that a
+    # new local mark would never reach the shipped set.
+    local_only = '--local-only' in sys.argv
+    raw_dir = os.path.join(here, 'logos_raw')
+
     got, missing, total = 0, [], 0
     for key, prefix, explicit in BRANDS:
         # A local file wins outright, WORDMARK included: someone putting a mark
         # in logos_local/ is saying they found one this script could not.
         override = local_mark(key)
+        if local_only and not override:
+            continue
         if override:
             img = process(open(override, 'rb').read())
             path = os.path.join(dest, key + '.png')
             img.save(path, optimize=True)
+            if local_only and os.path.isdir(raw_dir):
+                img.save(os.path.join(raw_dir, key + '.png'), optimize=True)
             total += os.path.getsize(path)
             got += 1
             print('  %-26s %-42s %dx%d  %.1fkB' %

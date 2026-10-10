@@ -4202,7 +4202,7 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     font-variant-numeric: tabular-nums;
     line-height: 1;
     /* The label and the clock are white with a hard dark line round them. */
-    --lap-line: #1c1820;
+    --lap-line: #2e2d3a;
     --lap-outline:
         -0.17cqh -0.17cqh 0 var(--lap-line), 0.17cqh -0.17cqh 0 var(--lap-line),
         -0.17cqh 0.17cqh 0 var(--lap-line), 0.17cqh 0.17cqh 0 var(--lap-line),
@@ -4241,14 +4241,20 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(30, 25, 44, 0.88);
+    /* The chip is not a rectangle: its left edge leans, 0.47 of a unit over
+       its 3.67 height, it is lighter at that end than at the square one, and
+       it has a fine line round it. Read off a vectorised copy of the race
+       block, which shows what the footage blurs. */
+    background: rgba(36, 34, 44, 0.9) linear-gradient(90deg, rgba(70, 68, 86, 0.5), rgba(70, 68, 86, 0) 48%, rgba(6, 6, 8, 0.42));
+    box-shadow: inset 0 0 0 0.1cqh #343341;
+    clip-path: polygon(0.47cqh 0, 100% 0, 100% 100%, 0 100%);
 }
 #lap-badge-chip {
     min-width: 7.76cqh;
     height: 3.7cqh;
     /* The extra on the left is the letter-spacing after the last figure, so
        the count stays in the middle of the chip. */
-    padding: 0 1.15cqh 0.3cqh calc(1.25cqh + 0.125em);
+    padding: 0 1.05cqh 0.3cqh calc(1.35cqh + 0.125em);
     font-size: 2.9cqh;
     letter-spacing: 0.125em;
 }
@@ -4287,7 +4293,7 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     right: 0.1cqh;
     bottom: 0.1cqh;
     width: 0.46cqh;
-    background: var(--nav-accent, var(--nav-accent-gender-default, #e79ac6));
+    background: var(--nav-accent, var(--nav-accent-gender-default, #f68baf));
 }
 /* 33px figures, a third smaller than the clock's. */
 #lap-cp-row {

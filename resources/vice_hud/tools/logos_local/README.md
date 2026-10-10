@@ -29,3 +29,16 @@ the long edge and overwrite the PNG.
   spells TRUFFADE across the badge or is a 59x38 icon, and the panel already
   prints the name directly above the mark. Rasterised from
   `TRUFFADE.source.svg`, supplied by the server owner.
+- Twenty-one emblems cut from the vectorised Rockstar logo library by @GTAGFX
+  (the shared pCloud folder "Rockstar Games / Logos / GTA V / Vehicle
+  Manufactures"), supplied by the server owner: ALBANY, ANNIS, BENEFACTOR,
+  BOLLOKAN, BRAVADO, CHARIOT, DECLASSE, EBERHARD, EMPEROR, ENUS, KARIN, KRAKEN,
+  LAMPADATI, OBEY, OCELOT, PENAUD, PFISTER, WEENY, ZIRCONIUM, and two the wiki
+  had nothing usable for, PRINCIPE and TOUNDRA. Where the library's file is an
+  emblem over or beside its wordmark, only the emblem is kept. The library's
+  chrome and full-colour badges (Cheval, Classique, Dinka, Dundreary, Fathom,
+  Hijak, Schyster, Vulcar and a few more) were tried and left out: flattened
+  to grey they read weaker than the flat marks already here.
+
+  `python tools/fetch_logos.py --local-only` rebuilds just the marks in this
+  folder, with no network.
