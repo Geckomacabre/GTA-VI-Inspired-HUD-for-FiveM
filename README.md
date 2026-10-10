@@ -321,7 +321,11 @@ its own.
    If you ran `osm-target`, `ox_target`, `qb-target`, `qtarget` or
    `qbx_honor` as resources of their own, take them out of `server.cfg`
    and out of `resources/`: `vice_hud` is all of them now, and two
-   resources answering to one name is an error.
+   resources answering to one name is an error. Exports and `dependency`
+   lines under those names keep working; a script that tests
+   `GetResourceState('ox_target') == 'started'` does not see a provided
+   name, and `resources/vice_hud/README.md` ("Merged in") says what to do
+   about it.
 3. Make sure the dependencies each one needs are already installed and
    started *before* it in `server.cfg`:
    - `vice_hud` needs **ox_lib** and **oxmysql** (targeting keeps its

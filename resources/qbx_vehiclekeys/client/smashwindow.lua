@@ -45,7 +45,8 @@ end
 ---@return {durationMultiplier: number, alertChanceMultiplier: number} tierConfig
 ---@return 'angel'|'devil'|nil tier
 local function getHonorTuning()
-    if GetResourceState('qbx_honor') ~= 'started' then
+    -- Honor is the qbx_honor resource, or part of vice_hud.
+    if GetResourceState('qbx_honor') ~= 'started' and GetResourceState('vice_hud') ~= 'started' then
         return smashConfig.honor.neutral, nil
     end
 

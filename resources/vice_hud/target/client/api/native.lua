@@ -18,6 +18,7 @@ local api = setmetatable({}, {
     rawset(Api, key, value)
     exports(key, value)
     ExportAs('ox_target', key, value)
+    ExportAs('osm-target', key, value)   -- merged into vice_hud: its own old name
   end,
 })
 

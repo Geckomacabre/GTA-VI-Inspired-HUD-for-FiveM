@@ -27,6 +27,7 @@ shared_scripts {
     'target/shared/designs.lua',
     'target/designs/**/design.lua',
     'honor/config.lua',
+    'honor/alias.lua',
 }
 
 client_scripts {
@@ -182,9 +183,13 @@ files {
 -- callbacks came with this switched on; it now covers the HUD's as well.
 nui_callback_strict_mode 'true'
 
--- vice_hud IS these resources now. Anything written against them -- an
--- exports.ox_target call, a dependency on qbx_honor -- lands here, and they
--- must not also be installed.
+-- vice_hud IS these resources now, and they must not also be installed.
+-- `provide` is what satisfies another manifest's `dependency 'ox_target'`.
+-- It does NOT alias exports or GetResourceState: exports under the old names
+-- are answered by handlers the code registers itself (ExportAs in
+-- target/client/api/native.lua, HonorExport in honor/alias.lua), and a script
+-- that tests GetResourceState('ox_target') needs changing or a resource of
+-- that name -- see the README.
 provide 'osm-target'
 provide 'ox_target'
 provide 'qb-target'

@@ -538,10 +538,21 @@ resources drawing over each other.
 | `honor/` | `qbx_honor` | the honor stat, its hooks and exports, and the greet / antagonise options on peds |
 
 `vice_hud` `provide`s `osm-target`, `ox_target`, `qb-target`, `qtarget` and
-`qbx_honor`. Scripts written against any of them keep working unchanged
-(`exports.ox_target:addBoxZone`, `exports.qbx_honor:AddHonor`, a
-`dependency 'ox_target'`), and none of the five may be installed as a resource
-of its own beside it.
+`qbx_honor`, and none of the five may be installed as a resource of its own
+beside it. What that covers, and what it does not:
+
+| A script that does this | Still works? |
+| --- | --- |
+| `dependency 'ox_target'` (or any of the five) in its manifest | Yes, through `provide` |
+| `exports.ox_target:addBoxZone(...)`, `exports['qb-target']:...`, `exports.qbx_honor:AddHonor(...)` | Yes. `provide` does not alias exports, so the code registers each one under the old name itself (`ExportAs` in `target/client/api/native.lua`, `HonorExport` in `honor/alias.lua`) |
+| `GetResourceState('ox_target') == 'started'` (or `'qbx_honor'`, `'osm-target'`) | **No.** `provide` does not make a name report as started |
+
+For the last row there are two ways out. The resources in this bundle that
+tested a name that way (`gk_basketball`, `qbx_vehiclekeys`) now also accept
+`vice_hud`. For anything else, either change the test the same way, or run a
+manifest-only resource of that name beside `vice_hud` (a folder with nothing
+but an `fxmanifest.lua`) and delete the matching `provide` line from this
+resource's manifest, so the name has one claimant.
 
 What each kind of interaction is drawn by, so nothing is offered twice:
 
@@ -569,6 +580,7 @@ What was changed in `target/` to load it from here, and nothing else:
   sends its messages through the HUD page, and `html/index.html` takes the
   resource name from the frame's own address when the game does not supply it;
 - its controller-brand preference reads and writes the HUD's setting;
+- its exports are also answered under the name `osm-target`;
 - `use_experimental_fxv2_oal` is not carried over, as it would apply to the
   whole HUD.
 

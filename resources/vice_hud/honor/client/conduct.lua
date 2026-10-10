@@ -319,7 +319,8 @@ local function antagonize(target)
 end
 
 CreateThread(function()
-    while GetResourceState('ox_target') ~= 'started' do
+    -- Targeting is part of this resource now; wait for the resource itself.
+    while GetResourceState(GetCurrentResourceName()) ~= 'started' do
         Wait(1000)
     end
 

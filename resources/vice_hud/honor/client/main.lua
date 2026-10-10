@@ -45,7 +45,7 @@ local pushToHud, seedHud
 local function getHonor()
     return currentHonor
 end
-exports('GetHonor', getHonor)
+HonorExport('GetHonor', getHonor)
 
 ---Whether this character's honor has permanently latched at the
 ---unrepairable floor. Never goes back to false once true.
@@ -53,7 +53,7 @@ exports('GetHonor', getHonor)
 local function isHonorBroken()
     return currentHonorBroken
 end
-exports('IsHonorBroken', isHonorBroken)
+HonorExport('IsHonorBroken', isHonorBroken)
 
 ---@param value number? defaults to the local player's current honor
 ---@return 'angel' | 'devil' | nil
@@ -63,7 +63,7 @@ local function getBadgeTier(value)
     if value <= Config.DevilThreshold then return 'devil' end
     return nil
 end
-exports('GetBadgeTier', getBadgeTier)
+HonorExport('GetBadgeTier', getBadgeTier)
 
 -- Server-side trace lines, mirrored here so one console tells the whole story.
 RegisterNetEvent('qbx_honor:client:trace', function(line)

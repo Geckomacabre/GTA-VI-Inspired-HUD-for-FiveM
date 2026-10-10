@@ -73,7 +73,7 @@ local function getBadgeTier(value)
     if value <= Config.DevilThreshold then return 'devil' end
     return nil
 end
-exports('GetBadgeTier', getBadgeTier)
+HonorExport('GetBadgeTier', getBadgeTier)
 
 -- ============================================================================
 -- Core API
@@ -153,7 +153,7 @@ local function AdjustHonor(src, delta, reason, severity)
     return newValue
 end
 
-exports('AdjustHonor', AdjustHonor)
+HonorExport('AdjustHonor', AdjustHonor)
 
 ---Raises a player's honor. `amount` is always treated as positive.
 ---@param src number
@@ -163,7 +163,7 @@ local function AddHonor(src, amount, reason)
     amount = math.abs(tonumber(amount) or 0)
     return AdjustHonor(src, amount, reason)
 end
-exports('AddHonor', AddHonor)
+HonorExport('AddHonor', AddHonor)
 
 ---Lowers a player's honor. `amount` is always treated as positive (it is subtracted).
 ---@param src number
@@ -173,7 +173,7 @@ local function RemoveHonor(src, amount, reason)
     amount = math.abs(tonumber(amount) or 0)
     return AdjustHonor(src, -amount, reason)
 end
-exports('RemoveHonor', RemoveHonor)
+HonorExport('RemoveHonor', RemoveHonor)
 
 -- ============================================================================
 -- Hook API
@@ -264,7 +264,7 @@ local function ApplyHook(src, hookName)
 
     return newValue
 end
-exports('ApplyHook', ApplyHook)
+HonorExport('ApplyHook', ApplyHook)
 
 ---Returns a player's current honor value (from cache if available, else qbx_core metadata).
 ---@param src number
@@ -279,7 +279,7 @@ local function GetHonor(src)
 
     return player.PlayerData.metadata.honor or Config.DefaultHonor
 end
-exports('GetHonor', GetHonor)
+HonorExport('GetHonor', GetHonor)
 
 ---Whether this player's honor has permanently latched at the unrepairable
 ---floor. See Config's "Unrepairable floor" section — this never goes back to
@@ -296,7 +296,7 @@ local function IsHonorBroken(src)
 
     return player.PlayerData.metadata.honorBroken == true
 end
-exports('IsHonorBroken', IsHonorBroken)
+HonorExport('IsHonorBroken', IsHonorBroken)
 
 -- ============================================================================
 -- First-load initialization
