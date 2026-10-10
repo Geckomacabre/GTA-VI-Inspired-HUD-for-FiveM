@@ -14,6 +14,19 @@ shared_scripts {
     -- awards XP and the server persists it, and the two must not be able to
     -- disagree about what a level means.
     'skills.lua',
+
+    -- Targeting (target/, merged from osm-target) and honor (honor/, merged
+    -- from qbx_honor). Their settings go into the same Config table as the
+    -- HUD's, so both config files load after config.lua above.
+    'target/config.lua',
+    'target/locales/locale.lua',
+    'target/locales/*.lua',
+    'target/shared/schema.lua',
+    'target/shared/compat.lua',
+    'target/shared/resolver.lua',
+    'target/shared/designs.lua',
+    'target/designs/**/design.lua',
+    'honor/config.lua',
 }
 
 client_scripts {
@@ -24,6 +37,9 @@ client_scripts {
     -- from refusing to load, which takes the entire HUD down, not one feature.
     -- Neither file reaches back into client.lua: see their headers for the
     -- exact surface that crosses.
+    -- First of all: the button resolver the two files below both draw on
+    -- (which button a control is on, for the device in hand).
+    'client_glyphs.lua',
     'client_vitals.lua',
     'client_overlays.lua',
     'client.lua',
@@ -38,17 +54,59 @@ client_scripts {
     -- Popup styling. Self-contained: publishes a state bag that ox_lib reads,
     -- and shares nothing with the two files above.
     'theme.lua',
+
+    -- Targeting: the osm-target engine, in its own load order.
+    'target/client/framework/init.lua',
+    'target/client/framework/esx.lua',
+    'target/client/framework/ox.lua',
+    'target/client/framework/qbcore.lua',
+    'target/client/framework/qbox.lua',
+    'target/client/framework/standalone.lua',
+    'target/client/target/player.lua',
+    'target/client/target/store.lua',
+    'target/client/api/native.lua',
+    'target/client/api/qb.lua',
+    'target/client/api/qtarget.lua',
+    'target/client/ui/surfaces.lua',
+    'target/client/target/discovery.lua',
+    'target/client/target/hit.lua',
+    'target/client/target/input.lua',
+    'target/client/target/machine.lua',
+    'target/client/target/defaults.lua',
+    'target/client/ui/nui.lua',
+    'target/client/config_sync.lua',
+    'target/client/debug.lua',
+    'target/client/main.lua',
+    -- Honor: after targeting, whose greet / antagonise options it registers.
+    'honor/client/main.lua',
+    'honor/client/conduct.lua',
+    'honor/client/debug.lua',
 }
 
 -- Owns the SERVER-WIDE layout: /hudpublish writes layout.json here and mirrors
 -- it into GlobalState, so one admin fixing the HUD fixes it for everyone.
 server_scripts {
+    -- For targeting's saved settings (/targetadmin).
+    '@oxmysql/lib/MySQL.lua',
     'server.lua',
     'server_skills.lua',
     -- Gym stations for free weights (data/gym.json), edited from em_toolkit.
     'server_gym.lua',
     -- Server-wide popup theme (/themepublish). Independent of the layout above.
     'server_theme.lua',
+
+    'target/server/framework/init.lua',
+    'target/server/framework/esx.lua',
+    'target/server/framework/ox.lua',
+    'target/server/framework/qbcore.lua',
+    'target/server/framework/qbox.lua',
+    'target/server/framework/standalone.lua',
+    'target/server/db.lua',
+    'target/server/config_store.lua',
+    'target/server/version.lua',
+    'target/server/main.lua',
+    'honor/server/main.lua',
+    'honor/server/debug.lua',
 }
 
 ui_page 'html/index.html'
@@ -96,6 +154,13 @@ files {
     -- straight out of the reference screenshots -- another subfolder, same
     -- non-recursing caveat as above.
     'html/icons/tells/*.png',
+    -- Targeting's own page: the admin panel and preferences (a frame inside
+    -- html/index.html) and the in-world DUI surfaces.
+    'target/html/index.html',
+    'target/html/assets/*.js',
+    'target/html/assets/*.css',
+    'target/designs/**/design.js',
+    'target/locales/*.lua',
 }
 
 -- The radar masks in stream/ are picked up AUTOMATICALLY — FiveM streams
@@ -113,6 +178,20 @@ files {
 -- `node tools/radius.test.js`. tools/ is not in files{} either — it is build
 -- and test tooling, and clients have no use for it.
 
+-- Only this resource's own pages may call its NUI callbacks. Targeting's admin
+-- callbacks came with this switched on; it now covers the HUD's as well.
+nui_callback_strict_mode 'true'
+
+-- vice_hud IS these resources now. Anything written against them -- an
+-- exports.ox_target call, a dependency on qbx_honor -- lands here, and they
+-- must not also be installed.
+provide 'osm-target'
+provide 'ox_target'
+provide 'qb-target'
+provide 'qtarget'
+provide 'qbx_honor'
+
 dependencies {
     'ox_lib',
+    'oxmysql',
 }

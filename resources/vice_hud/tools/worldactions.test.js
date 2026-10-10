@@ -21,7 +21,7 @@ let fails = 0;
 const ok = (c, l, e) => c ? console.log('  PASS  ' + l)
   : (console.log('  FAIL  ' + l + (e !== undefined ? '  -> ' + JSON.stringify(e) : '')), fails++);
 
-const a = src.indexOf('local function waSafeLabel');
+const a = src.indexOf('local function waUsingPad');
 const b = src.indexOf('\nend, false)', src.indexOf("RegisterCommand('hudworldactions'")) + '\nend, false)'.length;
 if (a < 0 || b < 12) throw new Error('could not locate the world-actions block');
 
@@ -79,6 +79,17 @@ push('exports', (S) => {
   lua.lua_setglobal(S, to_luastring('__exported_' + name));
   return 0;
 });
+
+// The resolving is client_glyphs.lua's now (ViceGlyphs), which the lifted
+// block calls into -- so the real one is loaded first, on the same stubs.
+push('GetResourceKvpString', () => 0);
+push('SetResourceKvp', () => 0);
+push('SendNUIMessage', () => 0);
+const glyphs = fs.readFileSync(root + 'client_glyphs.lua', 'utf8');
+if (lauxlib.luaL_loadstring(L, to_luastring(glyphs)) !== lua.LUA_OK)
+  throw new Error('load glyphs: ' + lua.lua_tojsstring(L, -1));
+if (lua.lua_pcall(L, 0, 0, 0) !== lua.LUA_OK)
+  throw new Error('run glyphs: ' + lua.lua_tojsstring(L, -1));
 
 if (lauxlib.luaL_loadstring(L, to_luastring(src.slice(a, b))) !== lua.LUA_OK)
   throw new Error('load: ' + lua.lua_tojsstring(L, -1));

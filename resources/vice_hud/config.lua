@@ -5,6 +5,44 @@ Config = {}
 -- announces the vehicle and then clears.
 Config.VehiclePanelMs = 5000
 
+-- Which controller's buttons the HUD draws while a player is on a pad:
+--   'xbox'          A B X Y, LB RB LT RT, Menu / View
+--   'playstation'   cross circle square triangle, L1 R1 L2 R2, Options / touchpad
+-- This is the default for everyone. A player with the other kind of pad
+-- switches their own with /hudpad xbox or /hudpad playstation, and that
+-- choice is remembered for them. On keyboard and mouse the HUD draws key caps
+-- and the mouse instead, whatever this says; it follows whichever device the
+-- player touched last.
+Config.PadGlyphs = 'xbox'
+
+-- Where the vehicle panel's nitrous pip gets its reading: a state bag key on
+-- the LOCAL player, written by whichever resource runs the nitrous itself.
+-- vice_hud only reads it. The value is a table --
+--
+--   { installed = true, level = 0.0..1.0, active = false, ready = true }
+--
+-- -- and the pip is hidden whenever the key is unset or `installed` is false,
+-- so a server with no nitrous resource never sees it. Point this at another
+-- key to follow a different resource, or set it to '' to stop reading a bag
+-- at all and drive the pip through exports.vice_hud:SetVehicleNitrous instead.
+Config.NitrousStateBag = 'customs:nitrous'
+
+-- How long the "Hold [key] to activate nitrous" tip stays up, in ms, when a
+-- kit has just been fitted to the car you are sitting in. 0 turns the
+-- automatic tip off; exports.vice_hud:ShowNitrousHint still works either way.
+-- The key cap in it comes from the nitrous table's own `command` (a
+-- RegisterKeyMapping command name, shown as the player's live bind) or `key`
+-- (a control id or a ready-made label).
+Config.NitrousHintMs = 7000
+
+-- A state bag key on the LOCAL player that means "a menu is covering the
+-- screen". While it reads true the nitrous tip is held back, and it is shown
+-- when the key goes false -- a kit is fitted inside the customs shop's
+-- upgrade menu, and a tip shown there would be used up behind it. '' to never
+-- hold the tip for a menu. (A HUD hidden through SetHudVisible holds it too,
+-- with no setting needed.)
+Config.NitrousHintHoldBag = 'customs:menuOpen'
+
 -- Hide the native green/blue health+armour bars drawn around the minimap.
 --
 -- Done via the minimap scaleform's SETUP_HEALTH_ARMOUR method (param 3 = hide
@@ -648,7 +686,10 @@ Config.Crosshair = {
 --                            what the reference footage uses. The stylesheet's
 --                            own default for the nav bar is Helvetica 700;
 --                            these rows override it.
---   zone.al = 'left'         the zone name is ragged-left rather than centred.
+--   slots / zone / vehicle / vehpips  scale and size multipliers are all 1:
+--                            the stylesheet carries sizes measured off the
+--                            reference footage, and a multiplier here would
+--                            only pull them away from it again.
 --   skillup.op = 0           the skill level-up card is fully transparent,
 --                            i.e. the feature runs but never draws. Remove
 --                            this row to get it back.
@@ -662,16 +703,16 @@ Config.DefaultLayout = {
     honorpop      = { x = 46.3, y = 0.1, sx = 1.1, sy = 1.1, fs = 0.45, ic = 1 },
     reputation    = { x = 81, y = -17.6, sx = 1, sy = 1 },
     reputationpop = { x = 46.8, y = -3.2, sx = 0.45, sy = 0.45 },
-    prompts       = { x = -0.4, y = 0.1, sx = 1, sy = 1 },
+    prompts       = { x = 0, y = 0, sx = 1, sy = 1 },
     skillup       = { x = 0, y = 0, sx = 1, sy = 1, op = 0 },
     focusfx       = { x = 0, y = 0, sx = 1, sy = 1 },
     mapframe      = { x = -0.3, y = 0.3, sx = 1.18, sy = 1.2, fs = 1, rad = 1.3, ic = 1, sp = 1 },
     navpopup      = { x = 0, y = 0, sx = 1, sy = 1, fw = 100, ff = "'GTAArtDeco', 'HelveticaNeueHUD', sans-serif" },
     navcompass    = { x = 0, y = 16.6, sx = 1, sy = 1, op = 0.3 },
-    slots         = { x = -0.25, y = -6, sx = 1.17, sy = 1.05, fs = 0.8, fw = 400, ls = -0.005, op = 0.85, rad = 0.3, ic = 0.9, ff = "'GTAArtDeco', 'HelveticaNeueHUD', sans-serif", sm = 'none', al = 'center' },
-    zone          = { x = 0, y = 0, sx = 1, sy = 1, fs = 1.3, fw = 100, ls = 0.085, rad = 0, ff = "'GTAArtDeco', 'HelveticaNeueHUD', sans-serif", al = 'left' },
-    vehicle       = { x = 0, y = 0, sx = 1, sy = 1, fs = 1.45, fw = 400, ls = 0.085, rad = 1.1, ic = 1, sp = 1, sm = 'auto' },
-    vehpips       = { x = 0, y = 0, sx = 1.2, sy = 1.2, fs = 1.05, ls = 0, rad = 1.3, ic = 0.8, sp = 0.6 },
+    slots         = { x = -0.25, y = -6, sx = 1, sy = 1, fs = 1, fw = 400, ls = -0.005, op = 0.85, rad = 0.57, ic = 1, ff = "'GTAArtDeco', 'HelveticaNeueHUD', sans-serif", al = 'center', sm = 'none' },
+    zone          = { x = 0, y = 0, sx = 1, sy = 1, fs = 1, fw = 400, ls = 0.004, ff = "'GTAArtDeco', 'HelveticaNeueHUD', sans-serif", al = 'center' },
+    vehicle       = { x = 0, y = 0, sx = 1, sy = 1, fs = 1, ls = 0.02, rad = 0, ic = 1, sp = 1, sm = 'auto' },
+    vehpips       = { x = 0, y = 0, sx = 1, sy = 1, fs = 1, ls = 0, rad = 1, ic = 1, sp = 1 },
     vehlogo       = { x = -0.1, y = 0, sx = 1.55, sy = 0.9, op = 1 },
     speedlimit    = { x = 13.2, y = 4.8, sx = 0.65, sy = 0.65 },
     seatbelt      = { x = -30.6, y = -12.9, sx = 1, sy = 1 },

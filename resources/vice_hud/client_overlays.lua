@@ -170,16 +170,30 @@ RegisterCommand('hudkillmark', function(_, args)
 end, false)
 
 -- =============================================================================
--- Race lap / checkpoint HUD
+-- Race HUD
 -- =============================================================================
 -- Fed entirely by whatever race resource is running — sk_streetkings today
 -- (see its race_singleplayer_c.lua / race_multiplayer_c.lua), via plain data.
 -- vice_hud draws it and does not know sk_streetkings exists.
 --
+-- Three rows, bottom right: PROGRESS and a percentage, the chequered plate,
+-- the clock. All of it optional except the clock:
+--
+--   position, racers   place in the field, "1 / 6" on the plate. Leave both
+--                      out (a solo run has no field) and the plate shows the
+--                      checkpoint count instead, as it always used to.
+--   progress           0.0 .. 1.0 along the route, for the PROGRESS figure.
+--                      Left out, it is worked out from lap / cp / cpTotal,
+--                      which is right but moves a checkpoint at a time.
+--   lap, laps          "LAP 1/2", drawn only when laps > 1.
+--   cp, cpTotal        checkpoints cleared this lap, and per lap.
+--
 -- elapsedMs is a snapshot, not a stream: the caller is expected to push this
--- only on real events (run start, a checkpoint hit, finish/abort) — the NUI
--- side ticks the displayed time smoothly on its own between pushes (see
--- onLapHud in app.js) rather than needing this called every frame.
+-- only on real events (run start, a checkpoint hit, a change of position,
+-- finish/abort) — the NUI side ticks the displayed time smoothly on its own
+-- between pushes (see onLapHud in app.js) rather than needing this called
+-- every frame. A resource that does send `progress` will want to push a
+-- little more often than that; a couple of times a second is plenty.
 exports('SetLapTimer', function(data)
     if not data or data.show == false then
         ui('lapHud', { show = false })
@@ -191,16 +205,84 @@ exports('SetLapTimer', function(data)
         laps = data.laps,
         cp = data.cp,
         cpTotal = data.cpTotal,
+        position = data.position,
+        racers = data.racers,
+        progress = data.progress,
         elapsedMs = data.elapsedMs,
         running = data.running,
     })
 end)
 
 RegisterCommand('hudlaptimer', function()
-    exports.vice_hud:SetLapTimer({ lap = 1, laps = 2, cp = 10, cpTotal = 16, elapsedMs = 19950, running = true })
+    exports.vice_hud:SetLapTimer({ position = 1, racers = 6, progress = 0.30,
+        lap = 1, laps = 1, cp = 5, cpTotal = 16, elapsedMs = 30390, running = true })
     print('^3[vice_hud]^7 /hudlaptimer — sample data, /hudlaptimeroff to clear.')
 end, false)
 RegisterCommand('hudlaptimeroff', function() exports.vice_hud:SetLapTimer({ show = false }) end, false)
+
+-- ---- race cards and countdown -------------------------------------------------
+-- The pieces of a race that are not the running block: the title card before
+-- the start, the 3-2-1-go, and the placing at the finish. Plain data in, same
+-- as SetLapTimer; the page holds each one up for as long as the reference does
+-- unless told otherwise, so a race resource can call these and forget them.
+
+--- The title card: a small line, the race's name, a small line.
+--- @param data { series?: string, name: string, type?: string, duration?: number }|nil
+---        duration in ms (default 1900, 0 = until hidden). nil hides it.
+exports('ShowRaceTitle', function(data)
+    if type(data) ~= 'table' then ui('raceCard', { show = false }) return end
+    ui('raceCard', {
+        show = true, kind = 'title',
+        series = data.series, name = data.name, type = data.type,
+        holdMs = tonumber(data.duration),
+    })
+end)
+
+--- The result card: "1ST" over the finishing time.
+--- @param data { position: number, timeMs?: number, label?: string, duration?: number }|nil
+---        label replaces the ordinal ("DNF", "WASTED"). duration in ms
+---        (default 2000, 0 = until hidden). nil hides it.
+exports('ShowRaceResult', function(data)
+    if type(data) ~= 'table' then ui('raceCard', { show = false }) return end
+    ui('raceCard', {
+        show = true, kind = 'result',
+        position = data.position, timeMs = data.timeMs, label = data.label,
+        holdMs = tonumber(data.duration),
+    })
+end)
+
+--- 3, 2, 1, go.
+---   ShowRaceCountdown()            the whole run from 3, timed by the page
+---   ShowRaceCountdown({ from = 5 })
+---   ShowRaceCountdown(3) / ('go')  one beat, for a resource keeping its own clock
+---   ShowRaceCountdown(false)       stop and clear
+--- "go" appears `from` seconds after the call when the page runs it.
+exports('ShowRaceCountdown', function(data)
+    if data == false then ui('raceCountdown', { show = false }) return end
+    if type(data) == 'table' then
+        ui('raceCountdown', {
+            show = true, from = data.from, value = data.value,
+            stepMs = data.stepMs, digitMs = data.digitMs, goMs = data.goMs,
+        })
+    elseif data ~= nil then
+        ui('raceCountdown', { show = true, value = data })
+    else
+        ui('raceCountdown', { show = true, from = 3 })
+    end
+end)
+
+RegisterCommand('hudrace', function()
+    print('^3[vice_hud]^7 /hudrace — title card, countdown, race block, then the result card.')
+    exports.vice_hud:ShowRaceTitle({ series = "HIT 'N' RUN VC", name = 'SALTON TO WANING SANDS', type = 'GROUP RACE' })
+    SetTimeout(5500, function() exports.vice_hud:ShowRaceCountdown() end)
+    SetTimeout(8500, function()
+        exports.vice_hud:SetLapTimer({ position = 5, racers = 6, progress = 0.03, elapsedMs = 0, running = true })
+    end)
+    SetTimeout(14500, function()
+        exports.vice_hud:SetLapTimer({ show = false })
+        exports.vice_hud:ShowRaceResult({ position = 1, timeMs = 88893 })
+    end)
+end, false)
 
 -- =============================================================================
 -- World action prompt — a short list of button-glyph + label choices
@@ -232,63 +314,28 @@ RegisterCommand('hudlaptimeroff', function() exports.vice_hud:SetLapTimer({ show
 -- of this file for the established precedent). The icon can no longer
 -- disagree with the binding: it IS the binding, resolved.
 
--- GetControlInstructionalButton returns GTA button-font ligatures for a pad,
--- which do not exist in the NUI's fonts -- see the identical helper and
--- comment in client.lua's Action Prompts section, which this mirrors.
-local function waSafeLabel(str)
-    if not str or str == '' then return nil end
+-- The resolving is ViceGlyphs' (client_glyphs.lua), the same one the action
+-- prompts use, so a world action and a prompt bound to the same control can
+-- never show different buttons.
+local function waUsingPad() return ViceGlyphs.usingPad() end
 
-    -- Multi-digit = a raw internal icon index, not a key label; see the
-    -- identical guard in client.lua's safeLabel for the full reasoning.
-    -- Single digits are kept, because 1-9 are real keys.
-    if #str > 1 and str:match('^%d+$') then return nil end
-
-    for i = 1, #str do
-        local b = str:byte(i)
-        if b < 0x20 or b > 0x7E then return '•' end
-    end
-    return str
-end
-
--- IS_USING_KEYBOARD_AND_MOUSE rather than IsInputDisabled(2) -- see the
--- identical usingPad() in client.lua for why that check was not reliable.
-local function waUsingPad()
-    local ok, kbm = pcall(IsUsingKeyboardAndMouse, 2)
-    if ok and kbm ~= nil then return not kbm end
-
-    return not IsInputDisabled(2)
-end
-
--- Mirrors client.lua's resolveKey exactly -- see its comments. mouseButton
--- (ox_target/client/main.lua) is passed in here too, as ShowWorldActions' own
--- `key` for a prop's world prompt, so this path had the same "100" bug.
-local WA_MOUSE_BUTTON_LABELS = { [24] = 'LMB', [25] = 'RMB' }
-
-local function waResolveKey(key)
-    if type(key) == 'string' then return key end
-    if type(key) ~= 'number' then return nil end
-
-    if not waUsingPad() and WA_MOUSE_BUTTON_LABELS[key] then
-        return WA_MOUSE_BUTTON_LABELS[key]
-    end
-
-    local ok, raw = pcall(GetControlInstructionalButton, 0, key, true)
-    if not ok or not raw then return nil end
-    return waSafeLabel(raw:sub(3))
-end
+-- A control id -> token, device. See ViceGlyphs.control.
+local function waResolveKey(key) return ViceGlyphs.control(key) end
 
 local waOptions = nil     -- the last { label, key } list shown, for the refresh thread
 local waDevice = nil
 
+-- Each option carries the device its OWN button belongs to, which is the
+-- device in hand except for a bind that only exists on the other one.
 local function waResolveAll()
-    local device = waUsingPad() and 'pad' or 'kbm'
     local resolved = {}
     if waOptions then
         for i, opt in ipairs(waOptions) do
-            resolved[i] = { label = opt.label, glyph = waResolveKey(opt.key), device = device }
+            local glyph, device = waResolveKey(opt.key)
+            resolved[i] = { label = opt.label, glyph = glyph, device = device }
         end
     end
-    return resolved, device
+    return resolved, ViceGlyphs.device()
 end
 
 -- World-anchoring -- closes the gap #world-actions in index.html and the
@@ -336,21 +383,13 @@ exports('HideWorldActions', function()
     ui('worldActions', { show = false })
 end)
 
--- Re-resolve when the input device changes, same pattern as the Action
--- Prompts refresh thread -- so a mid-prompt controller/keyboard swap updates
--- the icon instead of leaving it wrong until the caller happens to re-push.
-CreateThread(function()
-    while true do
-        Wait(400)
-        if waOptions then
-            local device = waUsingPad() and 'pad' or 'kbm'
-            if device ~= waDevice then
-                waDevice = device
-                local resolved = waResolveAll()
-                ui('worldActions', { show = true, options = resolved })
-            end
-        end
-    end
+-- Re-resolve when the input device changes, the same way the action prompts
+-- do -- so a mid-prompt controller/keyboard swap updates the icon instead of
+-- leaving it wrong until the caller happens to re-push.
+ViceGlyphs.onDevice(function(device)
+    if not waOptions then return end
+    waDevice = device
+    ui('worldActions', { show = true, options = (waResolveAll()) })
 end)
 
 -- The world-anchoring thread itself -- see waCoords's own comment above for
@@ -428,7 +467,7 @@ local lockpickDir = -1  -- -1 = right-to-left (the real pick), 1 = left-to-right
 -- the mockup's centre glyph for visual noise, which this port simplifies
 -- away, see lockpickTick's comment below). INPUT_ATTACK (24) is the same
 -- LMB control already used elsewhere in this file (see
--- WA_MOUSE_BUTTON_LABELS[24] = 'LMB' above) — reused here as the "is the
+-- MOUSE_CONTROLS[24] = 'LMB' in client_glyphs.lua) — reused here as the "is the
 -- mouse player dragging" gate.
 local LOCKPICK_CONTROL_LOOK_LR = 1
 local LOCKPICK_CONTROL_ATTACK  = 24
@@ -496,7 +535,7 @@ local lockpickMouseDx = 0 -- reconstructed net mouse position since LMB was last
 --- position relative to where the hold started, not integrated effort over
 --- time" requirement to the letter.
 --- Mouse: gated on LMB actually being held (waUsingPad()'s counterpart,
---- WA_MOUSE_BUTTON_LABELS[24], is the established "24 = LMB" precedent in
+--- client_glyphs.lua's MOUSE_CONTROLS[24], is the established "24 = LMB" precedent in
 --- this file); while held, LOOK_LR's per-frame delta accumulates into
 --- lockpickMouseDx (see its own comment above); while not held, that
 --- accumulator decays back toward 0 instead of freezing.

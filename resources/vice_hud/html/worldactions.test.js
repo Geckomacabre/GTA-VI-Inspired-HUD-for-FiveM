@@ -34,7 +34,9 @@ const msg = (data) => window.dispatchEvent(new window.MessageEvent('message', { 
 const box = () => d.getElementById('world-actions');
 const rows = () => Array.from(box().querySelectorAll('.wa-row'));
 
-// ---- pad, recognised face buttons: the outlined shape ----------------------
+const btn = (row) => row.querySelector('.wa-btn');
+
+// ---- pad: the face button the bind is actually on --------------------------
 msg({ action: 'worldActions', show: true, options: [
   { label: 'Slim Jim', glyph: 'Y', device: 'pad' },
   { label: 'Smash Window', glyph: 'B', device: 'pad' },
@@ -42,36 +44,45 @@ msg({ action: 'worldActions', show: true, options: [
 ok(!box().classList.contains('hidden'), 'app.js listener is attached (box shows)');
 let r = rows();
 ok(r.length === 2, 'both options rendered', r.length);
-ok(r[0].querySelector('.wa-btn svg') && !r[0].querySelector('.wa-btn').textContent,
-   'pad Y (Triangle) renders the SHAPE icon, not text');
-ok(r[0].querySelector('.wa-btn svg path'),
-   'and it IS the triangle path, not some other shape');
-ok(r[1].querySelector('.wa-btn svg circle'),
-   'pad B (Circle) renders the circle shape');
+ok(btn(r[0]).classList.contains('glyph') && btn(r[0]).querySelectorAll('svg').length === 1,
+   'the button is the same single-svg drawing a prompt uses');
+ok(btn(r[0]).getAttribute('data-glyph') === 'Y' && btn(r[0]).classList.contains('pad-y'),
+   'pad Y is drawn as Y', btn(r[0]).className);
+ok(btn(r[1]).getAttribute('data-glyph') === 'B' && btn(r[1]).classList.contains('pad-b'),
+   'and pad B as B, not swapped', btn(r[1]).className);
+ok(r[0].firstElementChild === btn(r[0]) && r[0].lastElementChild.classList.contains('wa-label'),
+   'button first, then the label, as the reference has a world prompt');
 
-// ---- keyboard: the resolved key as plain text ------------------------------
+// ---- a PlayStation pad: the same two binds, drawn as its shapes -------------
+msg({ action: 'inputDevice', device: 'pad', pad: 'ps' });
+r = rows();
+ok(/Z$/.test(btn(r[0]).querySelector('path.g-ink').getAttribute('d')),
+   'on a PlayStation pad Y is the triangle, redrawn without being asked');
+ok(btn(r[1]).querySelector('circle.g-ink'), 'and B is the circle');
+msg({ action: 'inputDevice', device: 'pad', pad: 'xbox' });
+
+// ---- keyboard: the resolved key on a key cap --------------------------------
 msg({ action: 'worldActions', show: true, options: [
   { label: 'Slim Jim', glyph: 'R', device: 'kbm' },
   { label: 'Smash Window', glyph: 'F', device: 'kbm' },
 ]});
 r = rows();
-ok(!r[0].querySelector('.wa-btn svg'), 'keyboard renders NO shape svg');
-ok(r[0].querySelector('.wa-btn').textContent === 'R', 'keyboard shows the real bound letter (R)', r[0].querySelector('.wa-btn').textContent);
-ok(r[1].querySelector('.wa-btn').textContent === 'F', 'and the other option shows its own letter (F)', r[1].querySelector('.wa-btn').textContent);
-ok(r[0].querySelector('.wa-btn').classList.contains('wa-btn-text'),
-   'the text variant gets its own class so it does not inherit the shape sizing');
+ok(btn(r[0]).classList.contains('key') && !btn(r[0]).classList.contains('pad'), 'keyboard draws a key cap, not a pad button');
+ok(btn(r[0]).textContent === 'R', 'keyboard shows the real bound letter (R)', btn(r[0]).textContent);
+ok(btn(r[1]).textContent === 'F', 'and the other option shows its own letter (F)', btn(r[1]).textContent);
 
-// ---- a pad button with no shape mapping (shoulder/trigger/D-pad) ----------
+// ---- shoulders, triggers and the D-pad have drawings of their own ----------
 // Must not silently render nothing -- the whole point of this fix is that the
-// icon always reflects the real binding, even for a button this component
-// has no dedicated artwork for.
+// icon always reflects the real binding.
 msg({ action: 'worldActions', show: true, options: [
   { label: 'Slim Jim', glyph: 'LB', device: 'pad' },
+  { label: 'Smash Window', glyph: 'DPAD_RIGHT', device: 'pad' },
 ]});
 r = rows();
-ok(!r[0].querySelector('.wa-btn svg'), 'an unmapped pad button falls back off the shape path');
-ok(r[0].querySelector('.wa-btn').textContent === 'LB',
-   'and shows its own resolved text instead of a blank circle', r[0].querySelector('.wa-btn').textContent);
+ok(btn(r[0]).classList.contains('bumper') && btn(r[0]).textContent === 'LB',
+   'a bumper is drawn as a bumper and says which', btn(r[0]).className);
+ok(btn(r[1]).classList.contains('dpad') && btn(r[1]).querySelector('svg .g-dim'),
+   'and a D-pad direction as the D-pad with that arm picked out', btn(r[1]).className);
 
 // ---- hides cleanly, and an old-shape payload (pre-fix caller) is inert -----
 msg({ action: 'worldActions', show: false });

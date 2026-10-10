@@ -217,52 +217,130 @@
                 <span class="vname" id="veh-model"></span>
             </div>
             <div id="veh-foot">
-                <!-- Tracker, engine, fuel.
-                     Engine and fuel carry a RING that fills to the real reading,
-                     because "how much" is the question you actually have about
-                     them; the tracker has no quantity, so it gets no ring and
-                     says what it has to say in colour alone. Door lock status is
-                     qbx_vehiclekeys's job now, not vice_hud's -- this pip is
-                     driven entirely by whatever other resource calls
-                     exports.vice_hud:SetVehicleTracker, and stays hidden until
-                     one does. -->
+                <!-- ONE SVG PER PIP, ring and glyph together.
+                     They used to be two elements: the ring an SVG laid over
+                     the disc, the glyph a second box centred inside it by
+                     flexbox. The browser places every element on whole
+                     pixels, each rounded on its own, and on a disc under
+                     thirty pixels across that left a glyph up to a pixel off
+                     the centre of its own ring, in whichever direction the
+                     rounding fell: centred according to the layout, visibly
+                     not centred on screen. Inside a single SVG everything is
+                     drawn in one coordinate system, 36 units to the disc with
+                     its centre at (18, 18), and cannot drift apart.
+
+                     Each glyph is 24-unit art inside a group that scales it
+                     and puts its middle on (18, 18): equal space above and
+                     below, equal space left and right. The one exception is
+                     the pump, across: its outline runs out to a thin nozzle
+                     on the right while nearly all of its ink is the body on
+                     the left, so centred on its outline it reads as sitting
+                     left, and it is placed on its WEIGHT across instead.
+                     Sizes are the reference's: engine and pump about half
+                     the ring across (scale 1), the nitrous mark 44% (0.748),
+                     the tracker, which has no ring to clear, about 56%.
+
+                     The outer .pip-glyph group is there for the editor: its
+                     Font size row scales the glyph and its Icon size row the
+                     disc, and style.css turns the ratio of the two into a
+                     scale about the centre. -->
                 <div id="veh-pips">
                     <div class="pip unknown" id="pip-tracker" title="tracker">
-                        <svg class="pip-glyph" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 21s7-7.58 7-12A7 7 0 0 0 5 9c0 4.42 7 12 7 12z"/>
-                            <circle cx="12" cy="9" r="2.4"/>
+                        <svg class="pip-art" viewBox="0 0 36 36" aria-hidden="true">
+                            <!-- A solid pin with a hole in its head, standing
+                                 on a small flat ring: the reference's own
+                                 mark, 18 x 17 px in a 32 px disc. Pin and
+                                 ring together run x 3.3..20.7, y 2.5..21.8 in
+                                 the 24 box: middle (12, 12.15). -->
+                            <g class="pip-glyph">
+                                <g transform="translate(5.4 5.24) scale(1.05)">
+                                    <ellipse cx="12" cy="17.6" rx="7.6" ry="3.1" fill="none" stroke="currentColor" stroke-width="2.2"/>
+                                    <path fill-rule="evenodd" d="M12 2.5c-3 0-5.4 2.4-5.4 5.4 0 3.9 5.4 9.1 5.4 9.1s5.4-5.2 5.4-9.1c0-3-2.4-5.4-5.4-5.4zm0 3.2a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4z"/>
+                                </g>
+                            </g>
                         </svg>
                     </div>
                     <div class="pip unknown gauge" id="pip-engine" title="engine">
-                    <!-- The gauge. pathLength="100" is the whole trick: it
-                         relabels the circle's own length as 100 units, so the
-                         dash offset is a percentage directly and nothing has to
-                         know the radius or carry 2*pi*r around. -->
-                    <svg class="pip-ring" viewBox="0 0 36 36" aria-hidden="true">
-                        <circle class="pip-track" cx="18" cy="18" r="15.6" pathLength="100"/>
-                        <circle class="pip-fill" cx="18" cy="18" r="15.6" pathLength="100"/>
-                    </svg>
-                        <!-- Reference art (see README credit), stripped of its
-                             own baked-in disc so only the glyph remains --
-                             the pip's dark disc and ring already do that job.
-                             Masked rather than inline SVG so the exact
-                             reference shape ships as-is, still tinted by the
-                             same currentColor tone system as every other pip. -->
-                        <span class="pip-glyph pip-glyph-engine" aria-hidden="true"></span>
+                        <svg class="pip-art" viewBox="0 0 36 36" aria-hidden="true">
+                            <!-- The gauge. pathLength="100" is the whole trick:
+                                 it relabels the circle's own length as 100
+                                 units, so the dash offset is a percentage
+                                 directly and nothing has to know the radius or
+                                 carry 2*pi*r around. Turned a quarter back so
+                                 it starts at the top; a circle starts at
+                                 three on the clock face. -->
+                            <g class="pip-ring" transform="rotate(-90 18 18)">
+                                <circle class="pip-track" cx="18" cy="18" r="16.9" pathLength="100"/>
+                                <circle class="pip-fill" cx="18" cy="18" r="16.9" pathLength="100"/>
+                            </g>
+                            <!-- Reference art (see README credit), stripped of
+                                 its own baked-in disc so only the glyph
+                                 remains. Used as a MASK over a currentColor
+                                 rect, so the exact reference shape ships
+                                 as-is and still takes the tone of the pip
+                                 like every other glyph. Its ink is centred
+                                 in the file both ways: (12, 12). -->
+                            <g class="pip-glyph">
+                                <g transform="translate(6 6) scale(1)">
+                                    <mask id="pip-mask-engine" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+                                        <image href="icons/badge_engine_glyph.png" x="0" y="0" width="24" height="24"/>
+                                    </mask>
+                                    <rect x="0" y="0" width="24" height="24" fill="currentColor" mask="url(#pip-mask-engine)"/>
+                                </g>
+                            </g>
+                        </svg>
                     </div>
                     <div class="pip unknown gauge" id="pip-fuel" title="fuel">
-                    <!-- The gauge. pathLength="100" is the whole trick: it
-                         relabels the circle's own length as 100 units, so the
-                         dash offset is a percentage directly and nothing has to
-                         know the radius or carry 2*pi*r around. -->
-                    <svg class="pip-ring" viewBox="0 0 36 36" aria-hidden="true">
-                        <circle class="pip-track" cx="18" cy="18" r="15.6" pathLength="100"/>
-                        <circle class="pip-fill" cx="18" cy="18" r="15.6" pathLength="100"/>
-                    </svg>
-                        <!-- Same reference art / masking approach as the engine
-                             glyph above; see the comment there and the README
-                             credit. -->
-                        <span class="pip-glyph pip-glyph-fuel" aria-hidden="true"></span>
+                        <svg class="pip-art" viewBox="0 0 36 36" aria-hidden="true">
+                            <g class="pip-ring" transform="rotate(-90 18 18)">
+                                <circle class="pip-track" cx="18" cy="18" r="16.9" pathLength="100"/>
+                                <circle class="pip-fill" cx="18" cy="18" r="16.9" pathLength="100"/>
+                            </g>
+                            <!-- Same art and masking as the engine. The ink of
+                                 the pump is 8.9% LEFT of the middle of its
+                                 file (its bounding box runs out to the thin
+                                 nozzle on the right, its weight does not), so
+                                 across it is placed on its centre of mass,
+                                 x = 9.864; down, on the middle of the file. -->
+                            <g class="pip-glyph">
+                                <g transform="translate(8.136 6) scale(1)">
+                                    <mask id="pip-mask-fuel" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+                                        <image href="icons/badge_fuel_glyph.png" x="0" y="0" width="24" height="24"/>
+                                    </mask>
+                                    <rect x="0" y="0" width="24" height="24" fill="currentColor" mask="url(#pip-mask-fuel)"/>
+                                </g>
+                            </g>
+                        </svg>
+                    </div>
+                    <!-- Nitrous. Last in the row, where the reference puts it.
+                         Hidden until something reports a kit on the car you
+                         are driving (see the Nitrous section in client.lua):
+                         most cars have none, and an empty ring on every one of
+                         them would be a gauge for a thing that is not there.
+                         The ring is the tank. The glyph is the mark from the
+                         reference, measured off the footage: a wide, heavy
+                         chevron with a much smaller one tucked under it, NOT
+                         two equal chevrons, which is the generic "double up"
+                         icon and reads as a different symbol at this size.
+                         Filled rather than stroked, and `currentColor` like
+                         every other glyph in the row. -->
+                    <div class="pip unknown gauge hidden" id="pip-nitrous" title="nitrous">
+                        <svg class="pip-art" viewBox="0 0 36 36" aria-hidden="true">
+                            <g class="pip-ring" transform="rotate(-90 18 18)">
+                                <circle class="pip-track" cx="18" cy="18" r="16.9" pathLength="100"/>
+                                <circle class="pip-fill" cx="18" cy="18" r="16.9" pathLength="100"/>
+                            </g>
+                            <!-- 0.748, not 0.68: the reference mark spans 44%
+                                 of its disc, a little more than the others.
+                                 The two chevrons run y 3.55..20.4, so their
+                                 middle is (12, 11.975). -->
+                            <g class="pip-glyph">
+                                <g transform="translate(9.024 9.043) scale(0.748)">
+                                    <path d="M12 3.55 22.6 14.15 20 16.75 12 8.75 4 16.75 1.4 14.15Z"/>
+                                    <path d="M12 12.95 17.4 18.35 15.35 20.4 12 17.05 8.65 20.4 6.6 18.35Z"/>
+                                </g>
+                            </g>
+                        </svg>
                     </div>
                 </div>
             </div>
@@ -487,26 +565,82 @@
         </svg>
     </div>
 
-    <!-- Race lap / checkpoint HUD --------------------------------------------
+    <!-- Race HUD --------------------------------------------------------------
          Fed entirely by whatever race resource is running -- sk_streetkings
          today, via exports.vice_hud:SetLapTimer -- the same "this resource
          draws it, doesn't know who's feeding it" pattern as the weapon/equip
-         wheels. Not a /movehud element yet; fixed placement, first pass, not
-         pixel-measured against the reference the way the minimap was.
+         wheels. Not a /movehud element yet; fixed placement, bottom right.
 
-         "LAP 1/2" is plain outlined text, no box, matching the reference.
-         The checkpoint count sits in its own small plate with a row of pips
-         underneath -- a simplified stand-in for the reference's checkered
-         progress bar, which is too blurry in the source frames to reproduce
-         exactly (see the CSS). The timer sits below the plate, outside it,
-         large and unboxed, same as the reference. -->
+         Three rows, right-aligned, measured off the reference race footage:
+
+           PROGRESS [30%]     label, then the figure in its own dark chip
+           [ 1 / 6 |]         the chequered plate: POSITION in the field, with
+                              the pink bar down its right edge
+           00:30.39           the clock, large and unboxed
+
+         The plate carries position when the race resource sends one and falls
+         back to the checkpoint count when it does not, so a solo time trial
+         still has something to put there. "LAP 1/2" is only drawn for a race
+         that actually has more than one lap -- the reference is point to
+         point and shows none. -->
     <div id="lap-hud" class="hidden" aria-hidden="true">
-        <div id="lap-badge">LAP <span id="lap-cur">1</span>/<span id="lap-total">1</span></div>
+        <div id="lap-badge" class="hidden">LAP <span id="lap-cur">1</span>/<span id="lap-total">1</span></div>
+        <div id="lap-progress">
+            <span id="lap-progress-label">PROGRESS</span>
+            <span id="lap-progress-chip"><span id="lap-progress-pct">0</span>%</span>
+        </div>
         <div id="lap-cp-plate">
             <div id="lap-cp-row"><span id="lap-cp-cur">0</span> / <span id="lap-cp-total">0</span></div>
-            <div id="lap-cp-track"></div>
         </div>
         <div id="lap-timer">00:00.00</div>
+    </div>
+
+    <!-- Race cards ------------------------------------------------------------
+         The two top-centre cards a race shows, measured off the reference race
+         footage. They are one element because they are one layout: a small
+         chip, a big line, a small chip, any of which can be left out.
+
+           before the start     [ HIT 'N' RUN VC ]      series / organiser
+                              SALTON TO WANING SANDS     the race
+                                 [ GROUP RACE ]          the kind of race
+
+           at the finish               1ST               where you placed
+                                  [ 01:28.893 ]          your time
+
+         Both CUT in and out -- 1.9 s and 2.0 s on screen in the reference,
+         with no fade or slide at either end -- so there is no transition here
+         to get wrong. Fed by exports.vice_hud:ShowRaceTitle / ShowRaceResult. -->
+    <div id="race-card" class="hidden" aria-hidden="true">
+        <div id="race-card-top" class="race-chip"></div>
+        <div id="race-card-main"></div>
+        <div id="race-card-sub" class="race-chip"></div>
+    </div>
+
+    <!-- 3, 2, 1, go. One glyph at a time, top centre, cut in and cut out: each
+         digit is up for 0.3 s a second apart and "go" for 1.1 s. -->
+    <div id="race-count" class="hidden" aria-hidden="true"></div>
+
+    <!-- Nitrous hint ----------------------------------------------------------
+         "Hold [key] to activate nitrous (icon)" -- the one-line tip the
+         reference shows top-left the first time a car has nitrous to use.
+         Shown by client.lua's Nitrous section when a kit is fitted, or on
+         demand through exports.vice_hud:ShowNitrousHint. The key cap is the
+         same .glyph the action prompts use, so it follows the player's live
+         bind and input device the same way. -->
+    <div id="nitro-hint" class="hidden" aria-hidden="true">
+        <span id="nitro-hint-pre">Hold</span>
+        <span id="nitro-hint-key" class="glyph"></span>
+        <span id="nitro-hint-post">to activate nitrous</span>
+        <!-- Disc and mark in one SVG, for the same reason the pips are: two
+             boxes are rounded to the pixel separately and drift apart. The
+             middle of the mark (12, 11.975) sits on the disc's (18, 18). -->
+        <svg id="nitro-hint-icon" viewBox="0 0 36 36" aria-hidden="true">
+            <circle class="nitro-hint-disc" cx="18" cy="18" r="18"/>
+            <g class="nitro-hint-mark" transform="translate(7.56 7.582) scale(0.87)">
+                <path d="M12 3.55 22.6 14.15 20 16.75 12 8.75 4 16.75 1.4 14.15Z"/>
+                <path d="M12 12.95 17.4 18.35 15.35 20.4 12 17.05 8.65 20.4 6.6 18.35Z"/>
+            </g>
+        </svg>
     </div>
 
     <!-- Action prompts ---------------------------------------------------- -->
@@ -830,5 +964,12 @@
      effects of its own, so order is the whole of the contract. -->
 <script src="makes.js"></script>
 <script src="app.js"></script>
+
+<!-- Targeting's screen-space page: the /targetadmin panel, /targetui
+     preferences and the rail's sounds. It was osm-target's own ui_page; a
+     resource has one, so it lives here as a frame and app.js passes its
+     messages through (see onTargetNui). Clicks reach it only while one of its
+     panels is open. -->
+<iframe id="target-ui" src="../target/html/index.html" title="targeting" tabindex="-1"></iframe>
 </body>
 </html>

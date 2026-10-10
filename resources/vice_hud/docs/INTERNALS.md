@@ -563,7 +563,7 @@ set. The whole directory is about 400 kB.
 
 #### The status pips
 
-Tracker, engine and fuel, in that order. Each is a dark disc with coloured ink;
+Tracker, engine, fuel and nitrous, in that order. Each is a dark disc with coloured ink;
 engine and fuel also carry a **ring that fills to the real reading**, so the
 strip answers "how much fuel" and "how broken" rather than only "is it bad yet".
 
@@ -591,6 +591,39 @@ hide from a search should not also blind the HUD about it.
 | Tracker | clear | searching | spotted | none |
 | Engine | health >= 700 | >= 300 | below that, including the negatives a destroyed engine reports | health / 10 |
 | Fuel | above 25% | 25% or less | 10% or less | fuel % |
+| Nitrous | — | — | — | tank level; ice blue when usable, grey while locked out |
+
+**Nitrous is the fourth pip and the only one that is a control rather than a
+warning.** vice_hud does not run a nitrous system; the Nitrous section of
+`client.lua` reads one table — `{ installed, level, active, ready }` — from
+the local player's state bag (`Config.NitrousStateBag`) on every status tick,
+listens for the bag changing so the ring can move faster than the tick, and
+accepts the same table through `exports.vice_hud:SetVehicleNitrous`. The
+vehicle push carries it to the page as `nitrous`, and that push is what shows
+or hides the pip; the separate `nitrous` message only repaints a pip that is
+already up.
+
+The pip is drawn for as long as `installed` is true, collapsed or not and
+full or not, and not at all otherwise — most cars have no kit. Its tone is
+deliberately off the green / amber / red scale: a tank is never a problem,
+only usable or not. `active` changes nothing visually. The ring draining is
+the boost indicator, as in the reference, and **the ring's dash offset is the
+only thing in the nitrous UI that animates** — no pulse, no glow, nothing on
+the glyph.
+
+On a car with a kit the collapsed row is the reference's row: engine, fuel,
+nitrous. The two that would have been hidden for having nothing to report are
+drawn **quiet** instead — dim disc, grey glyph, no ring — and pick their
+colour and ring back up when they have a warning to give. Cars without a kit
+are unaffected.
+
+The **tip** ("Hold [key] to activate nitrous") is `#nitro-hint`, fed by the
+`nitrousHint` message. The same section of `client.lua` decides when: the
+reading going from no kit to kit more than 1.5 s after the vehicle was
+entered, never on the first reading after a resource start, once per vehicle.
+The key cap comes from the table's `command` (a key mapping, resolved to the
+live bind) or `key`. `tools/nitrous.test.js` runs that section for real
+against stubbed natives.
 
 The ring is drawn with `pathLength="100"` on the SVG circle, which relabels the
 circle's own length as 100 units so the dash offset *is* the percentage — no

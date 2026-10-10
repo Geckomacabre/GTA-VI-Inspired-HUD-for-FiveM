@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  osm-target NUI/DUI entry.
+
+  The same bundle serves four surfaces, chosen by the `surface` query parameter:
+    (none)            the screen-space NUI page: admin panel, preferences, sound
+    ?surface=menu     the in-world menu DUI (1024x1024)
+    ?surface=indicator&state=idle|near|active   the indicator DUIs (256x256)
+    ?surface=cursor   the sweep cursor DUI (128x128)
+
+  Transparency is forced inline as well as in CSS so the page never flashes an
+  opaque rectangle over the game before styles load.
+-->
+<html lang="en" class="dark" data-theme="dark" style="background: transparent !important;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>osm-target</title>
+    <!-- The house faces only. A design that wants its own typography ships it
+         in its own pack and registers it on load, so the host does not carry
+         link tags for designs a server may not have installed. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        overflow: hidden;
+        background: transparent !important;
+        background-color: transparent !important;
+        -webkit-user-select: none; user-select: none;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+    </style>
+  </head>
+  <body style="background: transparent !important;">
+    <div id="root" style="background: transparent !important;"></div>
+    <div id="modal-root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
