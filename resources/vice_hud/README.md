@@ -640,6 +640,19 @@ parts still load together.
 
 None of this has been run on a live server from this repository yet.
 
+## Something in your hands that is not a weapon
+
+The weapon icon's place in the top-right corner also shows what you are
+holding when it is not a weapon. `Config.HeldIcons` lists player state bag
+keys and the image for each; `gk_basketball` sets `bbBall` while you have the
+ball, so a basketball shows there, from ox_inventory's own item art like the
+weapon icons. A weapon in hand always wins.
+
+```lua
+exports.vice_hud:SetHeldIcon('nui://ox_inventory/web/images/basketball.png')   -- or any image
+exports.vice_hud:SetHeldIcon(nil)                                              -- clear
+```
+
 ## The drawn minimap: flat colour, sea and sand, buildings standing
 
 The reference minimap is not GTA V's dark radar. It is the map in flat colour,

@@ -3123,6 +3123,36 @@ local function wheelHeld()
         or NetworkIsInTutorialSession()
 end
 
+-- [held icon] ---------------------------------------------------------------
+-- Something in the hands that the game does not call a weapon -- a basketball
+-- -- shown where the weapon icon goes. Config.HeldIcons says which player state
+-- bag keys mean "holding one" and what to show; SetHeldIcon lets a script say
+-- so directly.
+local heldOverride = nil
+
+exports('SetHeldIcon', function(icon)
+    heldOverride = (type(icon) == 'string' and icon ~= '') and icon or nil
+end)
+
+local function heldIcon()
+    if heldOverride then return heldOverride end
+
+    local list = Config.HeldIcons
+    if type(list) ~= 'table' then return nil end
+
+    local state = LocalPlayer and LocalPlayer.state
+    if not state then return nil end
+
+    for i = 1, #list do
+        local entry = list[i]
+        if type(entry) == 'table' and entry.state and entry.icon and state[entry.state] then
+            return entry.icon
+        end
+    end
+    return nil
+end
+-- [/held icon] --------------------------------------------------------------
+
 CreateThread(function()
     -- loadMinimapPref() used to be called here; moved to run synchronously
     -- right after its own definition, above -- see the comment there.
@@ -3389,7 +3419,13 @@ CreateThread(function()
                 ui('weapon', { armed = true, icon = icon })
             end
         else
-            ui('weapon', { armed = false })
+            -- No weapon out. Something else in the hands takes the icon's place.
+            local held = heldIcon()
+            if held then
+                ui('weapon', { armed = true, icon = held })
+            else
+                ui('weapon', { armed = false })
+            end
         end
 
         -- ---- money --------------------------------------------------------
