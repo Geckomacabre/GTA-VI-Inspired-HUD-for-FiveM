@@ -1085,6 +1085,22 @@
             var btn = setGlyph(document.createElement('span'), opt.glyph, opt.device, 'wa-btn glyph');
             row.appendChild(btn);
 
+            // Between the button and the name: three dots on a dark disc for
+            // an option that opens a list, or a coloured dot.
+            if (opt.more) {
+                var more = document.createElement('span');
+                more.className = 'wa-more';
+                more.innerHTML = '<svg viewBox="0 0 36 36" aria-hidden="true">'
+                    + '<circle class="wa-more-disc" cx="18" cy="18" r="16.4"/>'
+                    + '<circle cx="18" cy="11" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="18" cy="25" r="2"/></svg>';
+                row.appendChild(more);
+            } else if (opt.dot) {
+                var dot = document.createElement('span');
+                dot.className = 'wa-dot';
+                if (typeof opt.dot === 'string' && /^#[0-9a-f]{3,8}$/i.test(opt.dot)) dot.style.background = opt.dot;
+                row.appendChild(dot);
+            }
+
             var label = document.createElement('span');
             label.className = 'wa-label';
             label.textContent = opt.label || '';
@@ -1092,6 +1108,7 @@
 
             box.appendChild(row);
         });
+        box.classList.toggle('wa-centred', !!d.centred);
         show(box, true);
     }
 

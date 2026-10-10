@@ -27,6 +27,7 @@ local pinOffset = nil            -- Entity-local hit point the toggle was presse
 local lastFollow = 0
 
 local anchor                     -- World position where interface surface is anchored
+local keyless = false            -- Opened by Machine.open, with no key held (Config.Proximity)
 local stateSince = 0
 local releaseSince = nil
 local lastRevalidate = 0
@@ -452,6 +453,7 @@ local function release()
       setState(SWEEPING)
       lastScan = 0
     else
+      keyless = false
       setState(IDLE)
       Machine.teardown()
     end
@@ -462,6 +464,7 @@ end
 function Machine.abort()
   if state == IDLE then return end
   requested = false
+  keyless = false
   state = IDLE
   target, anchor, resolved = nil, nil, {}
   menuName, menuHistory, releaseSince = nil, {}, nil
@@ -671,6 +674,8 @@ local function blocked()
     or (type(lib.progressActive) == 'function' and lib.progressActive())
 end
 
+function Machine.blocked() return blocked() end
+
 local function targetStillValid()
   if not target then return false end
 
@@ -727,7 +732,10 @@ local function logicTick()
     anchor = Hit.anchor(target, resolved)
     target.distance = Hit.distance(target, anchor, resolved)
 
-    if target.distance > Config.Interaction.distance + 1.5 then
+    -- A keyless list is on a shorter lead: it came up at arm's length, and
+    -- walking off is one of the ways it closes.
+    local lead = keyless and Config.Proximity and Config.Proximity.distance or Config.Interaction.distance
+    if target.distance > lead + 1.5 then
       release()
       return
     end
@@ -753,7 +761,12 @@ local function logicTick()
 
     local lookingAtTarget = scan ~= nil and scan.entity == target.entity
 
-    if angle > Config.Interaction.releaseAngle then
+    -- A list opened from a walk-up prompt was never aimed at to begin
+    -- with (the prompt takes anything in a wide cone), so looking away is not
+    -- how it closes: picking, cancelling and walking off are.
+    if keyless then
+      releaseSince = nil
+    elseif angle > Config.Interaction.releaseAngle then
       if lookingAtTarget then
         releaseSince = nil
       else
@@ -832,7 +845,7 @@ local function drawTick()
   -- Render aiming cursor: draw screen-space reticle or animate transition on target lock
   if state == SWEEPING then
     Surfaces.drawScreen('cursor', 0.5, 0.5, render.cursorSize * scaleFactor, aspect, 255)
-  elseif state == MAGNETISED and anchor and not Appearance.prefs.reducedMotion then
+  elseif state == MAGNETISED and anchor and not keyless and not Appearance.prefs.reducedMotion then
     local openTime = math.max(1, Config.Interaction.openTime)
     local t = (GetGameTimer() - stateSince) / openTime
     if t < 0.0 then t = 0.0 elseif t > 1.0 then t = 1.0 end
@@ -886,21 +899,9 @@ local function drawTick()
   end
 end
 
-function Machine.start()
-  if disabled then return end
-  requested = true
-  if state ~= IDLE then return end
-  if blocked() then return end
-
-  -- Every hold starts on the job's own options; letting go is the way back.
-  Layers.reset()
-
-  Surfaces.init()
-  Discovery.run(true)
-  setState(SWEEPING)
-  lastScan = 0
-  Nui.sfx('sweep')
-
+---The two loops that run for as long as targeting is up: input and drawing
+---every frame, the state machine beside them.
+local function runLoops()
   CreateThread(function()
     while state ~= IDLE do
       Input.suppress()
@@ -947,6 +948,11 @@ function Machine.start()
               break
             end
           end
+
+          -- A keyless list has no aim to move away from, so cancel has to
+          -- close it in this mode as well -- after the option keys have had
+          -- the press, for the one that shares cancel's button.
+          if keyless and state == MENU_OPEN and Input.cancelPressed() then Machine.cancel() end
         end
       elseif state == SWEEPING then
         if Input.cancelPressed() then Machine.abort() end
@@ -966,6 +972,93 @@ function Machine.start()
       Wait(state == MENU_OPEN and 30 or 0)
     end
   end)
+end
+
+function Machine.start()
+  if disabled then return end
+  requested = true
+  if state ~= IDLE then return end
+  if blocked() then return end
+
+  -- The key takes over from a walk-up prompt.
+  if Proximity then Proximity.hide() end
+
+  -- Every hold starts on the job's own options; letting go is the way back.
+  Layers.reset()
+
+  Surfaces.init()
+  Discovery.run(true)
+  setState(SWEEPING)
+  lastScan = 0
+  Nui.sfx('sweep')
+
+  runLoops()
+end
+
+---Open the list on a target with no key held (Config.Proximity): what the
+---targeting key and a moment of aim do, done in one step for a target the
+---walk-up prompt already found. `menu` goes straight into that submenu.
+---The session ends when the list closes -- there is no key to fall back to.
+---@param candidate table a target descriptor with an `anchor`
+---@param menu string? submenu to open on
+---@return boolean opened
+function Machine.open(candidate, menu)
+  if disabled or state ~= IDLE or blocked() then return false end
+
+  requested = false
+  keyless = true
+
+  Surfaces.init()
+  Discovery.run(true)
+  setState(SWEEPING)
+  lastScan = GetGameTimer()
+
+  magnetise(candidate)
+  if state ~= MAGNETISED then
+    Machine.abort()
+    return false
+  end
+
+  if menu then
+    menuName = menu
+    resolveTarget()
+    if #resolved == 0 then
+      Machine.abort()
+      return false
+    end
+    anchor = Hit.anchor(target, resolved)
+  end
+
+  runLoops()
+  return true
+end
+
+---Run one option of a target with no key held and no list (Config.Proximity),
+---with the same last-moment check the list's confirm makes.
+---@param candidate table a target descriptor with an `anchor`
+---@param entry table a resolved entry of it
+---@return boolean ran
+function Machine.execute(candidate, entry)
+  if disabled or state ~= IDLE or blocked() then return false end
+
+  local option = entry.option
+  target, anchor = candidate, candidate.anchor
+
+  Player.refresh()
+  local allowed, reason = Resolver.canExecute(option, Hit.context(target, nil), target.distance)
+
+  if allowed then
+    Nui.sfx('confirm')
+    execute(option)
+  else
+    Nui.sfx('reject')
+    if reason then Bridge.Notify(reason, 'error') end
+  end
+
+  -- The option may have yielded, and the targeting key gone down meanwhile:
+  -- only clear what is still ours.
+  if state == IDLE and target == candidate then target, anchor = nil, nil end
+  return allowed and true or false
 end
 
 ---Stop interaction: initiate release transition or abort sweep.

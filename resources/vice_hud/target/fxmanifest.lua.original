@@ -48,6 +48,7 @@ client_scripts {
   'client/target/hit.lua',
   'client/target/input.lua',
   'client/target/machine.lua',
+  'client/target/proximity.lua',
   'client/target/defaults.lua',
   'client/ui/nui.lua',
   'client/config_sync.lua',

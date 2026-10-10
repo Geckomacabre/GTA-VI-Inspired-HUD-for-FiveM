@@ -65,6 +65,45 @@ Config.Options = {
 }
 ```
 
+### Walk-up prompts (`Config.Proximity`)
+
+No key held. Nothing shows until the player walks up to something; then the
+prop, item or zone in reach and in front of them shows what can be done with
+it, each option beside the key or pad button that does it, and that key does
+it. Walking away takes the prompt down. The targeting key still works as
+before and is how everything left out of this is reached.
+
+```lua
+Config.Proximity = {
+    enabled = true,
+    distance = 2.0,       -- Metres before a prompt comes up
+    angle = 30.0,         -- Degrees either side of where the camera looks
+    peds = false,         -- Peds and players stay behind the targeting key
+    vehicles = 'named',   -- 'named' (only Config.Input.directKeyByName), 'all', or false
+    inVehicle = false,    -- No prompts while driving
+    maxDirect = 1,        -- More options than this: one prompt, with three dots, that opens the list
+    keys = { ... },       -- E (Y / Triangle on a pad) first; the rest matter with maxDirect above 1
+    blocks = { ... },     -- Game controls switched off while their button is a prompt
+}
+```
+
+- An option can settle it for itself: `proximity = true` shows it without the
+  key whatever it is on (a shop clerk, say), `proximity = false` keeps it
+  behind the key.
+- One option is a button and its name. More than one, or an option that opens
+  a submenu, is a button, three dots and a name; pressing it opens the list on
+  that target, which closes on a pick, on cancel, or on walking away. The
+  list's name is "Interact" unless one of its options carries
+  `targetName = 'Fridge'`.
+- Options that each have their own key in `Config.Input.directKeyByName`
+  (Slim Jim, Smash Window) always stand side by side, each on its button.
+- `dot = true` (or a `'#rrggbb'`) on an option draws a coloured dot before its
+  name, for something on sale.
+- With `vice_hud` running the prompt is its world prompt
+  (`exports.vice_hud:ShowWorldActions`), drawn with the player's own key or pad
+  button and redrawn when they change device. Without it the active design
+  draws it as a direct prompt.
+
 ---
 
 ## Targeting Hysteresis Parameters

@@ -238,6 +238,15 @@ keyboard and they become key caps and the mouse.
 | `Config.PadGlyphs = 'playstation'` | cross circle square triangle, L1 R1 L2 R2, Options / touchpad |
 | `/hudpad xbox` / `/hudpad playstation` | a player's own choice, remembered for them; it wins over the config |
 
+A world prompt option can carry `more = true` (three dots on a disc between
+the button and the name: it opens a list) or `dot = true` / `'#rrggbb'` (a
+coloured dot there). `ShowWorldActions(options, coords, opts)` takes
+`{ compact = false }` to keep the name at any distance, `{ centred = true }` to
+put the button on the point itself, and `{ id = 'my_resource' }` so that
+`HideWorldActions('my_resource')` only takes down a prompt that is still that
+resource's. `SetWorldActionsCoords(coords, id)` moves a prompt that is up.
+The merged targeting's walk-up prompts (`Config.Proximity`) are drawn with it.
+
 `ShowActionPrompt` and `ShowWorldActions` take a control id (or an ox_lib
 keybind's `.hash`) as before and need nothing new: the button is resolved from
 the live bind by `client_glyphs.lua`. A prompt with `opts.hold` gets a ring

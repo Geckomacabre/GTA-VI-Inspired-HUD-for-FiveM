@@ -26,6 +26,7 @@ Locales['en'] = {
 
   go_back = 'Back',
   no_options = 'Nothing to do here',
+  interact = 'Interact',
   toggle_targeting = 'Interact (osm-target)',
   toggle_layer = 'Switch interaction set while targeting (osm-target)',
   layer_primary = 'Job actions',

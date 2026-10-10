@@ -499,7 +499,8 @@ local function waResolveAll()
     if waOptions then
         for i, opt in ipairs(waOptions) do
             local glyph, device = waResolveKey(opt.key)
-            resolved[i] = { label = opt.label, glyph = glyph, device = device }
+            resolved[i] = { label = opt.label, glyph = glyph, device = device,
+                            more = opt.more and true or nil, dot = opt.dot or nil }
         end
     end
     return resolved, ViceGlyphs.device()
@@ -522,6 +523,9 @@ end
 -- #world-actions just stays on its own CSS fixed position, unchanged from
 -- before this existed.
 local waCoords = nil
+local waCompact = true    -- the label drops away at range, unless the caller says otherwise
+local waCentred = false   -- the first button sits ON the point instead of beside it
+local waOwner = nil       -- who put the prompt up, when they said (opts.id)
 
 -- Also drives the icon-only-at-range / full-label-up-close split ("both" of
 -- the two prop-prompt options considered): computed locally here each frame
@@ -534,19 +538,42 @@ local WA_COMPACT_DISTANCE = 1.5
 --- options: array of { label, key } -- key is a native GTA control ID
 --- (see PAD::IS_CONTROL_PRESSED's `action` param) or an ox_lib keybind's
 --- own `.hash` field, exactly as ShowActionPrompt's `key` already works.
+--- An option may also carry `more = true` (it opens a list: three dots on a
+--- dark disc between the button and its name, FRIDGE in the reference) and
+--- `dot = true` or a '#rrggbb' (a coloured dot there instead, the reference's
+--- mark for something on sale).
 --- coords (optional): vector3 world point to anchor the prompt to -- see
 --- the world-anchoring comment above. Omit it for the old fixed-position
 --- behaviour.
-exports('ShowWorldActions', function(options, coords)
+--- opts (optional): { compact = false } keeps the label at any distance;
+--- { centred = true } puts the first button on the point itself, as the
+--- reference does, rather than beside it; { id = 'my_resource' } names who
+--- put it up, so that HideWorldActions('my_resource') only takes down a
+--- prompt that is still theirs. There is one world prompt, and the last one
+--- shown is the one on screen.
+exports('ShowWorldActions', function(options, coords, opts)
     waOptions = options or {}
     waCoords = coords
+    waCompact = not (type(opts) == 'table' and opts.compact == false)
+    waCentred = type(opts) == 'table' and opts.centred == true
+    waOwner = type(opts) == 'table' and opts.id or nil
     local resolved, device = waResolveAll()
     waDevice = device
-    ui('worldActions', { show = true, options = resolved })
+    ui('worldActions', { show = true, options = resolved, centred = waCentred })
 end)
-exports('HideWorldActions', function()
+--- Move a prompt that is up to a new point, without rebuilding it (a door
+--- swinging, something being carried). Nothing if no prompt is up.
+exports('SetWorldActionsCoords', function(coords, id)
+    if id ~= nil and waOwner ~= id then return end
+    if waOptions and coords then waCoords = coords end
+end)
+--- id (optional): only hide a prompt put up under that id; another script's
+--- prompt, shown since, is left alone. No id hides whatever is up.
+exports('HideWorldActions', function(id)
+    if id ~= nil and waOwner ~= id then return end
     waOptions = nil
     waCoords = nil
+    waOwner = nil
     ui('worldActions', { show = false })
 end)
 
@@ -556,7 +583,7 @@ end)
 ViceGlyphs.onDevice(function(device)
     if not waOptions then return end
     waDevice = device
-    ui('worldActions', { show = true, options = (waResolveAll()) })
+    ui('worldActions', { show = true, options = (waResolveAll()), centred = waCentred })
 end)
 
 -- The world-anchoring thread itself -- see waCoords's own comment above for
@@ -573,7 +600,7 @@ CreateThread(function()
                 show = onScreen,
                 x = sX,
                 y = sY,
-                compact = #(playerCoords - waCoords) > WA_COMPACT_DISTANCE,
+                compact = waCompact and #(playerCoords - waCoords) > WA_COMPACT_DISTANCE,
             })
             Wait(0)
         else
@@ -589,6 +616,7 @@ RegisterCommand('hudworldactions', function()
     exports.vice_hud:ShowWorldActions({
         { label = 'Slim Jim', key = 47 },
         { label = 'Smash Window', key = 51 },
+        { label = 'Fridge', key = 74, more = true },
     })
     print('^3[vice_hud]^7 /hudworldactions — sample data. /hudworldactionsoff to clear.')
 end, false)

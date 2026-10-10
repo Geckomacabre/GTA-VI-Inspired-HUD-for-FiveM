@@ -4577,9 +4577,33 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 .wa-row {
     display: flex;
     align-items: center;
-    gap: 0.5cqh;
+    /* 13px from the edge of a 36px button to its name in the reference stills. */
+    gap: 0.8cqh;
 }
 .wa-btn { flex: 0 0 auto; }
+/* An option that opens a list: three dots on a dark disc, the size of the
+   button, between it and the name (FRIDGE in the reference). */
+.wa-more {
+    flex: 0 0 auto;
+    width: calc(3.05cqh * var(--ic-prompts, 1));
+    height: calc(3.05cqh * var(--ic-prompts, 1));
+}
+.wa-more svg { display: block; width: 100%; height: 100%; fill: #f6f2ee; }
+.wa-more .wa-more-disc { fill: rgba(40, 38, 46, 0.94); }
+/* A coloured dot in the same place: the reference's mark for something on sale. */
+.wa-dot {
+    flex: 0 0 auto;
+    width: 1.7cqh;
+    height: 1.7cqh;
+    margin: 0 0.35cqh;
+    border-radius: 50%;
+    background: #e8659f;
+}
+/* The first button sits on the point the prompt is about, its name running
+   off to the right, as the reference draws it. */
+#world-actions.wa-centred {
+    transform: translate(calc(-1.525cqh * var(--ic-prompts, 1)), calc(-1.525cqh * var(--ic-prompts, 1)));
+}
 #world-actions {
     font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
 }

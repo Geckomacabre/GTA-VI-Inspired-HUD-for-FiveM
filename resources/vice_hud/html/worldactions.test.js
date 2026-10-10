@@ -84,6 +84,25 @@ ok(btn(r[0]).classList.contains('bumper') && btn(r[0]).textContent === 'LB',
 ok(btn(r[1]).classList.contains('dpad') && btn(r[1]).querySelector('svg .g-dim'),
    'and a D-pad direction as the D-pad with that arm picked out', btn(r[1]).className);
 
+// ---- the marks between the button and the name ------------------------------
+msg({ action: 'worldActions', show: true, centred: true, options: [
+  { label: 'Fridge', glyph: 'Y', device: 'pad', more: true },
+  { label: 'Bag', glyph: 'Y', device: 'pad' },
+  { label: 'Shorts', glyph: 'E', device: 'kbm', dot: '#33cc88' },
+  { label: 'Hat', glyph: 'E', device: 'kbm', dot: 'url(x)' },
+]});
+r = rows();
+const kids = (row) => Array.from(row.children).map((n) => n.className.split(' ')[0]).join(' ');
+ok(kids(r[0]) === 'wa-btn wa-more wa-label' && r[0].querySelectorAll('.wa-more circle').length === 4,
+   'an option that opens a list has three dots on a disc between its button and its name', kids(r[0]));
+ok(kids(r[1]) === 'wa-btn wa-label', 'a plain one has nothing between them', kids(r[1]));
+ok(kids(r[2]) === 'wa-btn wa-dot wa-label' && /51,\s*204,\s*136|#33cc88/i.test(r[2].querySelector('.wa-dot').style.background),
+   'a dot takes the colour it is given', r[2].querySelector('.wa-dot').style.background);
+ok(r[3].querySelector('.wa-dot').style.background === '', 'but only a colour: anything else is the stock pink');
+ok(box().classList.contains('wa-centred'), 'and the prompt can sit with its button on the point');
+msg({ action: 'worldActions', show: true, options: [{ label: 'Bag', glyph: 'E', device: 'kbm' }] });
+ok(!box().classList.contains('wa-centred'), 'which the next prompt does not inherit');
+
 // ---- hides cleanly, and an old-shape payload (pre-fix caller) is inert -----
 msg({ action: 'worldActions', show: false });
 ok(box().classList.contains('hidden'), 'hides when told to');

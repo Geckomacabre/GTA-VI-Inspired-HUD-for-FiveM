@@ -318,9 +318,12 @@ end
 local function nearest(a, b) return a.distance < b.distance end
 
 ---Run discovery pass: evaluate nearby points and populate visible indicator list.
-function Discovery.run(force)
+---@param force boolean? ignore the interval
+---@param always boolean? run even with indicator markers switched off: the
+---  walk-up prompts need the points whether or not markers are drawn on them
+function Discovery.run(force, always)
   local settings = Config.Indicators
-  if not settings.enabled then
+  if not settings.enabled and not always then
     Discovery.points = {}
     return Discovery.points
   end

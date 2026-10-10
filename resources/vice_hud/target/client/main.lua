@@ -15,6 +15,7 @@ CreateThread(function()
 
   Nui.loadPrefs()
   Input.register()
+  Proximity.start()
 
   -- Pre-warm DUI surfaces: initialize browsers asynchronously in background
   SetTimeout(8000, function()

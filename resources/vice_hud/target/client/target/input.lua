@@ -155,6 +155,16 @@ local function pressed(control)
   return IsControlJustPressed(0, control) or IsDisabledControlJustPressed(0, control)
 end
 
+---The same two helpers for a caller with key declarations of its own
+---(Config.Proximity.keys).
+Input.controlsFor = controlsFor
+
+---@param entry table | number | number[] a control declaration
+---@return boolean pressed
+function Input.entryPressed(entry)
+  return pressed(controlsFor(entry))
+end
+
 ---Get scroll input direction: return -1 for up, 1 for down, or 0 for idle.
 ---@return -1 | 0 | 1
 function Input.scrollDelta()
@@ -234,6 +244,9 @@ local function labelFor(entry)
   local label = GetControlInstructionalButton(0, control, true)
   return label and label:sub(3) or ''
 end
+
+---Live binding text of a control declaration, as the designs want it.
+Input.keyLabel = labelFor
 
 local prompts = { device = '', confirm = '', cancel = '', padBrand = 'xbox' }
 local nextPromptCheck = 0
