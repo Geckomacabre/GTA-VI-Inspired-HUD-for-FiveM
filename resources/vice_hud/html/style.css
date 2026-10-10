@@ -2636,6 +2636,35 @@ html, body {
 }
 
 /* -----------------------------------------------------------------------------
+   The drawn minimap (map3d.js)
+   -----------------------------------------------------------------------------
+   The frame's rect, grown by a tenth of its height on every side: the island
+   is painted into the middle, exactly what the frame outlines, and the
+   overhang is there for a blip pinned to the edge to sit across it. map3d.js
+   knows the same tenth (OVERHANG) and rounds the island's corners itself, so
+   there is no border-radius here to cut a blip off.
+
+   It follows the frame's own nudges and scaling (--off-mapframe / --sc-mapframe)
+   and not its opacity: the picture brings its own see-through.
+
+   letter-spacing is how the script learns the frame's corner radius in pixels:
+   it does nothing to a canvas, and unlike the frame's own border-radius it can
+   be read while the frame is switched off.
+   -------------------------------------------------------------------------- */
+#map3d {
+    --m3d: calc(var(--map-height, 15.4cqh) * var(--sc-mapframe-y, 1) * 0.1);
+    position: absolute;
+    left: calc(var(--map-left, 1.75cqw) - var(--m3d));
+    bottom: calc(var(--map-bottom-edge, 2.6cqh) - var(--m3d));
+    width:  calc(var(--map-width, 15.8cqw) * var(--sc-mapframe-x, 1) + 2 * var(--m3d));
+    height: calc(var(--map-height, 15.4cqh) * var(--sc-mapframe-y, 1) * 1.2);
+    letter-spacing: calc((calc(0.62 * var(--w))) * var(--rad-mapframe, 1));
+    transform: translate(var(--off-mapframe-x,0cqw), var(--off-mapframe-y,0cqh));
+    transform-origin: bottom left;
+    pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------------
    Map badge
    -----------------------------------------------------------------------------
    A flat glyph in the map's own top-left corner. Anchored off the same

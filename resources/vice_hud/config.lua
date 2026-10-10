@@ -60,6 +60,55 @@ Config.HideNativeHealthBars = true
 -- Needs HideNativeHealthBars, which is what talks to the minimap.
 Config.HideSatNav = true
 
+-- The drawn minimap: the island in flat colour seen at a slant, sea and sand
+-- in their own colours and the buildings standing up, in place of the engine's
+-- radar. The look and the world it draws come from the "GTA-VI MiniMap (3D
+-- Buildings)" mod by @moddims; the frame, the player marker, the route colour,
+-- the distance figure and everything around the map stay this HUD's own.
+--
+-- IT NEEDS BUILDING FIRST. The world is that mod's survey of the map and is
+-- not in this repository:
+--
+--     python tools/map3d/build.py --mod "path/to/MiniMap.dll"
+--     python tools/map3d/blips.py --docs path/to/fivem-docs     (blip pictures)
+--
+-- Until then the page reports there is no world, one line is printed, and the
+-- engine's radar carries on exactly as before.
+--
+-- It is drawn on the HUD's page, by WebGL, because nothing else a server can
+-- hand its players is able to draw it: the engine's radar is a flat picture
+-- and cannot stand a building up. The geometry is uploaded once; after that a
+-- frame is a few dozen draw calls, and only when the player or camera moved.
+-- Each player can switch back to the engine's radar with /hudmap3d.
+Config.Map3D = {
+    enabled = true,
+
+    -- Inside a building's interior the engine's radar shows its floor plan,
+    -- which the drawn map has no version of. true hands the map back to the
+    -- engine for as long as the player is indoors.
+    engineIndoors = true,
+
+    buildings = true,       -- false: footprints only, nothing standing
+    blips = true,           -- draw the game's blips (false: none at all)
+    route = { length = 500.0 },     -- metres of GPS line to draw; false for none
+
+    view = {
+        zoom = 2.58,        -- map pixels per metre, on a panel 115 pixels tall
+        speedZoom = 0.25,   -- how far the view pulls back at speed (0 = never)
+        tilt = 0.8,         -- 0 = straight down; nearer 1 = flatter, further
+        anchor = 0.725,     -- the player marker, as a fraction down the panel
+        opacity = 0.87,     -- of the map itself; marker and blips stay solid
+        north = true,       -- the N badge (also follows /movehud's north toggle)
+    },
+
+    -- Colours, 0-255. Left out, each keeps the value in html/map3d.js.
+    paint = {
+        -- land = { 160, 155, 149 }, water = { 118, 152, 158 }, sand = { 178, 162, 134 },
+        -- road = { 172, 167, 161 }, lot = { 182, 177, 170 }, rail = { 148, 144, 140 },
+        -- roof = { 158, 159, 166 }, wall = { 146, 150, 160 },
+    },
+}
+
 -- Native HUD pieces hidden every frame because vice_hud draws its own version.
 -- Only list things we ACTUALLY replace — hiding a component we don't draw just
 -- removes information from the player:
