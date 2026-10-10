@@ -678,9 +678,6 @@ python tools/map3d/blips.py --docs path/to/fivem-docs
 
 - `build.py` writes `html/map3d/world.bin` and `ground.png`. Nothing in the
   mod is run; its map is read out of the file. Needs numpy, scipy and Pillow.
-  The mod's "buildings" include pylons, kiosks and sheds, and every one of
-  them is only an outline and a height, drawn as a flat-topped block. Those
-  under 60 m2 are left off rather than drawn as boxes (`--min-area`).
 - `blips.py` writes the sheet of blip pictures, from a clone of
   [fivem-docs](https://github.com/citizenfx/fivem-docs). Without it every
   blip is a round dot in its own colour. Needs numpy and Pillow.
