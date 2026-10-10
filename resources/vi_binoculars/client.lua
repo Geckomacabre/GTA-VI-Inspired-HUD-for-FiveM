@@ -176,7 +176,13 @@ local function run()
         TaskStartScenarioInPlace(ped, Config.Scenario, 0, true)
     end
 
-    cam = CreateCam('DEFAULT_SCRIPTED_FLY_CAMERA', true)
+    -- The plain scripted camera, which goes only where it is told. The FLY
+    -- camera moves itself with the triggers and the sticks -- the same inputs
+    -- that zoom and look here -- and floated off into the sky with them.
+    cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
+    local eye0 = GetOffsetFromEntityInWorldCoords(ped, 0.0, Config.EyeForward, Config.EyeUp)
+    SetCamCoord(cam, eye0.x, eye0.y, eye0.z)
+    SetCamRot(cam, pitch, 0.0, heading, 2)
     SetCamFov(cam, fovAt(0.0))
     if (Config.Sway or 0) > 0 then ShakeCam(cam, 'HAND_SHAKE', Config.Sway * 0.4) end
     RenderScriptCams(true, false, 0, true, false)
