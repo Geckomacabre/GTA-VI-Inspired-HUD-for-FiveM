@@ -43,6 +43,9 @@ client_scripts {
     'client_glyphs.lua',
     'client_vitals.lua',
     'client_overlays.lua',
+    -- The drawn minimap's game side. Before client.lua for the same reason as
+    -- the three above: client.lua's setRadar() asks it who is drawing the map.
+    'client_map3d.lua',
     'client.lua',
     -- After client.lua only because the exhaustion model there reads
     -- SkillFitness() from here, and that is guarded so load order cannot
@@ -118,6 +121,14 @@ files {
     'html/index.html',
     'html/style.css',
     'html/app.js',
+    -- The drawn minimap (Config.Map3D), and the world it draws. The world is
+    -- built per server by tools/map3d/build.py and blips.py, and is not in the
+    -- repository: until it is built these three lines match nothing, the page
+    -- says so, and the engine's radar carries on.
+    'html/map3d.js',
+    'html/map3d/*.bin',
+    'html/map3d/*.png',
+    'html/map3d/*.json',
     -- Bone-connected world prompts rendered with real 3D depth (see
     -- client_dui_worldpanel.lua's own header) -- a SEPARATE DUI browser
     -- pointed at this page, not part of the main index.html NUI frame.

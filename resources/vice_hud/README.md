@@ -440,6 +440,7 @@ anything shipped in this repo.
 | `/hudmask` · `/hudmaskmode` · `/hudmaskoff` | The rounded corner mask |
 | `/hudrects` · `/hudmatch` · `/hudcross` | Draw the engine's own component rects, and line them up |
 | `/hudminimap` | Show the map on foot |
+| `/hudmap3d` | The drawn minimap or the game's radar, per player |
 
 </details>
 
@@ -652,6 +653,68 @@ exports.vice_hud:SetHeldIcon('nui://ox_inventory/web/images/basketball.png')   -
 exports.vice_hud:SetHeldIcon(nil)                                              -- clear
 ```
 
+## The drawn minimap: flat colour, sea and sand, buildings standing
+
+The reference minimap is not GTA V's dark radar. It is the map in flat colour,
+seen at a slant, with the sea and the beach in their own colours and the
+buildings standing up off the ground. `Config.Map3D` draws that in place of the
+engine's radar.
+
+The look, the projection and the world it draws are those of the
+"GTA-VI MiniMap (3D Buildings)" mod by **@moddims**:
+its roads, its 3,589 building outlines and their heights, and its survey of
+where the map is water and where it is sand. Around it everything is still
+this HUD's: the frame and where it sits, the player marker measured off the
+reference, the route in the HUD's accent colour, the distance figure, the
+direction panel, and the game's own blips.
+
+**It has to be built first.** The world is that mod's work and is not in this
+repository; point the converter at the mod you downloaded.
+
+```bash
+python tools/map3d/build.py --mod "path/to/MiniMap.dll"
+python tools/map3d/blips.py --docs path/to/fivem-docs
+```
+
+- `build.py` writes `html/map3d/world.bin` and `ground.png`. Nothing in the
+  mod is run; its map is read out of the file. Needs numpy, scipy and Pillow.
+- `blips.py` writes the sheet of blip pictures, from a clone of
+  [fivem-docs](https://github.com/citizenfx/fivem-docs). Without it every
+  blip is a round dot in its own colour. Needs numpy and Pillow.
+- Until `world.bin` exists the page says so, one line is printed, and the
+  engine's radar carries on. Nothing else changes.
+
+What to know about it:
+
+- **It is drawn on the HUD's page, by WebGL.** The mod paints straight onto
+  the game's frame from a plugin, which a server cannot give its players, and
+  the engine's own radar is a flat picture that cannot stand a building up.
+  The geometry is uploaded to the graphics card once. After that a frame is a
+  few dozen draw calls over the 256 m squares around the player, and a frame
+  is only drawn when the player or the camera moved. A player with it switched
+  off downloads none of it.
+- **Indoors the engine's radar comes back**, because it has the floor plan and
+  the drawn map does not (`engineIndoors`).
+- **Blips are read from the game** every two seconds, and the ones riding a
+  ped or vehicle are followed in between. A blip that is not short-range stays
+  pinned to the edge, as on the radar. Radius and area blips are not drawn:
+  the game will not say how big they are.
+- **The route** is the game's own GPS line, read back from it, for the
+  waypoint and for a blip a script gave a route. The game hands it over with
+  kinks in it and a tail behind the player, so it is smoothed, started where
+  the player is, and brought in gradually just ahead of the marker.
+- **Where a route ends is ringed**: four arcs in the route's colour, as the
+  reference marks a destination. In the ring is a plain disc of that colour,
+  or, when the waypoint was set on a place, that place's own blip.
+- **After dark the map is dark**: slate land with the roads standing out of
+  it, changing over gradually at dusk and dawn by the game's clock
+  (`night`, `nightHours`, `paintNight`).
+- The pause map and the big map are the engine's and are untouched.
+- `/hudmap3d` switches between it and the game's radar for that player.
+
+`Config.Map3D.view` has the zoom, the tilt, where the player sits on the panel
+and the opacity; `Config.Map3D.paint` the colours.
+
 ## The player marker on the minimap
 
 The reference marks the player with a black-ringed disc and a pale arrowhead,
@@ -708,6 +771,10 @@ badge art), and the wanted-tell icon set are from the
 mod on GTA5-Mods.com. The BuckMe bank icon and its ring
 (`html/icons/buckme.png`, `html/icons/buckme_ring/`,
 `html/icons/fill_purple.png`) are original, made in-house.
+
+The drawn minimap's look, its projection and the world it draws are from the
+GTA-VI MiniMap (3D Buildings) mod by @moddims. That world is not included
+here; `tools/map3d/build.py` converts a copy of the mod you have downloaded.
 
 Thanks to GravityExploitz for BuckMe's satire paragraph and for help with the
 BuckMe card design.

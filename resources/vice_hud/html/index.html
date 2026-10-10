@@ -126,6 +126,12 @@
          give it a crisp boundary, which is why the map read as a soft blob.
          Drawing the border here means the edge is defined regardless of how
          the mask feathers. -->
+    <!-- The drawn minimap (Config.Map3D): the island in flat colour with its
+         buildings standing, painted by map3d.js where the engine's radar would
+         be. Same rect and corners as the frame, and under it. Hidden, and
+         costing nothing, unless client_map3d.lua switches it on. -->
+    <canvas id="map3d" class="hidden" aria-hidden="true"></canvas>
+
     <div id="map-frame" class="hidden" aria-hidden="true"></div>
 
     <!-- Map badge -------------------------------------------------------
@@ -1046,6 +1052,7 @@
      effects of its own, so order is the whole of the contract. -->
 <script src="makes.js"></script>
 <script src="app.js"></script>
+<script src="map3d.js"></script>
 
 <!-- Targeting's screen-space page: the /targetadmin panel, /targetui
      preferences and the rail's sounds. It was osm-target's own ui_page; a
