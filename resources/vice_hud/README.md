@@ -639,6 +639,31 @@ parts still load together.
 
 None of this has been run on a live server from this repository yet.
 
+## The player marker on the minimap
+
+The reference marks the player with a black-ringed disc and a pale arrowhead,
+not GTA V's white arrow. The minimap is a scaleform and that arrow is a vector
+shape inside it, so the marker is made by swapping the shape in a copy of the
+game's own `minimap.gfx`: the game still places it and turns it with you, at
+no cost, and it cannot drift from the map the way a marker drawn over it would.
+
+`tools/minimap_marker/build.py` does the swap and checks that nothing else in
+the file changed. It needs your game build's `minimap.gfx` and JPEXS Free
+Flash Decompiler; the script's own header says where each comes from.
+
+```bash
+python tools/minimap_marker/build.py --ffdec path/to/ffdec-cli.jar --in minimap.gfx --out stream/minimap.gfx
+```
+
+- The built file is not in this repository: it is the game's own file with
+  three shapes changed, and it is different for every game build. Build it
+  from yours, and again after changing `sv_enforceGameBuild`.
+- Its size is **Player arrow** in the HUD editor's map panel (0 is the game's
+  own size).
+- Delete `stream/minimap.gfx` to get the stock arrow back. Only one resource
+  on a server can stream that file.
+- The pause-menu map has its own scaleform and keeps the stock arrow.
+
 ## Licence
 
 [CC BY-NC-SA 4.0](LICENSE) — **non-commercial**. You may use, modify and
