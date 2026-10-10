@@ -2,9 +2,11 @@
 
 Binoculars that behave: raise them, look around, zoom smoothly, lower them.
 
-- **Smooth zoom.** Roll the mouse wheel, or hold the triggers (LMB / RMB on a
-  mouse). The picture glides to where you asked for instead of stepping, from
-  a 42° field of view down to 4°.
+- **Smooth zoom.** Roll the mouse wheel, or hold d-pad up / down on a
+  controller. The picture glides to where you asked for instead of stepping,
+  from a 42° field of view down to 4°.
+- **Walk with them up.** The ped holds them to its face and its legs are
+  free; forward is wherever the binoculars point.
 - **Mouse and controller.** Looking slows down as you zoom in, so a small
   movement stays small at full zoom on either.
 - **Your character does it too.** The ped takes the binocular stance and turns
@@ -21,8 +23,9 @@ Binoculars that behave: raise them, look around, zoom smoothly, lower them.
 | `/binoculars` | raise or lower (`Config.Command`) |
 | a key | `Config.Key`, rebindable per player; off by default |
 | an item | `Config.Item = 'binoculars'`; see below |
-| Mouse wheel, or hold LMB / RT | zoom in |
-| Mouse wheel, or hold RMB / LT | zoom out |
+| Mouse wheel | zoom in and out (keyboard and mouse) |
+| D-pad up / down | zoom in and out (controller) |
+| Move | walk about with them up (`Config.Move`); forward is where they point |
 | Left / Right (arrows or d-pad) | night and thermal vision, if `Config.Vision` turns them on |
 | Backspace / B | lower them |
 

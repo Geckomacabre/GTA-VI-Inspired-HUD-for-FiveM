@@ -2579,6 +2579,17 @@ CreateThread(function()
                     BeginScaleformMovieMethod(minimapScaleform, 'SETUP_HEALTH_ARMOUR')
                     ScaleformMovieMethodAddParamInt(3)
                     EndScaleformMovieMethod()
+                    -- The game's own sat-nav strip (a turn arrow and "0.12mi"
+                    -- along the map's bottom edge while a route is set) is a
+                    -- second distance beside the HUD's own, which the
+                    -- reference does not have. Asked to hide every frame,
+                    -- because the game shows it again each time the distance
+                    -- changes. A minimap.gfx built by tools/minimap_marker
+                    -- has it taken out altogether, which cannot flicker.
+                    if Config.HideSatNav ~= false then
+                        BeginScaleformMovieMethod(minimapScaleform, 'HIDE_SATNAV')
+                        EndScaleformMovieMethod()
+                    end
                 end
             end)
             if not ok then

@@ -22,9 +22,12 @@ Config.Item = 'binoculars'
 Config.FovWide   = 42.0
 Config.FovNarrow = 4.0
 
--- How fast the zoom moves: degrees per second at the wide end while a zoom
--- button is held (it slows as it narrows, so fine adjustment stays fine), and
--- how much one notch of the mouse wheel is worth, as a fraction of the range.
+-- Zoom is the mouse wheel on a keyboard and mouse, and d-pad up / down on a
+-- controller.
+--
+-- How fast it moves: degrees per second at the wide end while the d-pad is
+-- held (it slows as it narrows, so fine adjustment stays fine), and how much
+-- one notch of the mouse wheel is worth, as a fraction of the range.
 Config.ZoomSpeed  = 38.0
 Config.WheelStep  = 0.12
 
@@ -49,7 +52,25 @@ Config.Vision = { night = false, thermal = false }
 -- A little hand movement, more of it the further in you are. 0 for none.
 Config.Sway = 0.35
 
--- The stance. A scenario the ped plays while they are up; false for none.
+-- Walking with them up. true: the ped holds them to its face and can walk
+-- about, forward being wherever the binoculars point. false: it stands in the
+-- stance below until they come down.
+Config.Move = true
+
+-- How fast it may go with them up: 1.0 is a walk, 2.0 a run.
+Config.MoveSpeed = 1.0
+
+-- What the ped does while it can walk: an upper-body animation, and the prop
+-- in its hand.
+Config.Anim = {
+    dict = 'amb@world_human_binoculars@male@idle_a',
+    name = 'idle_c',
+    prop = 'prop_binoc_01',
+    bone = 28422,   -- right hand
+}
+
+-- The stance when it cannot (Config.Move = false). A scenario the ped plays
+-- on the spot; false for none.
 Config.Scenario = 'WORLD_HUMAN_BINOCULARS'
 
 -- Where the view is taken from: metres forward of and above the ped's root.

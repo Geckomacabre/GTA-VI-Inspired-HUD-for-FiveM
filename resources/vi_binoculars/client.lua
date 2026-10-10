@@ -6,9 +6,12 @@
      The view is a scripted camera at the ped's eyes that the player turns
      with the mouse or the right stick; the ped turns with it, so what other
      players see is someone scanning with binoculars, not a statue. Zoom is
-     the mouse wheel, or held on the triggers / mouse buttons, and is eased so
-     it glides instead of stepping. The further in, the slower the view turns
+     the mouse wheel, or d-pad up / down on a controller, and is eased so it
+     glides instead of stepping. The further in, the slower the view turns
      and the more the hands show.
+
+     The ped can walk with them up (Config.Move): forward is wherever the
+     binoculars point.
 
      With vice_hud running, the lens mask, the ZOOM and EXIT prompts and the
      label (what is being looked at) are its own. Without it the game's stock
@@ -30,8 +33,10 @@
      ========================================================================= ]]
 
 local CONTROL_LOOK_LR, CONTROL_LOOK_UD = 1, 2
-local CONTROL_ZOOM_IN, CONTROL_ZOOM_OUT = 24, 25        -- LMB / RT, RMB / LT
+local CONTROL_PAD_ZOOM_IN, CONTROL_PAD_ZOOM_OUT = 172, 173   -- d-pad up / down
 local CONTROL_WHEEL_UP, CONTROL_WHEEL_DOWN = 241, 242
+-- Moving: the two axes, and the four keys a keyboard feeds them from.
+local CONTROLS_MOVE = { 30, 31, 32, 33, 34, 35 }
 local CONTROL_EXIT = 194                                -- Backspace / B
 local CONTROL_VISION_PREV, CONTROL_VISION_NEXT = 174, 175   -- Left / Right
 local CONTROL_PUSH_TO_TALK = 249
@@ -47,6 +52,8 @@ local label, labelKey = nil, nil
 local hudOverlay = false
 local scaleform = nil
 local vision = 'normal'
+local prop = nil             -- the binoculars in the ped's hand, while it can walk
+local promptDevice = nil     -- which device the ZOOM prompt was last drawn for
 
 -- Plain first, then whichever of night and thermal config.lua turns on.
 local function visionModes()
@@ -93,6 +100,17 @@ local function hudRunning()
     return GetResourceState('vice_hud') == 'started'
 end
 
+-- The ZOOM prompt names what zooms on the device in hand: the wheel, or d-pad up.
+local function zoomKey()
+    if usingKeyboard() then return 'WHEEL_UP' end
+    return CONTROL_PAD_ZOOM_IN
+end
+
+local function showZoomPrompt()
+    promptDevice = usingKeyboard()
+    pcall(function() exports.vice_hud:ShowActionPrompt(PROMPT_ZOOM, 'Zoom', zoomKey()) end)
+end
+
 local function pushOverlay()
     if not hudOverlay then return end
     pcall(function()
@@ -106,7 +124,8 @@ local function startOverlay()
         hudOverlay = pcall(function()
             exports.vice_hud:SetBinocularOverlay(true, { label = label, key = labelKey })
             exports.vice_hud:ShowActionPrompt(PROMPT_EXIT, 'Exit', CONTROL_EXIT)
-            exports.vice_hud:ShowActionPrompt(PROMPT_ZOOM, 'Zoom', CONTROL_ZOOM_IN)
+            exports.vice_hud:ShowActionPrompt(PROMPT_ZOOM, 'Zoom', zoomKey())
+            promptDevice = usingKeyboard()
             if #visionModes() > 1 then
                 exports.vice_hud:ShowActionPrompt(PROMPT_VISION, 'Vision', CONTROL_VISION_NEXT)
             end
@@ -165,6 +184,58 @@ local function stop()
     active = false   -- the loop below sees this and unwinds
 end
 
+local function canMove()
+    return Config.Move ~= false and type(Config.Anim) == 'table'
+end
+
+local function playingAnim(ped)
+    return IsEntityPlayingAnim(ped, Config.Anim.dict, Config.Anim.name, 3)
+end
+
+-- Up to the face. Walking: an upper-body animation and the prop, so the legs
+-- are free. Standing: the game's own stance, which brings its own prop.
+local function raise(ped)
+    if not canMove() then
+        if Config.Scenario then TaskStartScenarioInPlace(ped, Config.Scenario, 0, true) end
+        return
+    end
+
+    local anim = Config.Anim
+    RequestAnimDict(anim.dict)
+    local deadline = GetGameTimer() + 1500
+    while not HasAnimDictLoaded(anim.dict) and GetGameTimer() < deadline do Wait(0) end
+    -- 51: looped, upper body only, and the player keeps control of the legs.
+    TaskPlayAnim(ped, anim.dict, anim.name, 5.0, 5.0, -1, 51, 0.0, false, false, false)
+
+    if anim.prop then
+        local model = GetHashKey(anim.prop)
+        RequestModel(model)
+        deadline = GetGameTimer() + 1500
+        while not HasModelLoaded(model) and GetGameTimer() < deadline do Wait(0) end
+        if HasModelLoaded(model) then
+            local at = GetEntityCoords(ped)
+            prop = CreateObject(model, at.x, at.y, at.z, true, true, false)
+            AttachEntityToEntity(prop, ped, GetPedBoneIndex(ped, anim.bone or 28422),
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, true, true, false, true, 1, true)
+            SetModelAsNoLongerNeeded(model)
+        end
+    end
+end
+
+local function lower(ped)
+    if prop then
+        if DoesEntityExist(prop) then DeleteEntity(prop) end
+        prop = nil
+    end
+    if IsEntityDead(ped) then return end
+
+    if canMove() then
+        StopAnimTask(ped, Config.Anim.dict, Config.Anim.name, 2.0)
+    elseif Config.Scenario and not IsPedInAnyVehicle(ped, false) then
+        ClearPedTasks(ped)
+    end
+end
+
 local function run()
     local ped = PlayerPedId()
     active = true
@@ -172,16 +243,14 @@ local function run()
     heading = GetEntityHeading(ped)
     pitch = clamp(GetGameplayCamRelativePitch(), Config.PitchMin, Config.PitchMax)
 
-    if Config.Scenario and not IsPedInAnyVehicle(ped, false) then
-        TaskStartScenarioInPlace(ped, Config.Scenario, 0, true)
-    end
+    if not IsPedInAnyVehicle(ped, false) then raise(ped) end
 
     -- The plain scripted camera, which goes only where it is told. The FLY
     -- camera moves itself with the triggers and the sticks -- the same inputs
     -- that zoom and look here -- and floated off into the sky with them.
     cam = CreateCam('DEFAULT_SCRIPTED_CAMERA', true)
-    local eye0 = GetOffsetFromEntityInWorldCoords(ped, 0.0, Config.EyeForward, Config.EyeUp)
-    SetCamCoord(cam, eye0.x, eye0.y, eye0.z)
+    local at0, turn0 = GetEntityCoords(ped), math.rad(heading)
+    SetCamCoord(cam, at0.x - math.sin(turn0) * Config.EyeForward, at0.y + math.cos(turn0) * Config.EyeForward, at0.z + Config.EyeUp)
     SetCamRot(cam, pitch, 0.0, heading, 2)
     SetCamFov(cam, fovAt(0.0))
     if (Config.Sway or 0) > 0 then ShakeCam(cam, 'HAND_SHAKE', Config.Sway * 0.4) end
@@ -198,9 +267,23 @@ local function run()
         ped = PlayerPedId()
         if blockedReason(ped) then break end
 
+        local onFoot = not IsPedInAnyVehicle(ped, false)
+        local walking = onFoot and canMove()
+
         DisableAllControlActions(0)
         EnableControlAction(0, CONTROL_PUSH_TO_TALK, true)
+        if walking then
+            for i = 1, #CONTROLS_MOVE do EnableControlAction(0, CONTROLS_MOVE[i], true) end
+            SetPedMaxMoveBlendRatio(ped, Config.MoveSpeed or 1.0)
+            -- Something else may have taken the arms (a stumble, another script).
+            if not playingAnim(ped) then
+                TaskPlayAnim(ped, Config.Anim.dict, Config.Anim.name, 5.0, 5.0, -1, 51, 0.0, false, false, false)
+            end
+        end
         if IsDisabledControlJustPressed(0, CONTROL_EXIT) then break end
+
+        -- The prompt follows the device: the wheel on a mouse, the d-pad on a pad.
+        if hudOverlay and promptDevice ~= usingKeyboard() then showZoomPrompt() end
 
         local dt = GetFrameTime()
         local fov = fovAt(zoom)
@@ -219,11 +302,15 @@ local function run()
         heading = heading % 360.0
         pitch = clamp(pitch, Config.PitchMin, Config.PitchMax)
 
-        -- zoom: held on the triggers / mouse buttons, stepped on the wheel
-        local held = GetDisabledControlNormal(0, CONTROL_ZOOM_IN) - GetDisabledControlNormal(0, CONTROL_ZOOM_OUT)
-        zoomTarget = zoomTarget + held * zoomRate * dt
-        if IsDisabledControlJustPressed(0, CONTROL_WHEEL_UP) then zoomTarget = zoomTarget + Config.WheelStep end
-        if IsDisabledControlJustPressed(0, CONTROL_WHEEL_DOWN) then zoomTarget = zoomTarget - Config.WheelStep end
+        -- zoom: stepped on the mouse wheel, held on d-pad up / down. Each only
+        -- on its own device: the same controls are other keys on the other one.
+        if usingKeyboard() then
+            if IsDisabledControlJustPressed(0, CONTROL_WHEEL_UP) then zoomTarget = zoomTarget + Config.WheelStep end
+            if IsDisabledControlJustPressed(0, CONTROL_WHEEL_DOWN) then zoomTarget = zoomTarget - Config.WheelStep end
+        else
+            local held = GetDisabledControlNormal(0, CONTROL_PAD_ZOOM_IN) - GetDisabledControlNormal(0, CONTROL_PAD_ZOOM_OUT)
+            zoomTarget = zoomTarget + held * zoomRate * dt
+        end
         zoomTarget = clamp(zoomTarget, 0.0, 1.0)
         zoom = zoom + (zoomTarget - zoom) * math.min(1.0, Config.Smoothing * dt)
 
@@ -237,10 +324,22 @@ local function run()
             end
         end
 
-        -- the ped turns with the view, and the view sits at its eyes
-        if not IsPedInAnyVehicle(ped, false) then SetEntityHeading(ped, heading) end
-        local eye = GetOffsetFromEntityInWorldCoords(ped, 0.0, Config.EyeForward, Config.EyeUp)
-        SetCamCoord(cam, eye.x, eye.y, eye.z)
+        -- Standing still, the ped turns with the view. Walking, its legs take
+        -- it where the stick says, and "forward" is kept meaning where the
+        -- binoculars point: movement is steered off the game's own camera,
+        -- which is held on the view's heading behind the scenes.
+        local moving = walking and (math.abs(GetControlNormal(0, 30)) > 0.15 or math.abs(GetControlNormal(0, 31)) > 0.15)
+        if walking then
+            SetGameplayCamRelativeHeading(((heading - GetEntityHeading(ped) + 540.0) % 360.0) - 180.0)
+            SetGameplayCamRelativePitch(pitch, 1.0)
+        end
+        if onFoot and not moving then SetEntityHeading(ped, heading) end
+
+        -- The view sits at the eyes, looking where it is turned rather than
+        -- where the body faces.
+        local at = GetEntityCoords(ped)
+        local turn = math.rad(heading)
+        SetCamCoord(cam, at.x - math.sin(turn) * Config.EyeForward, at.y + math.cos(turn) * Config.EyeForward, at.z + Config.EyeUp)
         SetCamRot(cam, pitch, 0.0, heading, 2)
         SetCamFov(cam, fovAt(zoom))
         if (Config.Sway or 0) > 0 then
@@ -249,6 +348,7 @@ local function run()
 
         -- Its own body and the prop in its hands would fill the frame.
         SetEntityLocallyInvisible(ped)
+        if prop then SetEntityLocallyInvisible(prop) end
         HideHudAndRadarThisFrame()
         if scaleform and HasScaleformMovieLoaded(scaleform) then
             DrawScaleformMovieFullscreen(scaleform, 255, 255, 255, 255, 0)
@@ -262,10 +362,7 @@ local function run()
     stopOverlay()
     RenderScriptCams(false, false, 0, true, false)
     if cam then DestroyCam(cam, false) cam = nil end
-    ped = PlayerPedId()
-    if Config.Scenario and not IsEntityDead(ped) and not IsPedInAnyVehicle(ped, false) then
-        ClearPedTasks(ped)
-    end
+    lower(PlayerPedId())
     TriggerEvent('vi_binoculars:stopped')
 end
 
@@ -282,6 +379,7 @@ local function use()
             stopOverlay()
             RenderScriptCams(false, false, 0, true, false)
             if cam then DestroyCam(cam, false) cam = nil end
+            pcall(lower, PlayerPedId())
         end
     end)
     return true
@@ -342,5 +440,5 @@ AddEventHandler('onResourceStop', function(res)
     stopOverlay()
     RenderScriptCams(false, false, 0, true, false)
     if cam then DestroyCam(cam, false) end
-    ClearPedTasks(PlayerPedId())
+    lower(PlayerPedId())
 end)

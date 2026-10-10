@@ -12,6 +12,13 @@ has to come out byte for byte what went in.
 The game still places the marker and turns it with the player; all that
 changes is what it looks like. Its size is the minimap's "blipScale" setting.
 
+It also takes out the game's own sat-nav strip -- the turn arrow and distance
+("-> 0.12mi") the minimap draws along its bottom edge while a route is set.
+The reference has one distance on the map, top left, and the HUD draws that
+one; the strip was a second. It is removed by renaming the strip's symbol, so
+the minimap's script finds nothing to attach and its sat-nav calls do nothing.
+--keep-satnav leaves it in.
+
 What you need:
   * minimap.gfx from the game build your server runs. It is in
         update\\update.rpf\\x64\\patch\\data\\cdimages\\scaleform_minimap.rpf
@@ -117,12 +124,33 @@ def find_shapes(all_tags):
     return out
 
 
+def drop_satnav(path):
+    """Rename the exported symbol "satnav" so the minimap can no longer attach it.
+    One tag, same length; returns False if the file has no such symbol."""
+    d = bytearray(open(path, 'rb').read())
+    nbits = d[8] >> 3
+    pos = 8 + (5 + 4 * nbits + 7) // 8 + 4
+    while pos < len(d):
+        word = struct.unpack('<H', d[pos:pos + 2])[0]
+        code, size, hdr = word >> 6, word & 0x3F, 2
+        if size == 0x3F:
+            size, hdr = struct.unpack('<I', d[pos + 2:pos + 6])[0], 6
+        body = pos + hdr
+        if code == 56 and bytes(d[body:body + 2]) == b'\x01\x00' and bytes(d[body + 4:body + size]) == b'satnav\x00':
+            d[body + 4:body + 10] = b'satna_'
+            open(path, 'wb').write(bytes(d))
+            return True
+        pos += hdr + size
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser(description='Put the GTA VI player marker into a copy of minimap.gfx.')
     ap.add_argument('--ffdec', required=True, help='path to JPEXS ffdec-cli.jar')
     ap.add_argument('--in', dest='src', required=True, help="the game's minimap.gfx")
     ap.add_argument('--out', required=True, help='where to write the new one')
     ap.add_argument('--java', default='java')
+    ap.add_argument('--keep-satnav', action='store_true', help="leave the game's own turn-and-distance strip on the map")
     a = ap.parse_args()
 
     head, before = tags(a.src)
@@ -147,13 +175,21 @@ def main():
         changed = [character(n) for o, n in zip(before, after) if o != n]
         if set(changed) != wanted or len(changed) != len(wanted):
             sys.exit('expected only shapes %s to change, got %s; not writing it' % (sorted(wanted), sorted(changed)))
+        strip = 'kept'
+        if not a.keep_satnav:
+            strip = 'removed' if drop_satnav(built) else 'not found in this file'
+            _, patched = tags(built)
+            off = [i for i, (o, n) in enumerate(zip(after, patched)) if o != n]
+            if len(patched) != len(after) or len(off) > 1 or (off and patched[off[0]][0] != 56):
+                sys.exit('taking out the sat-nav strip changed more than its one tag; not writing it')
         shutil.copyfile(built, a.out)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
     print('player marker written to %s' % a.out)
     print('  shapes replaced: ' + ', '.join('%s = %d' % (n, i) for n, i in ids.items()))
-    print('  %d other tags unchanged' % (len(before) - len(ids)))
+    print('  sat-nav strip: ' + strip)
+    print('  %d other tags unchanged' % (len(before) - len(ids) - (1 if strip == 'removed' else 0)))
 
 
 if __name__ == '__main__':

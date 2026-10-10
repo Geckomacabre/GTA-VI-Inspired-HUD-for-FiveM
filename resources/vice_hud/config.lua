@@ -54,6 +54,12 @@ Config.NitrousHintHoldBag = 'customs:menuOpen'
 -- broke the in-vehicle radio.
 Config.HideNativeHealthBars = true
 
+-- Hide the game's own sat-nav strip on the minimap (a turn arrow and a distance
+-- along its bottom edge while a route is set)? The reference has one distance
+-- on the map, top left, which the HUD draws itself; the strip is a second.
+-- Needs HideNativeHealthBars, which is what talks to the minimap.
+Config.HideSatNav = true
+
 -- Native HUD pieces hidden every frame because vice_hud draws its own version.
 -- Only list things we ACTUALLY replace — hiding a component we don't draw just
 -- removes information from the player:
