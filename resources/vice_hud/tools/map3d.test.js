@@ -83,7 +83,7 @@ const fresh = (config, before) => run(STUBS + (before || '') + '\nConfig = { Map
 console.log('-- who draws the map --');
 fresh('{ enabled = true, view = { zoom = 3 }, paint = { land = { 1, 2, 3 } } }');
 ok(get('ViceMap3D.owns()') === 'false', 'not before the page has said anything');
-run('ViceMap3D.show(true, true)');
+run('ViceMap3D.show(false, true)');
 ok(get('last("map3d").show') === 'false' && get('last("map3d").config.view.zoom') === '3', 'the page is told "not yet", and given the config once');
 run('cbs.map3dHello({}, function() end)');
 ok(get('last("map3d").load') === 'true', 'the page saying hello is answered with "fetch the world"');
@@ -101,9 +101,9 @@ run('ViceMap3D.show(false, false)');
 ok(get('last("map3d").show') === 'false', 'no minimap wanted: the drawn one goes too');
 
 console.log('\n-- indoors --');
-run('interior = 77; ViceMap3D.show(true, false)');
+run('interior = 77; ViceMap3D.show(ViceMap3D.owns(), false)');
 ok(get('ViceMap3D.owns()') === 'false' && get('last("map3d").show') === 'false', 'inside an interior the engine\'s floor plan is the map');
-run('interior = 0; ViceMap3D.show(true, false)');
+run('interior = 0; ViceMap3D.show(ViceMap3D.owns(), false)');
 ok(get('ViceMap3D.owns()') === 'true' && get('last("map3d").show') === 'true', 'and back outside it is drawn again');
 fresh('{ enabled = true, engineIndoors = false }');
 run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) interior = 77');
@@ -161,7 +161,8 @@ ok(get('#last("map3dMoving").list') === '1' && get('last("map3dMoving").list[1][
 console.log('\n-- client.lua --');
 const client = read('client.lua');
 const setRadar = client.slice(client.indexOf('local function setRadar(on)'), client.indexOf('-- DISPLAY_RADAR is a single global flag'));
-ok(/local drawn = on and ViceMap3D ~= nil and ViceMap3D\.owns\(\)/.test(setRadar), 'setRadar asks who is drawing');
+ok(/pcall\(ViceMap3D\.owns\)/.test(setRadar) && /drawn = on and okay and owns == true/.test(setRadar), 'setRadar asks who is drawing');
+ok(/if not pcall\(ViceMap3D\.show, on and drawn, northBlip\) then drawn = false end/.test(setRadar), 'and a fault in the drawn map leaves the engine\'s radar in charge');
 ok(/local engine = on and not drawn\s+radarWanted = engine\s+DisplayRadar\(engine\)/.test(setRadar), 'the engine\'s radar is shown only when the drawn one is not, and held to that');
 ok(/ui\('mapRect', \{ visible = on \}\)/.test(setRadar), 'the frame and badge still follow the HUD\'s own decision');
 const manifest = read('fxmanifest.lua');

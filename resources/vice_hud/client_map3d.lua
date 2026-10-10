@@ -5,14 +5,14 @@
 -- the radar, and feeds it what the engine would have drawn on its own: where
 -- the player is and which way the camera looks, the GPS line, and the blips.
 --
--- What crosses to client.lua is three calls, all made from its setRadar():
+-- What crosses to client.lua is two calls, both made from its setRadar():
 --
---   ViceMap3D.owns()            is the drawn map standing in for the radar
---                               right now? (it is not inside a building's
---                               interior, where the engine's floor plan is the
---                               better map, nor before the page has its world)
---   ViceMap3D.show(on, north)   the HUD's own decision about whether a minimap
---                               belongs on screen, and whether north is marked
+--   ViceMap3D.owns()            could the drawn map stand in for the radar
+--                               right now? (not inside a building's interior,
+--                               where the engine's floor plan is the better
+--                               map; not before the page has its world; not
+--                               after its feed has failed)
+--   ViceMap3D.show(on, north)   draw it or do not, and whether north is marked
 --
 -- Loaded before client.lua so the table exists by the time setRadar runs.
 -- Nothing here reaches back into client.lua.
@@ -33,15 +33,14 @@ do
     if saved == 'on' then chosen = true elseif saved == 'off' then chosen = false end
 end
 
+local broken = false        -- the feed below has failed: hand the map back
 local pageUp = false        -- the page is listening
 local pageOk = false        -- the page has loaded its world and can draw
 local pageWhy = nil         -- and if it cannot, what it said
-local indoors = false
-local hudWants = false      -- client.lua wants a minimap on screen at all
 local drawing = false       -- what the page was last told
 local north = true
 local configSent = false
-local staticDirty, routeDirty = true, true
+local routeDirty = true
 
 local function say(action, data)
     data = data or {}
@@ -55,17 +54,15 @@ local function round(v, places)
 end
 
 function ViceMap3D.owns()
-    if not chosen or not pageOk then return false end
-    if C.engineIndoors ~= false then
-        indoors = GetInteriorFromEntity(PlayerPedId()) ~= 0
-        if indoors then return false end
-    end
+    if not chosen or not pageOk or broken then return false end
+    if C.engineIndoors ~= false and GetInteriorFromEntity(PlayerPedId()) ~= 0 then return false end
     return true
 end
 
+--- `on` is "draw it": client.lua has already asked owns(), so this does not
+--- ask again (and cannot disagree with what the engine's radar was told).
 function ViceMap3D.show(on, showNorth)
-    hudWants = on and true or false
-    local want = hudWants and ViceMap3D.owns()
+    local want = on and true or false
     if showNorth ~= nil and (showNorth and true or false) ~= north then
         north = showNorth and true or false
         configSent = false
@@ -83,7 +80,7 @@ function ViceMap3D.show(on, showNorth)
         msg.config = { view = view, paint = C.paint }
     end
     say('map3d', msg)
-    if drawing then staticDirty, routeDirty = true, true end
+    if drawing then routeDirty = true end
 end
 
 -- The page says hello each time it loads, which is also each time it
@@ -100,7 +97,7 @@ RegisterNUICallback('map3dReady', function(d, cb)
     pageOk = d and d.ok == true
     pageWhy = d and d.why or nil
     drawing, configSent = false, false
-    staticDirty, routeDirty = true, true
+    routeDirty = true
     if not pageOk and chosen then
         print(('^3[vice_hud]^7 the drawn minimap is off, the engine\'s radar stays: %s')
             :format(tostring(pageWhy or 'the page gave no reason')))
@@ -121,10 +118,25 @@ end, false)
 
 exports('IsMap3D', function() return drawing end)
 
+-- Each of the three feeds below runs in its own thread, and none of them is
+-- allowed to fail quietly. If the position feed stops, the drawn map would sit
+-- frozen over a hidden radar, so that one hands the map back to the engine.
+local function feed(name, fn)
+    CreateThread(function()
+        local okay, err = pcall(fn)
+        if okay then return end
+        print(('^1[vice_hud]^7 drawn minimap: the %s feed stopped: %s'):format(name, tostring(err)))
+        if name == 'position' then
+            broken = true
+            print('^3[vice_hud]^7 the engine\'s radar is back in its place.')
+        end
+    end)
+end
+
 -- ---- where the player is -----------------------------------------------------
 -- Every frame while the map is up, and only what changed: a parked player
 -- costs four native calls a frame and no messages at all.
-CreateThread(function()
+feed('position', function()
     local lx, ly, lc, lh, ls = 0.0, 0.0, 0.0, 0.0, -1.0
     local sentFor = false
     while true do
@@ -214,7 +226,7 @@ end
 
 local routedBlipColour = nil    -- set by the blip scan below
 
-CreateThread(function()
+feed('route', function()
     if C.route == false then return end
     local hadRoute = false
     while true do
@@ -279,7 +291,7 @@ end
 
 local moving = {}       -- blip handle -> sprite, for blips riding an entity
 
-CreateThread(function()
+feed('blip', function()
     if C.blips == false then return end
     while true do
         if not drawing then
@@ -318,7 +330,6 @@ CreateThread(function()
                 for i = #static, BLIP_CAP + 1, -1 do static[i] = nil end
             end
             if drawing then
-                staticDirty = false
                 say('map3dBlips', { list = static })
             end
             Wait(2000)
@@ -326,7 +337,7 @@ CreateThread(function()
     end
 end)
 
-CreateThread(function()
+feed('moving blip', function()
     if C.blips == false then return end
     local had = false
     while true do

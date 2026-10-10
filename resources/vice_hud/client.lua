@@ -1005,8 +1005,16 @@ local function setRadar(on)
     -- callers; this only settles which of the two answers. `engine` is what
     -- the hide-enforcer below holds the game to, so nothing else can switch
     -- the real radar back on underneath the drawn one.
-    local drawn = on and ViceMap3D ~= nil and ViceMap3D.owns()
-    if ViceMap3D then ViceMap3D.show(on, northBlip) end
+    --
+    -- Behind pcall on purpose. This runs in the HUD's main poll loop, and a
+    -- fault in the drawn map must cost the drawn map and nothing else: if
+    -- either call fails the answer is "the engine draws it", as before.
+    local drawn = false
+    if ViceMap3D and ViceMap3D.owns and ViceMap3D.show then
+        local okay, owns = pcall(ViceMap3D.owns)
+        drawn = on and okay and owns == true
+        if not pcall(ViceMap3D.show, on and drawn, northBlip) then drawn = false end
+    end
     local engine = on and not drawn
     radarWanted = engine
     DisplayRadar(engine)
