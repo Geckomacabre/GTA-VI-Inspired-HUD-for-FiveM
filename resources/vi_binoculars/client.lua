@@ -19,6 +19,7 @@
          exports.vi_binoculars:Stop()
          exports.vi_binoculars:IsActive()
          exports.vi_binoculars:GetZoom()    -- 0 (wide) .. 1 (fully in)
+         exports.vi_binoculars:GetVision()  -- 'normal' | 'night' | 'thermal'
          exports.vi_binoculars:SetLabel(text, key)
                names what is being looked at, bottom left; `key` (a control
                id) draws its button beside it. nil clears it.
@@ -32,9 +33,11 @@ local CONTROL_LOOK_LR, CONTROL_LOOK_UD = 1, 2
 local CONTROL_ZOOM_IN, CONTROL_ZOOM_OUT = 24, 25        -- LMB / RT, RMB / LT
 local CONTROL_WHEEL_UP, CONTROL_WHEEL_DOWN = 241, 242
 local CONTROL_EXIT = 194                                -- Backspace / B
+local CONTROL_VISION_PREV, CONTROL_VISION_NEXT = 174, 175   -- Left / Right
 local CONTROL_PUSH_TO_TALK = 249
 
 local PROMPT_ZOOM, PROMPT_EXIT = 'vi_binoculars:zoom', 'vi_binoculars:exit'
+local PROMPT_VISION = 'vi_binoculars:vision'
 
 local active = false
 local cam = nil
@@ -43,6 +46,30 @@ local heading, pitch = 0.0, 0.0
 local label, labelKey = nil, nil
 local hudOverlay = false
 local scaleform = nil
+local vision = 'normal'
+
+-- Plain first, then whichever of night and thermal config.lua turns on.
+local function visionModes()
+    local modes = { 'normal' }
+    local v = Config.Vision
+    if type(v) == 'table' then
+        if v.night then modes[#modes + 1] = 'night' end
+        if v.thermal then modes[#modes + 1] = 'thermal' end
+    end
+    return modes
+end
+
+local function setVision(mode)
+    vision = mode
+    SetNightvision(mode == 'night')
+    SetSeethrough(mode == 'thermal')
+end
+
+-- Only undone if it was changed here, so goggles another script switched on
+-- are left alone.
+local function clearVision()
+    if vision ~= 'normal' then setVision('normal') end
+end
 
 local function clamp(v, lo, hi)
     if v < lo then return lo elseif v > hi then return hi end
@@ -80,6 +107,9 @@ local function startOverlay()
             exports.vice_hud:SetBinocularOverlay(true, { label = label, key = labelKey })
             exports.vice_hud:ShowActionPrompt(PROMPT_EXIT, 'Exit', CONTROL_EXIT)
             exports.vice_hud:ShowActionPrompt(PROMPT_ZOOM, 'Zoom', CONTROL_ZOOM_IN)
+            if #visionModes() > 1 then
+                exports.vice_hud:ShowActionPrompt(PROMPT_VISION, 'Vision', CONTROL_VISION_NEXT)
+            end
         end)
     end
     if not hudOverlay then
@@ -97,6 +127,7 @@ local function stopOverlay()
             exports.vice_hud:SetBinocularOverlay(false)
             exports.vice_hud:HideActionPrompt(PROMPT_ZOOM)
             exports.vice_hud:HideActionPrompt(PROMPT_EXIT)
+            exports.vice_hud:HideActionPrompt(PROMPT_VISION)
         end)
         hudOverlay = false
     end
@@ -155,6 +186,7 @@ local function run()
     -- Per z-unit, the field of view changes by Wide * ln(Wide / Narrow) degrees
     -- at the wide end; ZoomSpeed is given in degrees per second there.
     local zoomRate = Config.ZoomSpeed / (Config.FovWide * math.log(Config.FovWide / Config.FovNarrow))
+    local modes, modeAt = visionModes(), 1
 
     while active do
         ped = PlayerPedId()
@@ -189,6 +221,16 @@ local function run()
         zoomTarget = clamp(zoomTarget, 0.0, 1.0)
         zoom = zoom + (zoomTarget - zoom) * math.min(1.0, Config.Smoothing * dt)
 
+        -- vision: Right steps on, Left steps back, round the list
+        if #modes > 1 then
+            local step = (IsDisabledControlJustPressed(0, CONTROL_VISION_NEXT) and 1 or 0)
+                - (IsDisabledControlJustPressed(0, CONTROL_VISION_PREV) and 1 or 0)
+            if step ~= 0 then
+                modeAt = (modeAt - 1 + step) % #modes + 1
+                setVision(modes[modeAt])
+            end
+        end
+
         -- the ped turns with the view, and the view sits at its eyes
         if not IsPedInAnyVehicle(ped, false) then SetEntityHeading(ped, heading) end
         local eye = GetOffsetFromEntityInWorldCoords(ped, 0.0, Config.EyeForward, Config.EyeUp)
@@ -210,6 +252,7 @@ local function run()
     end
 
     active = false
+    clearVision()
     stopOverlay()
     RenderScriptCams(false, false, 0, true, false)
     if cam then DestroyCam(cam, false) cam = nil end
@@ -229,6 +272,7 @@ local function use()
         if not ok then
             print('^1[vi_binoculars]^7 ' .. tostring(err))
             active = false
+            clearVision()
             stopOverlay()
             RenderScriptCams(false, false, 0, true, false)
             if cam then DestroyCam(cam, false) cam = nil end
@@ -241,6 +285,7 @@ exports('Use', use)
 exports('Stop', stop)
 exports('IsActive', function() return active end)
 exports('GetZoom', function() return active and zoom or 0.0 end)
+exports('GetVision', function() return active and vision or 'normal' end)
 
 exports('SetLabel', function(text, key)
     label = (text ~= nil and text ~= '') and tostring(text) or nil
@@ -287,6 +332,7 @@ end
 AddEventHandler('onResourceStop', function(res)
     if res ~= GetCurrentResourceName() or not active then return end
     active = false
+    clearVision()
     stopOverlay()
     RenderScriptCams(false, false, 0, true, false)
     if cam then DestroyCam(cam, false) end

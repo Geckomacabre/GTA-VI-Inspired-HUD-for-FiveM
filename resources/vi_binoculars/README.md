@@ -23,6 +23,7 @@ Binoculars that behave: raise them, look around, zoom smoothly, lower them.
 | an item | `Config.Item = 'binoculars'`; see below |
 | Mouse wheel, or hold LMB / RT | zoom in |
 | Mouse wheel, or hold RMB / LT | zoom out |
+| Left / Right (arrows or d-pad) | night and thermal vision, if `Config.Vision` turns them on |
 | Backspace / B | lower them |
 
 They cannot be raised in a vehicle, in water, while falling, cuffed or dead,
@@ -54,6 +55,7 @@ exports.vi_binoculars:Use()        -- raise, or lower if they are up
 exports.vi_binoculars:Stop()
 exports.vi_binoculars:IsActive()
 exports.vi_binoculars:GetZoom()    -- 0 (wide) .. 1 (fully in)
+exports.vi_binoculars:GetVision()  -- 'normal' | 'night' | 'thermal'
 
 -- Name what is being looked at, bottom left, with the button for `key`
 -- beside it (a control id). nil clears it.

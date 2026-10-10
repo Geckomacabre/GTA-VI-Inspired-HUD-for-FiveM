@@ -41,6 +41,11 @@ Config.LookSpeedMouse = 7.0
 Config.PitchMin = -55.0
 Config.PitchMax = 55.0
 
+-- Night and thermal vision, stepped through with Left / Right (arrow keys or
+-- the d-pad) while they are up. Both off is plain binoculars, with no extra
+-- prompt on screen.
+Config.Vision = { night = false, thermal = false }
+
 -- A little hand movement, more of it the further in you are. 0 for none.
 Config.Sway = 0.35
 
