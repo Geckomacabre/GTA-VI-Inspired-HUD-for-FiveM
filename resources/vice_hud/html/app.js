@@ -663,6 +663,9 @@
     function onWeapon(d) {
         var icon = $('weapon-icon');
         if (icon) {
+            // An image that is not there (an inventory without that item's
+            // art) is hidden rather than left as a broken-picture box.
+            if (!icon.onerror) icon.onerror = function () { show(icon, false); };
             if (d.icon) { icon.src = d.icon; show(icon, true); }
             else show(icon, false);
         }

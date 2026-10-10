@@ -54,6 +54,17 @@ Config.NitrousHintHoldBag = 'customs:menuOpen'
 -- broke the in-vehicle radio.
 Config.HideNativeHealthBars = true
 
+-- Things held in the hands that are not weapons, shown where the weapon icon
+-- goes and for as long as they are held. Each entry is a player state bag key
+-- some resource sets while the thing is in hand, and the image to show for it.
+-- gk_basketball sets `bbBall` while you have the ball; the image is
+-- ox_inventory's own, the same place the weapon icons come from. A script can
+-- also set one directly: exports.vice_hud:SetHeldIcon(url), nil to clear.
+-- A weapon in hand always wins.
+Config.HeldIcons = {
+    { state = 'bbBall', icon = 'nui://ox_inventory/web/images/basketball.png' },
+}
+
 -- Hide the game's own sat-nav strip on the minimap (a turn arrow and a distance
 -- along its bottom edge while a route is set)? The reference has one distance
 -- on the map, top left, which the HUD draws itself; the strip is a second.
