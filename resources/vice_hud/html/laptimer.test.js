@@ -57,6 +57,9 @@ console.log('\n-- the lap badge is only for races that have laps --');
 ok($('lap-badge').classList.contains('hidden'), 'point to point (laps: 1): no LAP row');
 race({ position: 2, racers: 6, lap: 2, laps: 3, cp: 4, cpTotal: 10, elapsedMs: 0 });
 ok(!$('lap-badge').classList.contains('hidden'), 'three laps: LAP row shown');
+ok($('lap-progress').classList.contains('hidden'), 'in place of the PROGRESS row, as in the reference');
+ok($('lap-badge-label').textContent === 'LAP' && $('lap-badge-chip').contains($('lap-cur')),
+   'the count sits on its own chip beside the label');
 ok($('lap-cur').textContent === '2' && $('lap-total').textContent === '3', 'and it reads 2/3',
    [$('lap-cur').textContent, $('lap-total').textContent]);
 
@@ -99,7 +102,10 @@ ok(/right:/.test(rule('#lap-hud')) && /bottom:/.test(rule('#lap-hud'))
    'bottom right, rows right-aligned');
 ok(/conic-gradient/.test(rule('#lap-cp-plate')), 'the plate is chequered');
 ok(/--nav-accent/.test(rule('#lap-cp-plate::after')), 'with the accent bar down its right edge');
-ok(/background:\s*rgba/.test(rule('#lap-progress-chip')), 'the percentage sits in its own dark chip');
+ok(/background:\s*rgba/.test(rule('#lap-badge-chip')), 'the percentage and the lap count sit in their own dark chip');
+race({ lap: 1, laps: 1, elapsedMs: 0 });
+ok(!$('lap-progress').classList.contains('hidden') && $('lap-badge').classList.contains('hidden'),
+   'a point to point gets PROGRESS back');
 ok(!/background/.test(rule('#lap-timer')), 'and the clock is unboxed');
 ok(!$('lap-cp-track'), 'the old row of checkpoint pips is gone');
 
@@ -139,6 +145,16 @@ ok([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101, 111].map(place).join(' ')
 ok(row('race-card-sub') === '', 'no time sent: no time chip');
 msg({ action: 'raceCard', show: true, kind: 'result', holdMs: 0, label: 'DNF', timeMs: 0 });
 ok(row('race-card-main') === 'DNF' && row('race-card-sub') === '00:00.000', 'a label replaces the ordinal');
+
+console.log('\n-- the banner: FINAL LAP over the lap just finished --');
+msg({ action: 'raceCard', show: true, kind: 'banner', holdMs: 0, text: 'FINAL LAP', timeMs: 89290 });
+ok(card.classList.contains('banner') && !card.classList.contains('result'), 'shows as a banner');
+ok(row('race-card-main') === 'FINAL LAP' && row('race-card-sub') === '01:29.290' && row('race-card-top') === '',
+   'the reference frame: FINAL LAP over 01:29.290', [row('race-card-main'), row('race-card-sub')]);
+msg({ action: 'raceCard', show: true, kind: 'banner', holdMs: 0, text: 'FINAL LAP' });
+ok(row('race-card-sub') === '', 'no time sent: no time chip');
+msg({ action: 'raceCard', show: true, kind: 'result', holdMs: 0, position: 2 });
+ok(!card.classList.contains('banner') && card.classList.contains('result'), 'the next card is not left dressed as a banner');
 msg({ action: 'raceCard', show: false });
 ok(card.classList.contains('hidden'), 'and it can be hidden');
 ok(!/#race-card[^{]*\{[^}]*(transition|animation)/.test(css) && !/\.race-chip[^{]*\{[^}]*(transition|animation)/.test(css),

@@ -580,11 +580,15 @@
 
          The plate carries position when the race resource sends one and falls
          back to the checkpoint count when it does not, so a solo time trial
-         still has something to put there. "LAP 1/2" is only drawn for a race
-         that actually has more than one lap -- the reference is point to
-         point and shows none. -->
+         still has something to put there. The first row is LAP with the
+         count on a chip for a race that has laps, and PROGRESS with the
+         percentage on one for a point to point: the reference shows one or
+         the other, never both. -->
     <div id="lap-hud" class="hidden" aria-hidden="true">
-        <div id="lap-badge" class="hidden">LAP <span id="lap-cur">1</span>/<span id="lap-total">1</span></div>
+        <div id="lap-badge" class="hidden">
+            <span id="lap-badge-label">LAP</span>
+            <span id="lap-badge-chip"><span id="lap-cur">1</span>/<span id="lap-total">1</span></span>
+        </div>
         <div id="lap-progress">
             <span id="lap-progress-label">PROGRESS</span>
             <span id="lap-progress-chip"><span id="lap-progress-pct">0</span>%</span>

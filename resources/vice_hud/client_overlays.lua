@@ -251,6 +251,18 @@ exports('ShowRaceResult', function(data)
     })
 end)
 
+--- A line across the top with a time under it: FINAL LAP over the lap just
+--- finished. data: { text = 'FINAL LAP', timeMs = last lap, duration = ms
+--- (default 3000) }. nil hides it.
+exports('ShowRaceBanner', function(data)
+    if type(data) ~= 'table' then ui('raceCard', { show = false }) return end
+    ui('raceCard', {
+        show = true, kind = 'banner',
+        text = data.text, timeMs = data.timeMs,
+        holdMs = tonumber(data.duration),
+    })
+end)
+
 --- 3, 2, 1, go.
 ---   ShowRaceCountdown()            the whole run from 3, timed by the page
 ---   ShowRaceCountdown({ from = 5 })
@@ -423,15 +435,19 @@ end, false)
 RegisterCommand('hudshopoff', function() exports.vice_hud:HideShopItem() end, false)
 
 RegisterCommand('hudrace', function()
-    print('^3[vice_hud]^7 /hudrace — title card, countdown, race block, then the result card.')
+    print('^3[vice_hud]^7 /hudrace — title card, countdown, race block, FINAL LAP, then the result card.')
     exports.vice_hud:ShowRaceTitle({ series = "HIT 'N' RUN VC", name = 'SALTON TO WANING SANDS', type = 'GROUP RACE' })
     SetTimeout(5500, function() exports.vice_hud:ShowRaceCountdown() end)
     SetTimeout(8500, function()
-        exports.vice_hud:SetLapTimer({ position = 5, racers = 6, progress = 0.03, elapsedMs = 0, running = true })
+        exports.vice_hud:SetLapTimer({ position = 8, racers = 14, lap = 1, laps = 2, elapsedMs = 0, running = true })
     end)
-    SetTimeout(14500, function()
+    SetTimeout(12500, function()
+        exports.vice_hud:SetLapTimer({ position = 7, racers = 14, lap = 2, laps = 2, elapsedMs = 89290, running = true })
+        exports.vice_hud:ShowRaceBanner({ text = 'FINAL LAP', timeMs = 89290 })
+    end)
+    SetTimeout(18500, function()
         exports.vice_hud:SetLapTimer({ show = false })
-        exports.vice_hud:ShowRaceResult({ position = 1, timeMs = 88893 })
+        exports.vice_hud:ShowRaceResult({ position = 1, timeMs = 178893 })
     end)
 end, false)
 

@@ -280,14 +280,16 @@ that knows better when a player needs telling. `/hudnitrous` previews it.
 
 ### The race HUD
 
-Bottom right, as in the reference: `PROGRESS` and a percentage, the chequered
-plate with your position in the field, and the clock.
+Bottom right, as in the reference: a first row, the chequered plate with your
+position in the field, and the clock. The first row is `PROGRESS` and a
+percentage for a point to point, and `LAP` with the count on a chip (`2/2`)
+for a race that has laps: one or the other, as the reference draws them.
 
 ```lua
 exports.vice_hud:SetLapTimer({
     position  = 1,  racers = 6,    -- "1 / 6" on the plate
     progress  = 0.30,              -- 0.0 .. 1.0 along the route
-    lap = 1, laps = 1,             -- "LAP 1/2" is drawn only when laps > 1
+    lap = 1, laps = 1,             -- laps > 1 swaps PROGRESS for "LAP 1/2"
     cp  = 5, cpTotal = 16,         -- checkpoints this lap / per lap
     elapsedMs = 30390, running = true,
 })
@@ -300,7 +302,7 @@ count; with no `progress` the percentage is worked out from the checkpoints.
 them. While the block is up, action prompts and the honor toast move above it
 rather than sit underneath. `/hudlaptimer` previews it.
 
-The rest of a race is three more calls, each held on screen for as long as
+The rest of a race is four more calls, each held on screen for as long as
 the reference holds it and cut in and out with no fade, as it is there:
 
 ```lua
@@ -315,14 +317,17 @@ exports.vice_hud:ShowRaceCountdown({ from = 5 })
 exports.vice_hud:ShowRaceCountdown(3)             -- or one beat at a time: 3, 2, 1, 'go'
 exports.vice_hud:ShowRaceCountdown(false)         -- stop and clear
 
+-- as the last lap starts: FINAL LAP over the lap just finished (3.0 s)
+exports.vice_hud:ShowRaceBanner({ text = 'FINAL LAP', timeMs = 89290 })
+
 -- at the finish: placing over the time to the millisecond (2.0 s)
 exports.vice_hud:ShowRaceResult({ position = 1, timeMs = 88893 })   -- "1ST" / "01:28.893"
 exports.vice_hud:ShowRaceResult({ label = 'DNF' })
 ```
 
-`duration` (ms) on the title and the result overrides how long they stay; `0`
-leaves one up until the same export is called with `nil`. `/hudrace` plays the
-whole sequence.
+`duration` (ms) on the title, the banner and the result overrides how long
+they stay; `0` leaves one up until the same export is called with `nil`.
+`/hudrace` plays the whole sequence, as a two-lap race.
 
 Prompts are cleaned up automatically when the resource that registered them
 stops, so a crashed script cannot strand one on screen — give ids the

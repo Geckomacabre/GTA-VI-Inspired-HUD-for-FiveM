@@ -120,6 +120,19 @@ function SKRaceResult(position, elapsedMs)
     exports.vice_hud:ShowRaceResult({ position = position, timeMs = elapsedMs })
 end
 
+-- FINAL LAP over the lap just finished, as the last lap of a circuit starts.
+-- Called with the progress of the checkpoint just hit; `state` is the run's
+-- own table, which keeps the split between calls. Nothing on a route without
+-- laps, and nothing but the split without vice_hud.
+function SKLapSplit(state, lap, cpInLap, cpPerLap, laps, elapsedMs)
+    laps = laps or 1
+    if laps < 2 or cpInLap ~= cpPerLap or lap >= laps then return end
+    local lapMs = elapsedMs - (state.lapSplitMs or 0)
+    state.lapSplitMs = elapsedMs
+    if lap + 1 ~= laps or GetResourceState('vice_hud') ~= 'started' then return end
+    exports.vice_hud:ShowRaceBanner({ text = 'FINAL LAP', timeMs = lapMs })
+end
+
 -- Recovers "which lap, which checkpoint within that lap" from the flattened
 -- index SKRouteBuilder.buildCheckpointList produced, rather than tracking
 -- either separately — a 'circuit' route repeats def.checkpoints back to back

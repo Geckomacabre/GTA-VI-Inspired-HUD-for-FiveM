@@ -805,9 +805,10 @@
         var cur = $('lap-cur'), tot = $('lap-total');
         if (cur) cur.textContent = d.lap != null ? d.lap : 1;
         if (tot) tot.textContent = laps;
-        // A point-to-point race has no lap to count; the reference draws
-        // nothing there rather than "LAP 1/1".
+        // The first row is LAP for a race that has laps and PROGRESS for a
+        // point to point: the reference draws one or the other.
         show($('lap-badge'), +laps > 1);
+        show($('lap-progress'), !(+laps > 1));
 
         var pct = $('lap-progress-pct');
         if (pct) pct.textContent = lapProgressPct(d);
@@ -879,9 +880,15 @@
         if (!d || d.show === false) { show(card, false); return; }
 
         var result = d.kind === 'result';
+        // 'banner' is a line across the top with a time under it: FINAL LAP
+        // over the lap just finished.
+        var banner = d.kind === 'banner';
         var top = '', main = '', sub = '';
         if (result) {
             main = d.label != null ? String(d.label) : ordinal(d.position);
+            if (d.timeMs != null) sub = formatResultTime(d.timeMs);
+        } else if (banner) {
+            main = d.text != null ? String(d.text) : 'Final lap';
             if (d.timeMs != null) sub = formatResultTime(d.timeMs);
         } else {
             top = d.series || '';
@@ -893,10 +900,11 @@
         set('race-card-main', main);
         set('race-card-sub', sub);
         card.classList.toggle('result', result);
+        card.classList.toggle('banner', banner);
         show(card, true);
 
         // 1900 ms and 2000 ms are what the reference holds them for.
-        var hold = typeof d.holdMs === 'number' ? d.holdMs : (result ? 2000 : 1900);
+        var hold = typeof d.holdMs === 'number' ? d.holdMs : (result ? 2000 : banner ? 3000 : 1900);
         if (hold > 0) {
             raceCardTimer = setTimeout(function () {
                 raceCardTimer = null;

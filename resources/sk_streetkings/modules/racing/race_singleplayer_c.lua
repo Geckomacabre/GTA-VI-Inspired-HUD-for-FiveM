@@ -342,6 +342,7 @@ local function completeGate(run, status)
         elapsedMs = shownElapsed(run),
         running = not finished,
     })
+    SKLapSplit(run, lap, cpInLap, run.cpPerLap, run.laps, shownElapsed(run))
 end
 
 -- Air gates are flown through, not touched: judged against the plane's own frame every frame.

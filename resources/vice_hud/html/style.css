@@ -4173,6 +4173,11 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
                        squares, a 5px pink bar down its right edge
      00:30.39          cap height 38px, unboxed
 
+   A race with laps has LAP [2/2] as its first row instead. That row, the
+   plate's figures and where the block stands were re-measured on the
+   dirt-bike race (1920x1080), which is over bright ground and so shows how
+   much of each piece is see-through; the numbers are with each rule.
+
    Every size below is one of those numbers as a share of the frame, in cqh so
    the block holds its proportions on an ultrawide instead of stretching.
 
@@ -4183,30 +4188,36 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
    -------------------------------------------------------------------------- */
 #lap-hud {
     position: absolute;
-    right: 1.3cqw;
-    bottom: 3.6cqh;
+    right: 1.67cqw;
+    bottom: 3.13cqh;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 1.8cqh;
+    gap: 1.58cqh;
     pointer-events: none;
-    color: #e9e7ea;
+    color: #f4eff2;
     font-family: 'Bahnschrift', 'DIN Condensed', 'Oswald', 'Arial Narrow', sans-serif;
     font-stretch: 75%;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    text-shadow: 0 0.1cqh 0.3cqh rgba(0, 0, 0, 0.75);
+    /* The label and the clock are white with a hard dark line round them. */
+    --lap-line: #1c1820;
+    --lap-outline:
+        -0.17cqh -0.17cqh 0 var(--lap-line), 0.17cqh -0.17cqh 0 var(--lap-line),
+        -0.17cqh 0.17cqh 0 var(--lap-line), 0.17cqh 0.17cqh 0 var(--lap-line),
+        0 -0.17cqh 0 var(--lap-line), 0 0.17cqh 0 var(--lap-line),
+        -0.17cqh 0 0 var(--lap-line), 0.17cqh 0 0 var(--lap-line);
 }
 #lap-hud.hidden { display: none !important; }
 
-/* Only drawn for a race with more than one lap (see onLapHud). */
-#lap-badge {
-    font-size: 3.1cqh;
-    letter-spacing: 0.02em;
-}
-#lap-badge.hidden { display: none; }
+/* The first row: a label, then its figure on a dark chip. LAP 2/2 for a race
+   with laps, PROGRESS 30% for a point to point (see onLapHud).
 
+   The lap row is measured on the dirt-bike race at 1080p: the chip is
+   84 x 40px and stops 32px short of the right edge, its figure has 22px
+   capitals, and LAP (24px capitals) stands 26px to its left. */
+#lap-badge,
 #lap-progress {
     display: flex;
     align-items: center;
@@ -4214,7 +4225,15 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     font-size: 3.1cqh;
     letter-spacing: 0.02em;
 }
-#lap-progress-chip {
+#lap-badge.hidden,
+#lap-progress.hidden { display: none; }
+#lap-badge { gap: 2.15cqh; font-size: 3.16cqh; }
+/* The face's capitals sit a little low in their line; the padding puts them
+   level with the middle of the chip, as they are in the reference. */
+#lap-badge-label,
+#lap-progress-label { padding-bottom: 0.08em; text-shadow: var(--lap-outline); }
+#lap-progress-chip,
+#lap-badge-chip {
     min-width: 8.4cqh;
     height: 3.4cqh;
     padding: 0 0.6cqh;
@@ -4222,48 +4241,70 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(22, 21, 28, 0.66);
+    background: rgba(30, 25, 44, 0.88);
+}
+#lap-badge-chip {
+    min-width: 7.76cqh;
+    height: 3.7cqh;
+    /* The extra on the left is the letter-spacing after the last figure, so
+       the count stays in the middle of the chip. */
+    padding: 0 1.15cqh 0.3cqh calc(1.25cqh + 0.125em);
+    font-size: 2.9cqh;
+    letter-spacing: 0.125em;
 }
 
-/* The chequered plate. Two dark greys, drawn with one conic gradient per 2x2
-   block so the squares stay exactly square at any size -- the reference's flag
-   is a texture, and a gradient is the same pattern without a file to ship. */
+/* The chequered plate: 130 x 62.5px for "7 / 14", three 21px squares tall
+   starting light in its top left corner, darker towards the top, a 1px dark
+   line round it and a 5px pink bar inside that line down its right edge.
+   One conic gradient per 2x2 block keeps the squares square at any size --
+   the reference's flag is a texture, and a gradient is the same pattern
+   without a file to ship. */
 #lap-cp-plate {
     position: relative;
     min-width: 10.2cqh;
-    height: 6cqh;
-    padding: 0 1.4cqh 0 1cqh;
+    height: 5.79cqh;
+    padding: 0 1.96cqh 0.03cqh 1.09cqh;
     box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgba(30, 29, 38, 0.80);
-    background-image: conic-gradient(
-        rgba(92, 90, 104, 0.42) 0 25%, transparent 0 50%,
-        rgba(92, 90, 104, 0.42) 0 75%, transparent 0);
-    background-size: 4cqh 4cqh;
-    background-position: right 0.5cqh top;
+    background-color: rgba(38, 36, 54, 0.64);
+    background-image:
+        linear-gradient(to bottom, rgba(22, 16, 32, 0.6), rgba(22, 16, 32, 0) 72%),
+        conic-gradient(
+            transparent 0 25%, rgba(190, 175, 178, 0.27) 0 50%,
+            transparent 0 75%, rgba(190, 175, 178, 0.27) 0);
+    background-size: auto, 3.86cqh 3.86cqh;
+    background-position: 0 0, left top;
+    box-shadow: inset 0 0 0 0.1cqh rgba(24, 16, 24, 0.9);
 }
 /* The pink bar. The nav tile's own accent, so a character whose route and turn
    tile are teal gets a teal bar rather than a second, unrelated colour. */
 #lap-cp-plate::after {
     content: '';
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 0.5cqh;
+    top: 0.1cqh;
+    right: 0.1cqh;
+    bottom: 0.1cqh;
+    width: 0.46cqh;
     background: var(--nav-accent, var(--nav-accent-gender-default, #e79ac6));
 }
+/* 33px figures, a third smaller than the clock's. */
 #lap-cp-row {
-    font-size: 4.9cqh;
+    font-size: 4.32cqh;
+    word-spacing: -0.06em;
     white-space: nowrap;
 }
 
+/* 38.5px figures with the dark line round them, stopping 12px short of the
+   plate's right edge. */
 #lap-timer {
-    font-size: 4.9cqh;
-    /* The reference clock stops a little short of the plate's right edge. */
-    margin-right: 0.8cqh;
+    font-size: 4.95cqh;
+    /* Its line box is taller than its figures: this closes the gap under
+       the plate to the 21px of the reference. */
+    margin-top: -0.54cqh;
+    margin-right: 1.02cqh;
+    text-shadow: var(--lap-outline);
 }
 
 /* The race block takes the corner the action prompts and the honor toast
@@ -4341,6 +4382,32 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     height: 3.95cqh;
     font-size: 3.2cqh;
     margin-top: 0.3cqh;
+}
+/* FINAL LAP. Measured at 1080p: capitals 55px tall and 257px across starting
+   121px down, white with a 2px dark line round them, and 18px under them the
+   lap just finished on a 143 x 42px slate chip in 26px figures that stand
+   closer together than this face sets them. */
+#race-card.banner { top: 9.91cqh; gap: 0; }
+#race-card.banner #race-card-main {
+    font-size: 7.13cqh;
+    transform: scaleX(0.823);
+    color: #f6f3fa;
+    text-shadow:
+        -0.18cqh -0.18cqh 0 #2b2c3f, 0.18cqh -0.18cqh 0 #2b2c3f,
+        -0.18cqh 0.18cqh 0 #2b2c3f, 0.18cqh 0.18cqh 0 #2b2c3f,
+        0 -0.18cqh 0 #2b2c3f, 0 0.18cqh 0 #2b2c3f,
+        -0.18cqh 0 0 #2b2c3f, 0.18cqh 0 0 #2b2c3f;
+}
+#race-card.banner .race-chip {
+    height: 3.86cqh;
+    box-sizing: border-box;
+    margin-top: 0.92cqh;
+    padding: 0 1.135cqh 0.19cqh 0.985cqh;
+    font-size: 3.305cqh;
+    letter-spacing: -0.034em;
+    color: #dcdcf2;
+    background: rgba(66, 67, 86, 0.9);
+    box-shadow: inset 0 0 0 0.1cqh rgba(28, 28, 44, 0.85);
 }
 
 /* 3, 2, 1, go: one glyph in Pricedown, slanted, light with a dark outline and

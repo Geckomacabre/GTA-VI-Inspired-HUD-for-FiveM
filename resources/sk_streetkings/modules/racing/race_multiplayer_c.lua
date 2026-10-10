@@ -387,6 +387,8 @@ CreateThread(function()
                     elapsedMs = GetGameTimer() - raceState.startedAt,
                     running = not finished,
                 })
+                SKLapSplit(raceState, lap, cpInLap, raceState.cpPerLap, raceState.laps,
+                    GetGameTimer() - raceState.startedAt)
             end
         end
         Wait(sleep)
