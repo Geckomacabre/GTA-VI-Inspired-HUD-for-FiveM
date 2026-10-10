@@ -53,13 +53,6 @@ TILE = 32              # survey cells to a tile side
 WATER_STATES = (2, 6)
 SAND_STATE = 4
 
-# The mod's "buildings" are whatever its survey found standing: houses and
-# towers, but also electricity pylons, kiosks, sheds and tanks. Each is only an
-# outline and a height, so each is drawn as a flat-topped block -- which is a
-# fair picture of an office and a poor one of a pylon. Anything with a footprint
-# under this many square metres is left off the map rather than drawn as a box.
-MIN_BUILDING_AREA = 60.0
-
 # The mod keeps a body of water only when it is this many cells or more, and
 # a patch of sand only when it is this big and within reach of the water.
 WATER_MIN_CELLS = 150
@@ -121,28 +114,6 @@ def read_map(raw):
             if water[:2] == b'\x1f\x8b':
                 water = gzip.decompress(water)
     return bounds, layers, buildings, water
-
-
-def drop_small(layer, b, min_area):
-    """The footprint layer and the buildings, without the ones too small to be
-    buildings. Returns (layer, buildings, how many went)."""
-    xy, tri = layer
-    owner = b['owner']
-    n = len(b['height'])
-    p = xy[tri]
-    area = 0.5 * np.abs((p[:, 1, 0] - p[:, 0, 0]) * (p[:, 2, 1] - p[:, 0, 1])
-                        - (p[:, 2, 0] - p[:, 0, 0]) * (p[:, 1, 1] - p[:, 0, 1]))
-    keep = np.bincount(owner, area, n) >= min_area
-    if keep.all():
-        return layer, b, 0
-    renumber = np.cumsum(keep) - 1
-    tris = keep[owner]
-    rings = b['rings']
-    rings = rings[(rings[:, 0] < n) & keep[np.minimum(rings[:, 0], n - 1)]].copy()
-    rings[:, 0] = renumber[rings[:, 0]]
-    return ((xy, tri[tris]),
-            dict(height=b['height'][keep], owner=renumber[owner[tris]].astype('<u4'), pts=b['pts'], rings=rings),
-            int((~keep).sum()))
 
 
 def survey_grid(water, bounds):
@@ -300,15 +271,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--mod', required=True, help="the mod's MiniMap.dll (or its map, cut out)")
     ap.add_argument('--out', default=os.path.join(here, '..', '..', 'html', 'map3d'))
-    ap.add_argument('--min-area', type=float, default=MIN_BUILDING_AREA,
-                    help='leave out "buildings" with a footprint under this many square metres (0 keeps all)')
     args = ap.parse_args()
 
     raw = find_map(open(args.mod, 'rb').read())
     bounds, layers, buildings, water = read_map(raw)
-    dropped = 0
-    if buildings is not None and 0 in layers and args.min_area > 0:
-        layers[0], buildings, dropped = drop_small(layers[0], buildings, args.min_area)
     chunks = Chunks(bounds)
     os.makedirs(args.out, exist_ok=True)
 
@@ -348,8 +314,7 @@ def main():
             'roof': put(roof), 'roofStarts': put(roof_starts),
             'wall': put(wall), 'wallStarts': put(wall_starts),
         }
-        print('  buildings %7d, tallest %.0f m%s' % (len(buildings['height']), buildings['height'].max(),
-              ('  (%d under %.0f m2 left out)' % (dropped, args.min_area)) if dropped else ''))
+        print('  buildings %7d, tallest %.0f m' % (len(buildings['height']), buildings['height'].max()))
 
     grid = survey_grid(water, bounds)
     image = ground_image(grid)
