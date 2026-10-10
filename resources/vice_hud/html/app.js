@@ -2493,7 +2493,7 @@
         Object.keys(prompts).forEach(function (id) {
             var p = prompts[id];
             var row = document.createElement('div');
-            row.className = 'prompt';
+            row.className = 'prompt' + (p.off ? ' off' : '');
 
             var label = document.createElement('span');
             label.className = 'prompt-label';
@@ -2529,7 +2529,7 @@
     function onPrompt(d) {
         if (!d.id) return;
         if (d.show === false) delete prompts[d.id];
-        else prompts[d.id] = { label: d.label, glyph: d.glyph, device: d.device, hold: !!d.hold };
+        else prompts[d.id] = { label: d.label, glyph: d.glyph, device: d.device, hold: !!d.hold, off: !!d.off };
         renderPrompts();
     }
 
@@ -2555,10 +2555,253 @@
         padStyle = style;
         renderPrompts();
         if (lastWorldActions && lastWorldActions.show) onWorldActions(lastWorldActions);
+        if (lastBinoculars) onBinoculars(lastBinoculars);
         if (lastNitrousHint) {
             onNitrousHint({ show: true, refresh: true,
                             glyph: lastNitrousHint.glyph, device: lastNitrousHint.device });
         }
+    }
+
+    /* --- screen text and overlays ------------------------------------------
+       Subtitle, objective, help box, feed, title cards, the binocular mask
+       and the shop item panel. Each is one export in client_overlays.lua
+       and one handler here; none of them animates, they cut in and out as the
+       reference does.
+
+       Text takes two marks: **bold** for a key word, {braces} for the thing
+       the line is about (drawn pink, as the reference draws a destination). */
+    function richText(el, text) {
+        var s = String(text == null ? '' : text)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        s = s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+             .replace(/\{([^}]+)\}/g, '<em>$1</em>')
+             .replace(/\n/g, '<br>');
+        el.innerHTML = s;
+    }
+
+    var overlayTimers = {};
+    // Show `el` now and take it down after `holdMs` (0 or less: until told).
+    function holdFor(key, el, holdMs, fallbackMs, onDown) {
+        if (overlayTimers[key]) { clearTimeout(overlayTimers[key]); overlayTimers[key] = null; }
+        show(el, true);
+        var ms = typeof holdMs === 'number' ? holdMs : fallbackMs;
+        if (ms > 0) {
+            overlayTimers[key] = setTimeout(function () {
+                overlayTimers[key] = null;
+                show(el, false);
+                if (onDown) onDown();
+            }, ms);
+        }
+    }
+    function takeDown(key, el) {
+        if (overlayTimers[key]) { clearTimeout(overlayTimers[key]); overlayTimers[key] = null; }
+        show(el, false);
+    }
+
+    function onSubtitle(d) {
+        var el = $('subtitle');
+        if (!el) return;
+        if (!d || d.show === false || !d.text) { takeDown('subtitle', el); return; }
+        richText(el, d.text);
+        holdFor('subtitle', el, d.holdMs, 4000);
+    }
+
+    function onObjective(d) {
+        var el = $('objective');
+        if (!el) return;
+        var down = function () { if (stage) stage.classList.remove('has-objective'); };
+        if (!d || d.show === false || !d.text) { takeDown('objective', el); down(); return; }
+        richText(el, d.text);
+        if (stage) stage.classList.add('has-objective');
+        holdFor('objective', el, d.holdMs, 0, down);
+    }
+
+    function onHelpText(d) {
+        var el = $('help-text');
+        if (!el) return;
+        if (!d || d.show === false || !d.text) { takeDown('helpText', el); return; }
+        richText(el, d.text);
+        // The reference puts the wanted tells under a line about the police.
+        if (d.tells && d.tells.length) {
+            var row = document.createElement('div');
+            row.className = 'help-tells';
+            renderTells(row, d.tells);
+            el.appendChild(row);
+        }
+        holdFor('helpText', el, d.holdMs, 7000);
+    }
+
+    // One line in the feed on the right: "Crime reported", "+ $6" with the
+    // wallet beside it. Lines stack downward and leave on their own.
+    function onFeed(d) {
+        var box = $('feed');
+        if (!box || !d || !d.text) return;
+        var line = document.createElement('div');
+        line.className = 'feed-line';
+        var text = document.createElement('span');
+        richText(text, d.text);
+        line.appendChild(text);
+        if (d.icon) {
+            var img = document.createElement('img');
+            img.src = d.icon;
+            img.alt = '';
+            line.appendChild(img);
+        }
+        box.appendChild(line);
+        while (box.children.length > 5) box.removeChild(box.firstChild);
+        var ms = typeof d.holdMs === 'number' ? d.holdMs : 3500;
+        if (ms > 0) setTimeout(function () { if (line.parentNode) line.parentNode.removeChild(line); }, ms);
+    }
+
+    var TITLE_SPARKLE = '<svg class="title-sparkle" viewBox="0 0 30 34" aria-hidden="true">'
+        + '<path d="M11 12q1 9 10 10-9 1-10 10-1-9-10-10 9-1 10-10z"/>'
+        + '<path d="M23 0q.6 5.2 5.8 5.8-5.2.6-5.8 5.8-.6-5.2-5.8-5.8 5.2-.6 5.8-5.8z"/></svg>';
+
+    function onTitleCard(d) {
+        var el = $('title-card');
+        if (!el) return;
+        if (!d || d.show === false || !d.text) { takeDown('titleCard', el); return; }
+        var style = d.style === 'stack' || d.style === 'location' ? d.style : 'center';
+        el.className = style;
+        // A stacked card is one word a line unless the caller broke it itself.
+        var text = String(d.text);
+        if (style === 'stack' && text.indexOf('\n') < 0) text = text.split(/\s+/).join('\n');
+        el.textContent = text;
+        if (style === 'location') el.insertAdjacentHTML('beforeend', TITLE_SPARKLE);
+        holdFor('titleCard', el, d.holdMs, 3500);
+    }
+
+    var lastBinoculars = null;
+
+    function onBinoculars(d) {
+        var el = $('binoculars');
+        if (!el) return;
+        // Through binoculars there is the lens, what it is on, the prompts and
+        // any speech; the rest of the HUD waits (see #stage.bino).
+        if (stage) stage.classList.toggle('bino', !!(d && d.show !== false));
+        if (!d || d.show === false) { lastBinoculars = null; show(el, false); return; }
+        lastBinoculars = d;
+        var label = $('bino-label');
+        if (label) {
+            show(label, !!d.label);
+            $('bino-label-text').textContent = d.label || '';
+            setGlyph($('bino-label-btn'), d.glyph, d.device, 'wa-btn glyph');
+        }
+        show(el, true);
+    }
+
+    // { store, category, price, pay: ['bank','cash'], name, variant,
+    //   swatches: [{ color, locked }], selected (1-based), note, afford }
+    var SHOP_PAY = { cash: 'icons/cash.png', bank: 'icons/buckme.png' };
+
+    function onShop(d) {
+        var el = $('shop');
+        if (!el) return;
+        if (!d || d.show === false) {
+            show(el, false);
+            if (stage) stage.classList.remove('shopping');
+            return;
+        }
+        $('shop-store').textContent = d.store || '';
+        $('shop-category').textContent = d.category || '';
+        $('shop-price').textContent = d.price == null ? '' : money(d.price);
+        $('shop-name').textContent = d.name || '';
+        $('shop-variant').textContent = d.variant || '';
+
+        var pay = $('shop-pay');
+        pay.innerHTML = '';
+        (d.pay || ['bank', 'cash']).forEach(function (kind) {
+            if (!SHOP_PAY[kind]) return;
+            var img = document.createElement('img');
+            img.src = SHOP_PAY[kind];
+            img.alt = kind;
+            pay.appendChild(img);
+        });
+
+        var row = $('shop-swatches');
+        row.innerHTML = '';
+        (d.swatches || []).forEach(function (sw, i) {
+            var cell = document.createElement('div');
+            cell.className = 'shop-swatch' + (i + 1 === d.selected ? ' on' : '') + (sw && sw.locked ? ' locked' : '');
+            cell.style.backgroundColor = (sw && sw.color) || '#888';
+            row.appendChild(cell);
+        });
+
+        var cant = d.afford === false;
+        el.classList.toggle('cant', cant);
+        var note = d.note || (cant ? 'Not enough money' : '');
+        show($('shop-note'), !!note);
+        $('shop-note-text').textContent = note;
+
+        if (stage) stage.classList.add('shopping');
+        show(el, true);
+    }
+
+    // { make, model, stats: [{ label, value, max (default 10) }],
+    //   ratings: [{ value, kind: 'offroad' | 'road' }] }
+    var VS_RATING_ICON = {
+        offroad: '<svg viewBox="0 0 28 28" aria-hidden="true"><rect class="vs-tile" width="28" height="28"/>'
+            + '<path class="vs-mark" d="M4 21 10.500 9l4.500 7 3.500-4.500L24 21"/></svg>',
+        road: '<svg viewBox="0 0 28 28" aria-hidden="true"><rect class="vs-tile" width="28" height="28"/>'
+            + '<path class="vs-solid" d="M10.500 4h2l-1 20H6zM15.500 4h2l4.500 20h-5.500z"/></svg>'
+    };
+
+    function onVehStats(d) {
+        var el = $('veh-stats');
+        if (!el) return;
+        if (!d || d.show === false) { show(el, false); return; }
+        $('vs-make').textContent = d.make || '';
+        $('vs-model').textContent = d.model || '';
+
+        var rows = $('vs-rows');
+        rows.innerHTML = '';
+        (d.stats || []).forEach(function (s) {
+            var max = typeof s.max === 'number' && s.max > 0 ? s.max : 10;
+            var value = typeof s.value === 'number' ? s.value : 0;
+            var row = document.createElement('div');
+            row.className = 'vs-row';
+            var label = document.createElement('span');
+            label.className = 'vs-label';
+            label.textContent = s.label || '';
+            var num = document.createElement('span');
+            num.className = 'vs-value';
+            num.textContent = value.toFixed(1);
+            var bar = document.createElement('div');
+            bar.className = 'vs-bar';
+            var fill = document.createElement('div');
+            fill.className = 'vs-fill';
+            fill.style.setProperty('--vs', Math.max(0, Math.min(1, value / max)));
+            bar.appendChild(fill);
+            row.appendChild(label);
+            row.appendChild(num);
+            row.appendChild(bar);
+            rows.appendChild(row);
+        });
+
+        var ratings = $('vs-ratings');
+        ratings.innerHTML = '';
+        (d.ratings || []).forEach(function (r) {
+            var n = document.createElement('span');
+            n.textContent = r.value == null ? '' : String(r.value);
+            ratings.appendChild(n);
+            if (VS_RATING_ICON[r.kind]) ratings.insertAdjacentHTML('beforeend', VS_RATING_ICON[r.kind]);
+        });
+        show($('vs-foot'), (d.ratings || []).length > 0);
+        show(el, true);
+    }
+
+    // { show, strength (0..2), bars (fraction of the screen's height), pulse }
+    function onCineFx(d) {
+        var el = $('cine-fx');
+        if (!el) return;
+        var on = !!(d && d.show);
+        el.classList.toggle('active', on);
+        if (!on) return;
+        var strength = typeof d.strength === 'number' ? Math.max(0, Math.min(2, d.strength)) : 1;
+        var bars = typeof d.bars === 'number' ? Math.max(0, Math.min(0.2, d.bars)) : 0.032;
+        el.style.setProperty('--cine-strength', strength);
+        el.style.setProperty('--cine-bars', (bars * 100) + 'vh');
+        el.classList.toggle('pulse', d.pulse !== false);
     }
 
     // Targeting's page is a frame (#target-ui). Its Lua side wraps what it
@@ -4455,6 +4698,15 @@
         promptGlyphs: onPromptGlyphs,
         inputDevice: onInputDevice,
         'target:nui': onTargetNui,
+        subtitle: onSubtitle,
+        objective: onObjective,
+        helpText: onHelpText,
+        feed: onFeed,
+        titleCard: onTitleCard,
+        binoculars: onBinoculars,
+        shop: onShop,
+        cineFx: onCineFx,
+        vehStats: onVehStats,
         police: onPolice,
         policeEditor: onPoliceEditor,
         skills: onSkills,

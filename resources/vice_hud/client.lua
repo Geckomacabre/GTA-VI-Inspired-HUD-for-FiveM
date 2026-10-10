@@ -1458,6 +1458,7 @@ local function pushPrompt(id)
         -- rumble on appear (see ShowActionPrompt below) -- app.js's
         -- renderPrompts skips the normal glyph rendering entirely for this.
         denied = p.denied or nil,
+        off = p.off or nil,
     })
 end
 
@@ -1518,6 +1519,7 @@ ShowActionPrompt = function(id, label, key, opts)
         holdMs = holdMs, onHeld = opts.onHeld,
         heldSince = nil, lastFrac = 0, fired = false,
         denied = opts.denied and true or nil,
+        off = opts.off and true or nil,     -- shown greyed: there, but not usable right now
     }
     pushPrompt(id)
 end

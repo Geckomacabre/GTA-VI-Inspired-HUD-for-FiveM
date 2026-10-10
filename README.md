@@ -178,15 +178,33 @@ included here.
   step 3 for the exact entry and artwork to copy in. Depends on `ox_lib`,
   `ox_target`, `ox_inventory`, `qbx_core`, OneSync.
 
-- **`vi_crashcam`**: The GTA VI crash cam. Hit something hard enough and the
-  game cuts away — a couple of black frames, then a low camera at the
-  roadside watching your car go by in slow motion with the HUD off, then a
-  short fade back into the seat. A crash is speed lost in almost no time
-  (80 km/h or more, 45 of it gone inside a tenth of a second by default), so
-  braking never triggers it; `/crashcam` plays the shot without one.
-  Standalone, no dependencies — it hides `vice_hud` for the length of the
-  shot when that is running. Thresholds, timing and camera placement are in
-  its `config.lua`; see `resources/vi_crashcam/README.md`.
+- **`vi_crashcam`**: The GTA VI crash cam. Hit something hard enough and
+  the hit plays out in slow motion from where you were looking, then the game
+  cuts to a camera standing well back from the car, the edges of the screen
+  closed in and the HUD gone, and a little over three seconds later cuts back
+  to exactly the view you had, with time running back up to normal. A crash
+  is speed lost in almost no time (80 km/h or more, 45 of it gone inside a
+  tenth of a second by default), so braking never triggers it; `/crashcam`
+  plays the shot without one. Standalone, no dependencies. With `vice_hud`
+  running the overlay is its Focus effect in black with thin bars; without it
+  only the bars are drawn. Thresholds, timing, the overlay and where the
+  camera can stand are in its `config.lua`; see
+  `resources/vi_crashcam/README.md`.
+
+- **`vi_binoculars`**: Binoculars with a smooth zoom on the mouse wheel or the
+  triggers, mouse and controller look that slows as you zoom in, and a ped
+  that takes the stance and turns with the view. With `vice_hud` running the
+  lens mask, the `ZOOM` / `EXIT` prompts and the label naming what is being
+  looked at are its own. `/binoculars`, an optional key, or an inventory item.
+  No dependencies; see `resources/vi_binoculars/README.md`.
+
+- **`vi_wasted`**: The WASTED and BUSTED screens: slow motion, a camera
+  pulling back, a red wash and the word in Pricedown. Lifted out of the
+  [fenix-police fork](https://github.com/Geckomacabre/fenix-police) so they
+  can be used without it; it stands down when fenix-police itself is running.
+  WASTED plays when `qbx_medical` reports a death, BUSTED when a script asks
+  for it. GPL-3.0, like the resource it comes from; see
+  `resources/vi_wasted/README.md`.
 
 - **Targeting** (part of `vice_hud` now, in `vice_hud/target/`; it was the
   separate `osm-target` resource): World-space targeting with the *Context
@@ -299,6 +317,7 @@ its own.
    `resources/qbx_vehiclekeys`, `resources/gk_pausemenu`,
    `resources/qbx_relog`, `resources/vi_radio`,
    `resources/gk_basketball`, `resources/vi_crashcam`,
+   `resources/vi_binoculars`, `resources/vi_wasted`,
    `resources/Lenonida_customs`, `resources/streetkings_audio` and/or
    `resources/sk_streetkings` into your
    server's `resources/` folder. Keep the folder names as they are.
@@ -312,6 +331,8 @@ its own.
    ensure vi_radio
    ensure gk_basketball
    ensure vi_crashcam
+   ensure vi_binoculars
+   ensure vi_wasted
    ensure Lenonida_customs
    ensure streetkings_audio
    ensure sk_streetkings
@@ -347,7 +368,9 @@ its own.
    - `gk_basketball` needs **ox_lib**, **ox_target**, **ox_inventory**,
      **qbx_core**, and OneSync on. The `basketball` item also needs
      registering in `ox_inventory` — see `resources/gk_basketball/README.md`.
-   - `vi_crashcam` has no dependency.
+   - `vi_crashcam`, `vi_binoculars` and `vi_wasted` have no dependency.
+     Skip `vi_wasted` if you run fenix-police: it plays the same two
+     screens itself.
    - `sk_streetkings` needs **qbx_core**, **ox_lib**, **oxmysql**, and
      `sql/install.sql` from its folder run once. `streetkings_audio` is
      optional beside it.
@@ -530,6 +553,9 @@ that's a term of the upstream license these two resources are built on, not
 a choice made here. GPL-3.0 is still copyleft, though: it still stays open
 and it still can't be relicensed as closed/proprietary — the only guarantee
 above that doesn't carry over to these two specifically is "can't be sold."
+`resources/vi_wasted` is GPL-3.0 as well: its code is taken from the
+[fenix-police fork](https://github.com/Geckomacabre/fenix-police), and it
+keeps that licence and its own `LICENSE`.
 `resources/Lenonida_customs` is in the same position for the same reason: it
 is built on [renzu_customs](https://github.com/renzuzu/renzu_customs) by
 [renzuzu](https://github.com/renzuzu), keeps its own `LICENSE`, and stays

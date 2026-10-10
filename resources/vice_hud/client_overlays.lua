@@ -271,6 +271,157 @@ exports('ShowRaceCountdown', function(data)
     end
 end)
 
+-- =============================================================================
+-- Screen text and overlays
+-- =============================================================================
+-- Subtitles, the objective line, the help box, the feed, title cards, the
+-- binocular mask and the shop item panel. (WASTED and BUSTED are not here:
+-- they are the vi_wasted resource, taken from fenix-police.) Each is drawn by the page from
+-- one message; nothing here polls. Text takes two marks: **bold** for a key
+-- word and {braces} for the thing the line is about, which is drawn pink.
+--
+-- A duration is in ms. Where one is optional, nil means the element's own
+-- default and 0 means "until hidden"; passing nil / false as the text hides it.
+
+local function textMessage(action, text, durationMs, extra)
+    if text == nil or text == false or text == '' then
+        ui(action, { show = false })
+        return
+    end
+    local data = extra or {}
+    data.show = true
+    data.text = tostring(text)
+    data.holdMs = tonumber(durationMs)
+    ui(action, data)
+end
+
+--- One or two lines of speech, bottom centre. Default 4 s.
+exports('ShowSubtitle', function(text, durationMs)
+    textMessage('subtitle', text, durationMs)
+end)
+
+--- What to do next, under the subtitle: 'Return to {Lucia}'. Stays until
+--- hidden unless a duration is given.
+exports('ShowObjective', function(text, durationMs)
+    textMessage('objective', text, durationMs)
+end)
+
+--- The help box, top left. opts.tells = { 'outfit', 'voice', ... } draws that
+--- row of wanted tells under the text. Default 7 s.
+exports('ShowHelpText', function(text, durationMs, opts)
+    textMessage('helpText', text, durationMs, { tells = type(opts) == 'table' and opts.tells or nil })
+end)
+
+--- A line in the feed on the right ('Crime reported'). opts.icon is an image
+--- in html/ to draw after it; opts.duration defaults to 3.5 s.
+exports('ShowFeed', function(text, opts)
+    if text == nil or text == '' then return end
+    opts = type(opts) == 'table' and opts or {}
+    ui('feed', { text = tostring(text), icon = opts.icon, holdMs = tonumber(opts.duration) })
+end)
+
+--- A title card. style: 'center' (PROLOGUE), 'stack' (NINE MONTHS AGO., one
+--- word a line) or 'location' (a place name at the top). Default 3.5 s.
+exports('ShowTitleCard', function(text, style, durationMs)
+    textMessage('titleCard', text, durationMs, { style = style })
+end)
+
+--- The cinematic overlay: the Focus effect's vignette in black, with bars. It
+--- stays up while the HUD is hidden, which is the point of it. opts:
+--- { strength = 0..2 (default 1), bars = fraction of screen height (default
+--- 0.032, 0 for none), pulse = false for a still vignette }.
+exports('SetCinematicFx', function(active, opts)
+    if not active then ui('cineFx', { show = false }) return end
+    opts = type(opts) == 'table' and opts or {}
+    ui('cineFx', {
+        show = true,
+        strength = tonumber(opts.strength),
+        bars = tonumber(opts.bars),
+        pulse = opts.pulse ~= false,
+    })
+end)
+
+--- The binocular mask. opts: { label = 'PHONE CASES', key = control id for
+--- the button drawn beside the label }. A binocular script does the camera;
+--- this is only the picture (see resources/vi_binoculars).
+exports('SetBinocularOverlay', function(active, opts)
+    if not active then ui('binoculars', { show = false }) return end
+    opts = type(opts) == 'table' and opts or {}
+    local glyph, device
+    if opts.key ~= nil then glyph, device = ViceGlyphs.control(opts.key) end
+    ui('binoculars', { show = true, label = opts.label, glyph = glyph, device = device })
+end)
+
+--- The shop item panel. data: { store, category, price, pay = { 'bank',
+--- 'cash' }, name, variant, swatches = { { color = '#1f8a45', locked = true },
+--- ... }, selected = index, afford = false, note }. BUY / EXIT are ordinary
+--- action prompts; they sit in a row while the panel is up, and
+--- ShowActionPrompt's opts.off greys one that cannot be used.
+exports('ShowShopItem', function(data)
+    if type(data) ~= 'table' then ui('shop', { show = false }) return end
+    data.show = true
+    ui('shop', data)
+end)
+exports('HideShopItem', function()
+    ui('shop', { show = false })
+end)
+
+--- The vehicle stats panel, as shown beside a bike you can rent. data:
+--- { make = 'Maibatsu', model = 'Sanchez',
+---   stats = { { label = 'Speed', value = 4.5 }, ... },   -- value out of 10, or give max
+---   ratings = { { value = 649, kind = 'offroad' }, { value = 520, kind = 'road' } } }
+exports('ShowVehicleStats', function(data)
+    if type(data) ~= 'table' then ui('vehStats', { show = false }) return end
+    data.show = true
+    ui('vehStats', data)
+end)
+exports('HideVehicleStats', function()
+    ui('vehStats', { show = false })
+end)
+
+RegisterCommand('hudvehstats', function()
+    exports.vice_hud:ShowVehicleStats({
+        make = 'Maibatsu', model = 'Sanchez',
+        stats = {
+            { label = 'Speed', value = 4.5 }, { label = 'Acceleration', value = 5.4 },
+            { label = 'Asphalt handling', value = 5.2 }, { label = 'Off-road handling', value = 4.9 },
+            { label = 'Strength', value = 4.0 },
+        },
+        ratings = { { value = 649, kind = 'offroad' }, { value = 520, kind = 'road' } },
+    })
+    SetTimeout(8000, function() exports.vice_hud:HideVehicleStats() end)
+    print('^3[vice_hud]^7 /hudvehstats — sample vehicle stats panel for eight seconds.')
+end, false)
+
+RegisterCommand('hudtext', function()
+    exports.vice_hud:ShowSubtitle('Excuse me, sir. Sir. Owner of the pickup,\ngas needs to go in the tank.', 6000)
+    exports.vice_hud:ShowObjective('Return to {Lucia}', 6000)
+    exports.vice_hud:ShowHelpText('Repeated use of **Zombix** will temporarily have a weaker effect on your health.', 6000)
+    exports.vice_hud:ShowFeed('Crime reported')
+    print('^3[vice_hud]^7 /hudtext — subtitle, objective, help box and a feed line for six seconds.')
+end, false)
+
+RegisterCommand('hudtitle', function(_, args)
+    local style = args[1] or 'center'
+    local text = style == 'stack' and 'Nine months ago.' or style == 'location' and 'Port Gellhorn' or 'Prologue'
+    exports.vice_hud:ShowTitleCard(text, style)
+    print('^3[vice_hud]^7 /hudtitle [center|stack|location] — sample title card.')
+end, false)
+
+RegisterCommand('hudshop', function()
+    exports.vice_hud:ShowShopItem({
+        store = 'Game Horde', category = 'Earbuds', price = 139, name = 'Clef Earbuds', variant = 'Green',
+        swatches = {
+            { color = '#1c1c1e', locked = true }, { color = '#f1eef0', locked = true },
+            { color = '#f4ee2c', locked = true }, { color = '#a51c24', locked = true },
+            { color = '#1f8a45', locked = true }, { color = '#7a45ad', locked = true },
+        },
+        selected = 5, afford = false,
+    })
+    print('^3[vice_hud]^7 /hudshop — sample shop panel. /hudshopoff to clear.')
+end, false)
+RegisterCommand('hudshopoff', function() exports.vice_hud:HideShopItem() end, false)
+
 RegisterCommand('hudrace', function()
     print('^3[vice_hud]^7 /hudrace — title card, countdown, race block, then the result card.')
     exports.vice_hud:ShowRaceTitle({ series = "HIT 'N' RUN VC", name = 'SALTON TO WANING SANDS', type = 'GROUP RACE' })

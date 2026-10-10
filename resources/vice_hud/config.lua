@@ -15,6 +15,7 @@ Config.VehiclePanelMs = 5000
 -- player touched last.
 Config.PadGlyphs = 'xbox'
 
+
 -- Where the vehicle panel's nitrous pip gets its reading: a state bag key on
 -- the LOCAL player, written by whichever resource runs the nitrous itself.
 -- vice_hud only reads it. The value is a table --
@@ -695,9 +696,9 @@ Config.Crosshair = {
 --                            this row to get it back.
 Config.DefaultLayout = {
     status        = { x = 0.3, y = 1.1, sx = 1.45, sy = 1.45, fs = 1.75, ic = 1 },
-    topright      = { x = 0.2, y = 1, sx = 1.25, sy = 1.25 },
-    money         = { x = 0, y = -0.6, sx = 1.05, sy = 1.05, fs = 1.1, ic = 1.05 },
-    tells         = { x = 0.1, y = 0, sx = 1, sy = 1, fs = 1, ic = 1 },
+    topright      = { x = 0, y = 0, sx = 1, sy = 1 },
+    money         = { x = 0, y = 0, sx = 1, sy = 1, fs = 1, ic = 1 },
+    tells         = { x = 0, y = 0, sx = 1, sy = 1, fs = 1, ic = 1 },
     wanted        = { x = 0.4, y = 0.5, sx = 0.9, sy = 0.85, fs = 1.25, fw = 100, op = 1, rad = 1.1, ic = 1, ff = 'system-ui, sans-serif' },
     honor         = { x = -1.9, y = -7.3, sx = 1.1, sy = 1 },
     honorpop      = { x = 46.3, y = 0.1, sx = 1.1, sy = 1.1, fs = 0.45, ic = 1 },

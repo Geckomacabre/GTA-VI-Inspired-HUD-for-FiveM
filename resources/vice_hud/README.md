@@ -328,6 +328,40 @@ Prompts are cleaned up automatically when the resource that registered them
 stops, so a crashed script cannot strand one on screen — give ids the
 `yourresource:something` form for that to work.
 
+### Screen text and overlays
+
+Each of these is one export, empty until it is called, and measured off the
+reference. Text takes two marks: `**bold**` for a key word and `{braces}` for
+the thing the line is about, which is drawn pink. Durations are in ms; where
+one is optional, `nil` is the element's own default and `0` is "until hidden".
+
+| Export | What it draws |
+| --- | --- |
+| `ShowSubtitle(text, ms)` | one or two lines of speech, bottom centre (4 s) |
+| `ShowObjective(text, ms)` | what to do next, under the subtitle: `'Return to {Lucia}'` (until hidden) |
+| `ShowHelpText(text, ms, { tells = {...} })` | the help box, top left (7 s) |
+| `ShowFeed(text, { icon, duration })` | a line in the feed on the right: `'Crime reported'` (3.5 s) |
+| `ShowTitleCard(text, style, ms)` | `'center'` (PROLOGUE), `'stack'` (one word a line), `'location'` (a place name) |
+| `SetBinocularOverlay(on, { label, key })` | the lens mask; see `resources/vi_binoculars` for the binoculars themselves |
+| `ShowShopItem(data)` / `HideShopItem()` | store, category, price, item, variant, swatches, and why it cannot be bought |
+| `ShowVehicleStats(data)` / `HideVehicleStats()` | make over model, rated bars, the two ratings |
+| `SetCinematicFx(on, { strength, bars, pulse })` | the Focus effect in black with bars; stays up while the HUD is hidden (the crash cam uses it) |
+
+Passing `nil` / `false` as the text hides a text element. `ShowActionPrompt`
+takes `opts.off = true` to show a prompt greyed (there, but not usable right
+now), and while a shop panel is up the prompts lie in a row.
+
+WASTED and BUSTED are not here: they are `resources/vi_wasted`.
+
+`/hudtext`, `/hudtitle [center|stack|location]`, `/hudshop` and `/hudvehstats`
+show samples.
+
+### The top-right corner
+
+Wanted stars, tells, ammo, the weapon and money were re-measured against the
+clips where all of them are up at once, and those sizes are now the base
+styles; the shipped layout no longer scales that corner.
+
 ### The camera tell
 
 Five of the six wanted tells are worked out here. The sixth, `camera`, cannot

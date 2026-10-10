@@ -612,10 +612,20 @@ html, body {
      tells  w 1.11%  spacing 1.76%  right 1.82%  top 5.14%
    Star bottom lands at ~5.0%, so the rows sit almost flush — the old 1.55cqh
    gap pushed the tell row far below where it belongs. */
+/* Re-measured at 1080p on the clips where the whole column is up at once
+   (two stars, three tells, ammo, the weapon, one money row), and set as the
+   BASE here rather than reached through editor multipliers:
+     stars   24.4px, 36.9px apart, centre 43.6px down
+     tells   25px discs, 34px apart, centre 80px down
+     ammo    digits 21.3px tall, 17.8px between clip and reserve, centre 117px
+     weapon  63.5 x 41px, centre 165px
+     money   31.5px disc, digits 22.5px tall, 11.6px between them, rows 39px
+             apart; centre 214px under the weapon, 52px when alone
+   and one right edge for all of it, 33px in. */
 #topright {
     position: absolute;
-    right: 1.93cqw;
-    top: 2.96cqh;
+    right: 1.72cqw;
+    top: 2.91cqh;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -627,11 +637,11 @@ html, body {
      spacing  35.5px       = 1.85% centre-to-centre  => gap 0.57%
      right    36px         = 1.88%
      top      32px         = 2.96% */
-#stars { display: flex; gap: calc(0.73 * var(--w)); }
+#stars { display: flex; gap: calc(0.6525 * var(--w)); }
 
 .star {
-    width: calc((calc(1.15 * var(--w))) * var(--ic-topright, 1));
-    height: calc((calc(1.15 * var(--w))) * var(--ic-topright, 1));
+    width: calc((calc(1.271 * var(--w))) * var(--ic-topright, 1));
+    height: calc((calc(1.271 * var(--w))) * var(--ic-topright, 1));
     display: block;
     overflow: visible;
 }
@@ -662,19 +672,19 @@ html, body {
    shared column. */
 #tells {
     display: flex;
-    gap: calc(0.65 * var(--w));
+    gap: calc(0.4725 * var(--w));
     /* The stars and the tell row are separate groups in the reference, with a
        clear break between them — measured at ~0.45x a star's height across two
        reference frames. #topright's shared 0.14cqh row gap alone left them
        almost touching. */
-    margin-top: 0.78cqh;
+    margin-top: 0.93cqh;
     /* Tell row sits a hair further right than the stars (1.82% vs 1.93%).
        Left as raw cqw, NOT converted to --w: unlike the gap/margin-top above,
        this is a horizontal NUDGE of the row's position relative to the shared
        #topright column, not the row's own size -- the same "edge-anchored
        position, leave alone" reasoning the left/right/top offsets elsewhere
        get, even though it is spelled as a margin rather than an inset. */
-    margin-right: -0.11cqw;
+    margin-right: 0;   /* re-measured: one right edge for the whole column */
 }
 
 /* Measured off the reference: ~0.88% of width by ~1.94% of height, so a
@@ -682,8 +692,8 @@ html, body {
 .tell {
     /* Circles, per the GTA6 footage. Both axes use the same unit — the previous
        1.11cqw x 2.31cqh could only be round at one specific aspect ratio. */
-    width: calc((calc(1.25 * var(--w))) * var(--ic-tells, 1));
-    height: calc((calc(1.25 * var(--w))) * var(--ic-tells, 1));
+    width: calc((calc(1.3 * var(--w))) * var(--ic-tells, 1));
+    height: calc((calc(1.3 * var(--w))) * var(--ic-tells, 1));
     border-radius: 50%;
     /* Matched to the plate red baked into the cropped reference PNGs
        (weapon/person/people/vehicle, see TELL_IMG in app.js) so their
@@ -712,7 +722,9 @@ html, body {
     flex-direction: column;
     align-items: flex-end;
     gap: 0.45cqh;
-    margin-top: 1.15cqh;
+    /* Alone in the corner the first disc is centred 52px down, which the
+       column's own row gaps already give it. */
+    margin-top: 0;
 }
 .money-row { display: flex; align-items: center; gap: calc(0.6 * var(--w)); }
 
@@ -723,18 +735,21 @@ html, body {
     font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
     /* 1.62cqw rendered noticeably larger than the reference, which measures
        ~1.2% of screen width for the amount text. */
-    font-size: calc((calc(1.2 * var(--w))) * var(--fs-money, 1));
+    font-size: calc((3.23cqh) * var(--fs-money, 1));
     color: var(--text);
     text-shadow: 0 0.12cqh 0.26cqh rgba(0, 0, 0, 0.92);
     letter-spacing: var(--ls-money, 0.025em);
     line-height: 1;
     /* Digits are tabular so the string doesn't jitter as the amount changes. */
     font-variant-numeric: tabular-nums;
+    /* Pricedown's digits sit below the middle of its line box; this puts
+       their centre on the disc's, as the reference has them. */
+    transform: translateY(-0.075em);
 }
 
 .money-ic {
-    width: calc((calc(1.15 * var(--w))) * var(--ic-money, 1));
-    height: calc((calc(1.15 * var(--w))) * var(--ic-money, 1));
+    width: calc((2.9cqh) * var(--ic-money, 1));
+    height: calc((2.9cqh) * var(--ic-money, 1));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -791,14 +806,17 @@ html, body {
 #ammo {
     display: flex;
     align-items: baseline;
-    gap: calc(0.78 * var(--w));
+    /* Puts the digits' own centre 117px down at 1080p (Pricedown's digits sit
+       low in its line box). */
+    margin-top: 0.41cqh;
+    gap: calc(0.93 * var(--w));
     font-family: var(--ff-ammo, 'Pricedown', 'Segoe UI', Arial, sans-serif);
     line-height: 1;
     color: #d8d8d4;
     text-shadow: 0 0.15cqh 0.2cqh rgba(0, 0, 0, 0.9), 0 0 0.15cqh rgba(0, 0, 0, 0.8);
 }
-#ammo-clip { font-size: calc((2.9cqh) * var(--fs-ammo, 1)); color: #f0f0ec; }
-#ammo-reserve { font-size: calc((2.9cqh) * var(--fs-ammo, 1)); color: #cfcfca; }
+#ammo-clip { font-size: calc((3.03cqh) * var(--fs-ammo, 1)); color: #f0f0ec; }
+#ammo-reserve { font-size: calc((3.03cqh) * var(--fs-ammo, 1)); color: #cfcfca; }
 
 /* Measured 63x43px at 1920x1080 => 3.28% wide, 3.98% tall. */
 #weapon-icon {
@@ -807,6 +825,9 @@ html, body {
     max-height: calc((3.98cqh) * var(--ic-ammo, 1));
     object-fit: contain;
     filter: drop-shadow(0 0.15cqh 0.25cqh rgba(0, 0, 0, 0.85));
+    /* Centre 165px down under the ammo, and the money row 49px below that. */
+    margin-top: 1.14cqh;
+    margin-bottom: 0.84cqh;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1775,6 +1796,389 @@ html, body {
     justify-content: center;
 }
 
+/* -----------------------------------------------------------------------------
+   Screen text and full-screen overlays
+   -----------------------------------------------------------------------------
+   Measured at 1080p on the reference clips. cqh is 10.8px there.
+
+     subtitle    regular rounded sans, capitals 25.6px, lines 47px apart, centred,
+                 last baseline 90px above the bottom
+     objective   the same face in extra bold, capitals 18.3px, baseline 58px
+                 above the bottom; the thing to go to is pink
+     help box    32px in, 289px down, 420px wide, 16px of padding, capitals
+                 17.4px, key words bold, on a dark plate
+     feed        right-aligned 38px in, first line 428px down, lines 40px
+                 apart, capitals 16px
+   -------------------------------------------------------------------------- */
+@font-face {
+    font-family: 'ViceText';
+    src: url('fonts/PlusJakartaSans-Variable.ttf') format('truetype-variations');
+    font-weight: 200 800;
+    font-style: normal;
+    font-display: swap;
+}
+
+#subtitle, #objective, #help-text, #feed {
+    position: absolute;
+    font-family: 'ViceText', 'Segoe UI', Roboto, Arial, sans-serif;
+    color: #ececf0;
+    pointer-events: none;
+}
+#subtitle, #objective {
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 62cqw;
+    text-align: center;
+    text-shadow:
+        -0.14cqh -0.14cqh 0 rgba(8, 8, 10, 0.9), 0.14cqh -0.14cqh 0 rgba(8, 8, 10, 0.9),
+        -0.14cqh 0.14cqh 0 rgba(8, 8, 10, 0.9), 0.14cqh 0.14cqh 0 rgba(8, 8, 10, 0.9),
+        0 0 0.5cqh rgba(0, 0, 0, 0.75);
+}
+#subtitle {
+    bottom: 7.47cqh;
+    font-size: 3.21cqh;
+    font-weight: 400;
+    line-height: 1.352;
+}
+#objective {
+    bottom: 4.9cqh;
+    font-size: 2.3cqh;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+}
+#objective em, #subtitle em, #help-text em { font-style: normal; color: #e8869f; }
+
+#help-text {
+    left: var(--map-left, 1.67cqw);
+    top: 26.76cqh;
+    width: 39cqh;
+    box-sizing: border-box;
+    padding: 1.2cqh 1.48cqh;
+    font-size: 2.15cqh;
+    font-weight: 400;
+    line-height: 1.25;
+    background: rgba(38, 34, 46, 0.82);
+    border-radius: 0.28cqh;
+    box-shadow: inset 0 0 0 0.09cqh rgba(255, 255, 255, 0.14);
+}
+#help-text b, #subtitle b, #feed b { font-weight: 700; }
+#help-text .help-tells { display: flex; gap: 0.5cqh; margin-top: 0.7cqh; }
+#help-text .help-tells .tell { width: 2.1cqh; height: 2.1cqh; }
+
+#feed {
+    right: 1.98cqw;
+    top: 38.5cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1.72cqh;
+    font-size: 1.98cqh;
+    font-weight: 400;
+    line-height: 1;
+    text-shadow:
+        -0.12cqh -0.12cqh 0 rgba(8, 8, 10, 0.9), 0.12cqh -0.12cqh 0 rgba(8, 8, 10, 0.9),
+        -0.12cqh 0.12cqh 0 rgba(8, 8, 10, 0.9), 0.12cqh 0.12cqh 0 rgba(8, 8, 10, 0.9),
+        0 0 0.4cqh rgba(0, 0, 0, 0.7);
+}
+.feed-line { display: flex; align-items: center; gap: 1cqh; white-space: nowrap; }
+.feed-line img { height: 1.75cqh; width: auto; display: block; filter: drop-shadow(0 0 0.15cqh rgba(0, 0, 0, 0.8)); }
+
+/* Title cards. Three shapes in the reference:
+     stack     "NINE MONTHS AGO." -- very large capitals 96px tall, one word a
+               line, 160px apart, starting 613px in and 407px down
+     center    "PROLOGUE" -- capitals 124px tall, tracked out, centred 702px down
+     location  "PORT GELLHORN" -- a place name, capitals 45px tall, centred
+               136px down, with a pair of sparkles after it
+   All cut in and out, like the race cards. */
+#title-card {
+    position: absolute;
+    color: #f6f2f4;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    line-height: 1;
+    white-space: pre-line;
+    pointer-events: none;
+}
+#title-card.stack {
+    left: 31.9cqw;
+    top: 34.7cqh;
+    font-size: 12.7cqh;
+    line-height: 1.165;
+    letter-spacing: 0.05em;
+    transform: scaleX(1.12);
+    transform-origin: 0 0;
+}
+#title-card.center {
+    left: 50%;
+    top: 65cqh;
+    transform: translate(-50%, -50%);
+    font-size: 16.4cqh;
+    font-stretch: 75%;
+    letter-spacing: 0.03em;
+    text-shadow: 0 0 1.2cqh rgba(255, 200, 215, 0.35);
+    white-space: nowrap;
+}
+#title-card.location {
+    left: 50%;
+    top: 12.5cqh;
+    /* The reference letters this by hand, tall and very narrow: 13 characters
+       in 258px at a 45px cap. Squeezed to that width rather than spaced. */
+    transform: translate(-50%, -50%) scaleX(0.62);
+    display: flex;
+    align-items: center;
+    gap: 1.4cqh;
+    font-size: 5.83cqh;
+    font-stretch: 75%;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 0.9cqh rgba(255, 255, 255, 0.45), 0 0.2cqh 0.5cqh rgba(0, 0, 0, 0.55);
+    white-space: nowrap;
+}
+#title-card .title-sparkle { height: 0.95em; width: auto; flex: 0 0 auto; fill: currentColor; filter: drop-shadow(0 0 0.5cqh rgba(255, 255, 255, 0.5)); }
+
+/* Binoculars. A lens-shaped opening with a soft dark edge and the rest of the
+   screen black; a hairline reticle; the thing being looked at named bottom
+   left, button first; ZOOM is an ordinary action prompt bottom right. */
+#binoculars { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+#stage.bino > *:not(#binoculars):not(#prompts):not(#subtitle):not(#objective) { visibility: hidden !important; }
+#bino-lens {
+    position: absolute;
+    left: 2.6cqw;
+    right: 2.6cqw;
+    top: 2.2cqh;
+    bottom: 6.2cqh;
+    border-radius: 46cqh;
+    box-shadow:
+        0 0 0 200cqw #000,
+        inset 0 0 6cqh 3.4cqh rgba(0, 0, 0, 0.92),
+        inset 0 0 16cqh 2cqh rgba(0, 0, 0, 0.55);
+}
+#bino-reticle { position: absolute; inset: 0; width: 100%; height: 100%; }
+#bino-reticle path { fill: none; stroke: rgba(18, 18, 20, 0.6); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+#bino-label {
+    position: absolute;
+    left: calc(0.62 * var(--w));
+    bottom: 1.2cqh;
+    display: flex;
+    align-items: center;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    gap: 0.6cqh;
+}
+
+/* Shop item panel. Top left: the store dimmed, a slash, and under it what is
+   being browsed. Bottom left: how it is paid for and the price (dimmed when it
+   cannot be afforded), the item, the variant, a row of 110px swatches with the
+   chosen one outlined, and under a hairline the reason it cannot be bought.
+   The BUY / EXIT buttons are action prompts, laid in a row while this is up. */
+#shop { position: absolute; inset: 0; pointer-events: none; }
+#shop-head {
+    position: absolute;
+    left: 1.77cqw;
+    top: 2.3cqh;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    font-stretch: 80%;
+    text-transform: uppercase;
+    line-height: 1;
+    text-shadow: 0 0.15cqh 0.4cqh rgba(0, 0, 0, 0.6);
+}
+#shop-store { font-size: 3.3cqh; color: rgba(214, 212, 226, 0.58); }
+#shop-store:not(:empty)::after { content: ' /'; }
+#shop-category { margin-top: 0.75cqh; font-size: 4.23cqh; color: #f6f2f4; }
+#shop-item {
+    position: absolute;
+    left: 1.82cqw;
+    bottom: 3.1cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    color: #f2f0ea;
+}
+#shop-price-row { display: flex; align-items: center; gap: 1.2cqh; }
+#shop-pay { display: flex; gap: 1.2cqh; }
+#shop-pay img { height: 3.2cqh; width: auto; display: block; }
+#shop-price {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    font-size: 4.27cqh;
+    line-height: 1;
+    transform: translateY(-0.075em);
+    text-shadow: 0 0.14cqh 0.3cqh rgba(0, 0, 0, 0.9);
+}
+#shop.cant #shop-price { color: #8f8c98; }
+#shop-name {
+    margin-top: 1.17cqh;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    font-stretch: 80%;
+    font-size: 3.57cqh;
+    line-height: 1;
+    text-transform: uppercase;
+    text-shadow:
+        -0.12cqh -0.12cqh 0 #000, 0.12cqh -0.12cqh 0 #000, -0.12cqh 0.12cqh 0 #000, 0.12cqh 0.12cqh 0 #000,
+        0 0.2cqh 0.4cqh rgba(0, 0, 0, 0.6);
+}
+#shop-variant {
+    margin-top: 2.85cqh;
+    font-family: 'ViceText', 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 2.47cqh;
+    line-height: 1;
+    text-shadow: 0 0.12cqh 0.3cqh rgba(0, 0, 0, 0.85);
+}
+#shop-variant:empty, #shop-swatches:empty { display: none; }
+#shop-swatches { display: flex; gap: 0.99cqh; margin-top: 2.2cqh; }
+.shop-swatch {
+    position: relative;
+    width: 10.19cqh;
+    height: 10.19cqh;
+    box-sizing: border-box;
+    box-shadow: inset 0 0 0 0.1cqh rgba(255, 255, 255, 0.28);
+    background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 45%);
+}
+.shop-swatch.on { box-shadow: inset 0 0 0 0.3cqh #f6f2f4; }
+.shop-swatch.locked::after, .shop-cant {
+    font-family: 'Pricedown', 'Segoe UI', Arial, sans-serif;
+    color: #e0303a;
+    text-shadow: -0.1cqh -0.1cqh 0 #f6f2f4, 0.1cqh -0.1cqh 0 #f6f2f4, -0.1cqh 0.1cqh 0 #f6f2f4, 0.1cqh 0.1cqh 0 #f6f2f4;
+    line-height: 1;
+}
+.shop-swatch.locked::after { content: '$'; position: absolute; right: 0.9cqh; bottom: 0.7cqh; font-size: 2.9cqh; }
+#shop-note {
+    display: flex;
+    align-items: center;
+    gap: 1.6cqh;
+    margin-top: 2.74cqh;
+    padding-top: 1.7cqh;
+    min-width: 52.4cqh;
+    box-shadow: inset 0 0.1cqh 0 rgba(255, 255, 255, 0.22);
+    font-family: 'ViceText', 'Segoe UI', Roboto, Arial, sans-serif;
+    font-size: 2.47cqh;
+    line-height: 1;
+    text-shadow: 0 0.12cqh 0.3cqh rgba(0, 0, 0, 0.85);
+}
+.shop-cant { font-size: 3cqh; margin-left: 0.6cqh; }
+#stage.shopping #prompts { flex-direction: row; align-items: center; gap: 1.67cqh; }
+
+/* A prompt that is on screen but cannot be used right now: the reference greys
+   both the word and the button. */
+.prompt.off .prompt-label { color: #8a8794; }
+.prompt.off .g-face { fill: #76727f; }
+.prompt.off .g-ink, .prompt.off .g-text, .prompt.off .g-solid { opacity: 0.55; }
+
+/* Vehicle stats panel. Measured on the bike rental at 1080p: 418px wide,
+   32px in from the right, 505px down. A dark band with the make over the
+   model (72px), a grey body of five rows 60px apart -- a bold condensed
+   label, the figure on a dark chip at the right, and under them a 12px bar
+   filled to value/10 with a small marker on the end -- and a dark band at
+   the foot with the two ratings (47px). */
+#veh-stats {
+    position: absolute;
+    right: 1.67cqw;
+    top: 46.76cqh;
+    width: 38.7cqh;
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    font-stretch: 80%;
+    text-transform: uppercase;
+    line-height: 1;
+    color: #f6f2f4;
+    pointer-events: none;
+}
+#vs-head, #vs-foot { background: rgba(52, 47, 62, 0.95); display: flex; align-items: center; }
+#vs-head { position: relative; height: 6.65cqh; padding: 0 1.3cqh; overflow: hidden; }
+#vs-names { display: flex; flex-direction: column; justify-content: center; gap: 0.62cqh; height: 100%; }
+#vs-line { display: flex; align-items: center; gap: 0.6cqh; }
+#vs-icon { width: 2.7cqh; height: 2.12cqh; flex: 0 0 auto; fill: #f6f2f4; }
+#vs-icon .vs-key { fill: rgba(52, 47, 62, 1); }
+#vs-make { font-size: 2.09cqh; }
+#vs-model { font-size: 2.09cqh; color: #d6cbe6; font-weight: 600; }
+#vs-road { position: absolute; right: 1.2cqh; bottom: 0; height: 5.6cqh; width: auto; fill: rgba(255, 255, 255, 0.12); }
+#vs-rows {
+    background: rgba(150, 140, 160, 0.72);
+    padding: 1.26cqh 1.16cqh 1.52cqh 1.14cqh;
+    display: flex;
+    flex-direction: column;
+    gap: 1.48cqh;
+}
+.vs-row { display: grid; grid-template-columns: 1fr auto; align-items: center; row-gap: 0.1cqh; }
+.vs-label {
+    font-size: 2.2cqh;
+    text-shadow:
+        -0.11cqh -0.11cqh 0 #1d1a24, 0.11cqh -0.11cqh 0 #1d1a24,
+        -0.11cqh 0.11cqh 0 #1d1a24, 0.11cqh 0.11cqh 0 #1d1a24;
+}
+.vs-value {
+    min-width: 3.57cqh;
+    height: 2.87cqh;
+    box-sizing: border-box;
+    padding: 0 0.5cqh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(52, 47, 62, 1);
+    font-size: 2.2cqh;
+    font-variant-numeric: tabular-nums;
+}
+.vs-bar {
+    grid-column: 1 / -1;
+    position: relative;
+    height: 1.1cqh;
+    background: rgba(120, 110, 128, 0.9);
+    box-shadow: 0 0 0 0.13cqh #1d1a24;
+}
+.vs-fill { position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--vs, 0) * 100%); background: #f1e8f5; }
+.vs-fill::after {
+    content: '';
+    position: absolute;
+    right: -0.37cqh;
+    top: -0.38cqh;
+    width: 0.74cqh;
+    height: 1.86cqh;
+    box-sizing: border-box;
+    background: #fbf7fc;
+    border: 0.13cqh solid #1d1a24;
+}
+#vs-foot { height: 4.38cqh; padding: 0 1.14cqh; justify-content: space-between; }
+#vs-foot-label { font-size: 2.09cqh; }
+#vs-ratings { display: flex; align-items: center; gap: 0.9cqh; font-size: 2.09cqh; font-variant-numeric: tabular-nums; }
+#vs-ratings svg { width: 2.7cqh; height: 2.7cqh; display: block; margin-right: 0.5cqh; }
+#vs-ratings svg:last-child { margin-right: 0; }
+#vs-ratings .vs-tile { fill: #fbf7fc; }
+#vs-ratings .vs-mark { fill: none; stroke: #1d1a24; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+#vs-ratings .vs-solid { fill: #1d1a24; }
+
+/* Cinematic overlay (SetCinematicFx; the crash cam uses it). The same
+   construction as #focus-fx -- a vignette that closes the edges in, an inner
+   shadow, a slow breathe -- in black rather than Focus's purple, plus the two
+   bars. It cuts in and out with the shot; nothing fades. vh, not cqh: it sits
+   outside the stage so that it survives the HUD being hidden. */
+#cine-fx {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    display: none;
+    background:
+        radial-gradient(ellipse 150% 135% at 50% 50%,
+            transparent 40%,
+            rgba(10, 8, 14, calc(0.34 * var(--cine-strength, 1))) 72%,
+            rgba(4, 3, 8, calc(0.74 * var(--cine-strength, 1))) 100%);
+    box-shadow: inset 0 0 14vh rgba(0, 0, 0, calc(0.5 * var(--cine-strength, 1)));
+}
+#cine-fx.active { display: block; }
+#cine-fx.active.pulse { animation: cineFxPulse 2600ms ease-in-out infinite; }
+@keyframes cineFxPulse {
+    0%, 100% { transform: scale(1); filter: brightness(1); }
+    50%      { transform: scale(1.04); filter: brightness(1.18); }
+}
+.cine-bar { position: absolute; left: -5%; right: -5%; height: var(--cine-bars, 3.2vh); background: #000; }
+.cine-top { top: 0; }
+.cine-bottom { bottom: 0; }
+@media (prefers-reduced-motion: reduce) {
+    #cine-fx.active.pulse { animation: none; }
+}
+
 /* Targeting's own page, hosted as a frame over the HUD (see index.html). It is
    transparent and takes no clicks until one of its panels opens. */
 #target-ui {
@@ -2647,8 +3051,8 @@ html, body {
    rows ~40% further apart than the reference. */
 #status    { gap: calc(0.28 * var(--w) * var(--sp-status, 1)); }
 #topright  { gap: calc(0.14cqh * var(--sp-topright, 1)); }
-#tells     { gap: calc(0.65 * var(--w) * var(--sp-tells, 1)); }
-#money     { gap: calc(0.45cqh * var(--sp-money, 1)); }
+#tells     { gap: calc(0.4725 * var(--w) * var(--sp-tells, 1)); }
+#money     { gap: calc(0.38cqh * var(--sp-money, 1)); }
 #slots     { gap: calc(0.45cqh * var(--sp-slots, 1)); }
 #wanted    { gap: calc(1.1cqh  * var(--sp-wanted, 1)); }
 #honor     { gap: calc(0.8 * var(--w) * var(--sp-honor, 1)); }

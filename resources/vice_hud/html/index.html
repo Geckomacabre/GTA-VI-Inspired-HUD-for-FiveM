@@ -644,6 +644,74 @@
     </div>
 
     <!-- Action prompts ---------------------------------------------------- -->
+    <!-- Screen text and full-screen overlays -------------------------------
+         Everything here is driven by an export (client_overlays.lua) and is
+         empty until one is called: subtitles and the objective line at the
+         bottom, the help box top left, the feed on the right, title cards, the
+         binocular mask, and the shop item panel. Sizes and
+         positions are measured off the reference; see style.css. -->
+    <div id="subtitle" class="hidden"></div>
+    <div id="objective" class="hidden"></div>
+    <div id="help-text" class="hidden"></div>
+    <div id="feed"></div>
+    <div id="title-card" class="hidden"></div>
+    <div id="binoculars" class="hidden">
+        <div id="bino-lens"></div>
+        <svg id="bino-reticle" viewBox="0 0 1920 1080" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M533 284v-14h14M1387 284v-14h-14M533 796v14h14M1387 796v14h-14"/>
+            <path d="M310 365q-24 174 0 348M1610 365q24 174 0 348"/>
+            <path d="M952 540h20M962 530v20"/>
+        </svg>
+        <div id="bino-label" class="hidden">
+            <span id="bino-label-btn" class="wa-btn glyph"></span>
+            <span id="bino-label-text" class="wa-label"></span>
+        </div>
+    </div>
+    <div id="shop" class="hidden">
+        <div id="shop-head">
+            <div id="shop-store"></div>
+            <div id="shop-category"></div>
+        </div>
+        <div id="shop-item">
+            <div id="shop-price-row">
+                <span id="shop-pay"></span>
+                <span id="shop-price"></span>
+            </div>
+            <div id="shop-name"></div>
+            <div id="shop-variant"></div>
+            <div id="shop-swatches"></div>
+            <div id="shop-note" class="hidden">
+                <span class="shop-cant">$</span><span id="shop-note-text"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vehicle stats: make over model, five rated bars, and the two ratings.
+         Shown beside a vehicle that can be rented or bought
+         (exports.vice_hud:ShowVehicleStats). -->
+    <div id="veh-stats" class="hidden">
+        <div id="vs-head">
+            <div id="vs-names">
+            <div id="vs-line">
+            <svg id="vs-icon" viewBox="0 0 28 22" aria-hidden="true">
+                <path d="M5.2 8.2 7 3.6Q7.6 2 9.3 2h9.4q1.700 0 2.3 1.6l1.800 4.600q2.200.5 2.200 2.700V17q0 1-1 1h-.8v1.600q0 1.400-1.400 1.400h-1.600q-1.400 0-1.400-1.400V18H8.200v1.600Q8.200 21 6.800 21H5.200q-1.400 0-1.400-1.400V18H3q-1 0-1-1v-6.100q0-2.200 2.200-2.700z"/>
+                <path class="vs-key" d="M9.300 11.200a2.300 2.300 0 1 0 2.200 3h2.100v1.300h1.500v-1.300h1.200v1.300h1.500v-1.300h1.200v-1.600h-7.500a2.300 2.300 0 0 0-2.200-1.400z"/>
+            </svg>
+                <span id="vs-make"></span>
+            </div>
+                <div id="vs-model"></div>
+            </div>
+            <svg id="vs-road" viewBox="0 0 120 60" aria-hidden="true">
+                <path d="M0 60 52 4h4L22 60zM34 60 57 4h3l-8 56zM64 60 60 4h3l19 56zM98 60 64 4h4l52 56z"/>
+            </svg>
+        </div>
+        <div id="vs-rows"></div>
+        <div id="vs-foot">
+            <span id="vs-foot-label">Rating</span>
+            <span id="vs-ratings"></span>
+        </div>
+    </div>
+
     <div id="prompts"></div>
 
 </div>
@@ -957,6 +1025,16 @@
         <div id="ed-resize" role="separator" aria-label="resize the editor"
              title="Drag to resize"></div>
     </div>
+</div>
+
+<!-- Cinematic overlay --------------------------------------------------------
+     The Focus effect's vignette in black, with thin bars top and bottom, for
+     a cutaway such as the crash cam (exports.vice_hud:SetCinematicFx). Outside
+     .stage on purpose: a cutaway hides the HUD, which hides everything in the
+     stage, and this has to stay up while it is hidden. -->
+<div id="cine-fx" aria-hidden="true">
+    <div class="cine-bar cine-top"></div>
+    <div class="cine-bar cine-bottom"></div>
 </div>
 
 <!-- Manufacturer palette. Loaded BEFORE app.js, which reads it the first
