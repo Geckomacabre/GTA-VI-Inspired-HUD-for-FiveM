@@ -1000,8 +1000,24 @@ local radarWanted = nil     -- the last thing we ASKED for, which is not the sam
 local hudHiddenForDeath = false -- debounces the SetHudVisible message below to one send per transition
 local function setRadar(on)
     on = on and true or false
-    radarWanted = on
-    DisplayRadar(on)
+    -- The drawn minimap (client_map3d.lua) stands in for the engine's radar
+    -- whenever it can. Whether a map belongs on screen is still decided by the
+    -- callers; this only settles which of the two answers. `engine` is what
+    -- the hide-enforcer below holds the game to, so nothing else can switch
+    -- the real radar back on underneath the drawn one.
+    --
+    -- Behind pcall on purpose. This runs in the HUD's main poll loop, and a
+    -- fault in the drawn map must cost the drawn map and nothing else: if
+    -- either call fails the answer is "the engine draws it", as before.
+    local drawn = false
+    if ViceMap3D and ViceMap3D.owns and ViceMap3D.show then
+        local okay, owns = pcall(ViceMap3D.owns)
+        drawn = on and okay and owns == true
+        if not pcall(ViceMap3D.show, on and drawn, northBlip) then drawn = false end
+    end
+    local engine = on and not drawn
+    radarWanted = engine
+    DisplayRadar(engine)
     if on ~= radarShown then
         radarShown = on
         ui('mapRect', { visible = on })

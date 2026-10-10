@@ -12,3 +12,7 @@ resources/vice_hud/**/*.orig-rgbonly
 
 # Per-server runtime state, not shipped defaults
 resources/vice_hud/theme.json
+
+# The drawn minimap's world and blip sheet: built per server by
+# tools/map3d/build.py and blips.py from files that are not ours to hand out.
+resources/vice_hud/html/map3d/
