@@ -173,29 +173,6 @@ Config.Stations = {
     ['RADIO_37_MOTOMAMI']              = { label = 'MOTOMAMI Los Santos',       logo = 'MOTOMAMI.png',               genre = 'Latin' },
 }
 
--- GTA VI station names and carousel tiles, worn by the GTA V station nearest
--- each in kind. Only the name and the tile change: the music and the DJs are
--- still the GTA V station's, so a DJ will still say the old name on air.
--- false leaves every station as itself; take a line out to leave that one.
-Config.GTA6Stations = true
-Config.GTA6Skin = {
-    ['RADIO_06_COUNTRY']    = { label = 'Back Country Radio',   logo = 'BackCountryRadio.png' },     -- Rebel Radio
-    ['RADIO_09_HIPHOP_OLD'] = { label = 'Dirty South Classics', logo = 'DirtySouthClassics.png' },   -- West Coast Classics
-    ['RADIO_02_POP']        = { label = 'Flash FM',             logo = 'FlashFM.png' },              -- Non-Stop-Pop FM
-    ['RADIO_08_MEXICAN']    = { label = 'Cocoteo FM',           logo = 'CocoteoFM.png' },            -- East Los FM
-    ['RADIO_13_JAZZ']       = { label = 'Afrobank FM',          logo = 'AfrobankFM.png' },           -- Worldwide FM
-    ['RADIO_04_PUNK']       = { label = 'The Chamber 106.6',    logo = 'TheChamber106.6.png' },      -- Channel X
-}
-if Config.GTA6Stations then
-    for id, skin in pairs(Config.GTA6Skin) do
-        local station = Config.Stations[id]
-        if station then
-            station.label = skin.label or station.label
-            station.logo = skin.logo or station.logo
-        end
-    end
-end
-
 -- ---------------------------------------------------------------------------
 -- On Demand
 -- ---------------------------------------------------------------------------
