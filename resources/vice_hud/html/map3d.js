@@ -21,9 +21,9 @@
  *               the GPS line(s) as world x,y pairs, `head` on the one that
  *               starts at the player; and where each ends -- ringed, with the
  *               place's blip picture in the ring if it ends at one
- *   map3dBlips  { list: [[x, y, sprite, r, g, b, a, flags, rot], ...] }
- *               flags: 1 = stays on the edge when out of view, 2 = turns with
- *               its heading
+ *   map3dBlips  { list: [[x, y, sprite, r, g, b, a, flags], ...] }
+ *               flags: 1 = stays on the edge when out of view. A blip's icon
+ *               is always drawn upright, as the engine's radar draws it
  *   map3dMoving { list }                    the same, for blips that ride an
  *                                           entity and so are sent more often
  *
@@ -792,8 +792,7 @@
             cell = atlas && atlas.cells[b[2]];
             if (cell == null) { dots.push([at.x, at.y, tint]); continue; }
             cols = atlas.cols; rows = atlas.rows; cx = cell % cols; cy = Math.floor(cell / cols);
-            var rot = (b[7] & 2) ? (pos.c - b[8]) * Math.PI / 180 : 0;
-            sprite(at.x + m, at.y + m, size, rot, cx / cols, cy / rows, (cx + 1) / cols, (cy + 1) / rows, tint);
+            sprite(at.x + m, at.y + m, size, 0, cx / cols, cy / rows, (cx + 1) / cols, (cy + 1) / rows, tint);
         }
         // A route that ends at a place: the place's own picture in the ring.
         for (i = 0; i < marks.length; i++) {
