@@ -3320,6 +3320,13 @@ CreateThread(function()
         local stamina, staminaKnown = ViceVitals.readStamina(ped, playerId, Config.Tick)
         if not staminaKnown then stamina = 100.0 end
         ViceVitals.updateExhaustion(stamina)
+        -- Stamina being SPENT is its own piece of news: the bolt beside the bar
+        -- marks it starting (client_vitals.lua sends that itself), and the
+        -- drawn minimap's marker sends out rings for as long as it lasts.
+        do
+            local spending = ViceVitals.spendingStamina(ped, stamina, Config.Tick)
+            if ViceMap3D and ViceMap3D.ripple then pcall(ViceMap3D.ripple, spending) end
+        end
 
         -- nil while surfaced, and an absent key is how the page knows the
         -- stamina row is showing stamina. Sent every tick either way, so
@@ -3336,6 +3343,9 @@ CreateThread(function()
             focus   = math.floor(ViceVitals.focusMeter()),
             focusActive = ViceVitals.focusActive(),
             stamina = math.floor(math.max(0, math.min(100, stamina))),
+            -- Only with Config.Stamina.boltRed = 'drain': the bolt held red
+            -- for as long as the bar is going down. Absent otherwise.
+            boltRed = ViceVitals.boltRed() or nil,
             oxygen  = oxygen and math.floor(oxygen) or nil,
             -- Both absent unless there is a cap, so the tail's presence is the
             -- warning and no separate flag can contradict it.

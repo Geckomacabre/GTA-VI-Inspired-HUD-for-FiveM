@@ -19,6 +19,11 @@
 --
 --   ViceMap3D.police(state)     'contact', 'searching', 'red', or nil
 --
+-- and one from its status readout, which already knows whether the player is
+-- spending stamina:
+--
+--   ViceMap3D.ripple(on)        rings going out from the player's marker
+--
 -- Loaded before client.lua so the table exists by the time setRadar runs.
 -- Nothing here reaches back into client.lua.
 --
@@ -44,6 +49,7 @@ local pageOk = false        -- the page has loaded its world and can draw
 local pageWhy = nil         -- and if it cannot, what it said
 local drawing = false       -- what the page was last told
 local policeState = nil     -- what the police know, as client.lua last said
+local rippling = false      -- the player is spending stamina, likewise
 local north = true
 local configSent = false
 local routeDirty = true
@@ -84,11 +90,15 @@ function ViceMap3D.show(on, showNorth)
         view.north = north and view.north ~= false
         view.buildings = C.buildings ~= false
         msg.config = { view = view, paint = C.paint, paintNight = C.paintNight,
-                       police = type(C.police) == 'table' and C.police or nil }
+                       police = type(C.police) == 'table' and C.police or nil,
+                       ripple = type(C.ripple) == 'table' and C.ripple or nil }
     end
     -- Said again with every "draw": the page may have been reloaded, or the
     -- map may have been down while the police found or lost the player.
-    if drawing then msg.police = policeState or false end
+    if drawing then
+        msg.police = policeState or false
+        msg.ripple = rippling
+    end
     say('map3d', msg)
     if drawing then routeDirty = true end
 end
@@ -103,6 +113,16 @@ function ViceMap3D.police(state)
     if state == policeState then return end
     policeState = state
     if drawing then say('map3d', { police = state or false }) end
+end
+
+--- Whether the player is spending stamina. While they are, the reference
+--- sends rings out from their marker; the page does the drawing and the
+--- timing, this only says when it starts and stops.
+function ViceMap3D.ripple(on)
+    on = on == true and C.ripple ~= false
+    if on == rippling then return end
+    rippling = on
+    if drawing then say('map3d', { ripple = on }) end
 end
 
 -- The page says hello each time it loads, which is also each time it

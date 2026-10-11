@@ -286,6 +286,33 @@
     var healthFlashTimer = null;
     var healthRecentlyChanged = false;
 
+    /* The bolt beside the stamina bar, in red. Two things can ask for it:
+       a blink (`staminaBolt` with `ms`, sent by client_vitals.lua the moment
+       a sprint begins -- which is what the reference does), and `boltRed` in
+       the status payload, which holds it for as long as the bar is going down
+       (Config.Stamina.boltRed = 'drain'). Either one shows it; it is a class
+       on the row and nothing more, so there is no fade to get stuck in. */
+    var boltBlink = false, boltHeld = false, boltTimer = null;
+
+    function paintBolt() {
+        var row = $('s-stamina');
+        if (row) row.classList.toggle('bolt-red', boltBlink || boltHeld);
+    }
+
+    function onStaminaBolt(d) {
+        if (boltTimer) { clearTimeout(boltTimer); boltTimer = null; }
+        boltBlink = !!(d && d.red);
+        var ms = Number(d && d.ms);
+        if (boltBlink && isFinite(ms) && ms > 0) {
+            boltTimer = setTimeout(function () {
+                boltTimer = null;
+                boltBlink = false;
+                paintBolt();
+            }, Math.min(ms, 5000));
+        }
+        paintBolt();
+    }
+
     function onStatus(d) {
         var health = d.health == null ? 100 : d.health;
         var focus = d.focus == null ? 100 : d.focus;
@@ -333,6 +360,8 @@
         var focusFx = $('focus-fx');
         if (focusFx) focusFx.classList.toggle('active', focusActive);
         setFill('s-stamina', stamina);
+        boltHeld = d.boltRed === true;
+        paintBolt();
         if (submerged) setFill('s-oxygen', oxygen);
 
         // Nominal state is an empty top-left corner, matching the reference.
@@ -4690,6 +4719,7 @@
 
     var HANDLERS = {
         status: onStatus,
+        staminaBolt: onStaminaBolt,
         wanted: onWanted,
         cash: onCash,
         duffle: onDuffle,

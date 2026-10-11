@@ -12,12 +12,13 @@
  * frame is a few dozen draw calls over the 256 m squares around the player,
  * and a frame is only drawn when client_map3d.lua says something moved.
  *
- *   map3d       { load, show, config, night, police }
+ *   map3d       { load, show, config, night, police, ripple }
  *               fetch the world; on or off; Config.Map3D's view and paints;
- *               how far into the night it is, 0-1; and what the police know:
+ *               how far into the night it is, 0-1; what the police know:
  *               'contact' (they can see the player), 'searching' (they have
  *               lost sight and are looking), 'red' (shaken off, still wanted),
- *               or false
+ *               or false; and whether the player is spending stamina, which
+ *               sends rings out from their marker
  *   map3dPos    { x, y, c, h, s }           position, camera and ped heading
  *                                           (degrees), speed (m/s)
  *   map3dRoute  { routes: [{ pts, rgb, rim, head }], ends: [{ x, y, rgb, ring, icon, iconRgb }] }
@@ -116,6 +117,48 @@
         }
         return moving;
     }
+    // Stamina. While the player is spending it the reference sends rings out
+    // from their marker: thin and light, a new one from the marker's rim every
+    // 0.4 s, each growing at a steady 2.65 marker radii a second and thinning
+    // away to nothing at 4, so two or three are on the map at once and the
+    // last of them is gone a second after the running stops. Tracked through
+    // seventeen frames of the footage, and its brightness set against the
+    // same frames; every length here is in marker radii.
+    var RIPPLE = {
+        every: 0.4,         // seconds between one ring and the next
+        speed: 2.65,        // marker radii a second
+        from: 1.0,          // where a ring starts: the marker's rim
+        to: 4.0,            // and where it has faded out (the last seen is at 3.5)
+        alpha: 0.72,        // at the rim; a straight line down to nothing at `to`
+        width: 0.14,        // of the line
+        wake: 0.3,          // the faint wash a ring leaves inside itself, as a
+        wakeLength: 1.1,    //   part of its own brightness, and how far in
+        rgb: [255, 255, 255]
+    };
+    var ripple = { on: false, rings: [], next: 0 };     // rings: when each was born, ms
+    function setRipple(on) { ripple.on = on === true; }
+    function rippleLife() { return (RIPPLE.to - RIPPLE.from) / Math.max(0.01, RIPPLE.speed) * 1000; }
+    // Lets the old rings go and starts the next one when it is due. True while
+    // there is anything to animate.
+    function stepRipple(now) {
+        var life = rippleLife(), gap = Math.max(0.05, RIPPLE.every) * 1000;
+        while (ripple.rings.length && now - ripple.rings[0] >= life) ripple.rings.shift();
+        if (ripple.on && now >= ripple.next) {
+            // On the beat if this frame is only a little late for it; from
+            // now if the rings are starting up again.
+            var born = now - ripple.next < gap ? ripple.next : now;
+            ripple.rings.push(born);
+            ripple.next = born + gap;
+        }
+        return ripple.on || ripple.rings.length > 0;
+    }
+    // How far out each live ring is, newest first, in marker radii.
+    function rippleRadii(now) {
+        var out = [];
+        for (var i = ripple.rings.length - 1; i >= 0; i--) out.push(RIPPLE.from + RIPPLE.speed * (now - ripple.rings[i]) / 1000);
+        return out;
+    }
+
     function ink(name) {
         var d = PAINT[name], n = NIGHT[name];
         if (n == null || night <= 0) return d;
@@ -285,6 +328,21 @@
             fs: 'uniform vec2 uPanel; uniform vec2 uMargin; uniform float uCorner; out vec4 o;' +
                 'void main() { vec2 q = abs(gl_FragCoord.xy - uMargin - uPanel * 0.5) - (uPanel * 0.5 - uCorner);' +
                 ' float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uCorner; o = vec4(clamp(0.5 - d, 0.0, 1.0)); }'
+        },
+        // The rings round the player's marker. Every pixel asks how far it is
+        // from the marker, in marker radii, and adds up what each live ring
+        // puts there: a thin soft line, and a faint wash on its inner side.
+        // Worked out per pixel so a ring keeps its thinness as it grows.
+        ripple: {
+            vs: 'layout(location = 0) in vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }',
+            fs: 'uniform vec2 uAt; uniform float uR; uniform float uRings[6]; uniform vec4 uColour; uniform vec2 uSpan; uniform vec3 uLine; out vec4 o;' +
+                'void main() { float d = length(gl_FragCoord.xy - uAt) / uR, a = 0.0;' +
+                ' if (d > uSpan.y + 4.0 * uLine.x) discard;' +
+                ' for (int i = 0; i < 6; i++) { float r = uRings[i]; if (r <= 0.0) continue;' +
+                '  float x = d - r, line = exp(-x * x / (uLine.x * uLine.x));' +
+                '  float wake = x < 0.0 ? uLine.y * clamp(1.0 + x / uLine.z, 0.0, 1.0) : 0.0;' +
+                '  a += max(line, wake) * clamp((uSpan.y - r) / (uSpan.y - uSpan.x), 0.0, 1.0); }' +
+                ' a = min(a, 1.0) * uColour.a; o = vec4(uColour.rgb * a, a); }'
         },
         sprite: {
             vs: 'layout(location = 0) in vec2 aPx; layout(location = 1) in vec2 aUv; layout(location = 2) in vec4 aTint; uniform vec2 uPanel; out vec2 vUv; out vec4 vTint;' +
@@ -607,6 +665,7 @@
         if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
         var dt = Math.min(0.25, lastDraw ? (now - lastDraw) / 1000 : 0.25);
         var fading = stepFlood(dt, snapNext);
+        var rippling = stepRipple(now);
         snapNext = false;
         var floodEdge = [POLICE.radius - POLICE.soft, POLICE.radius];
         lastDraw = now;
@@ -731,10 +790,11 @@
 
         gl.disable(gl.SCISSOR_TEST);
         gl.viewport(0, 0, W, H);
-        drawSprites(V);
+        drawSprites(V, now);
         gl.bindVertexArray(null);
-        // A fade has to be carried through even if the player is standing still.
-        if (fading) invalidate();
+        // A fade has to be carried through even if the player is standing
+        // still, and the rings keep moving for as long as there are any.
+        if (fading || rippling) invalidate();
     }
 
     /* --- what sits on top: blips, north, the player ----------------------- */
@@ -820,7 +880,28 @@
         return (x === at.x && y === at.y) ? at : { x: x, y: y };
     }
 
-    function drawSprites(V) {
+    // The rings stamina sends out, drawn under the marker so each one comes
+    // out from behind its rim. Six is twice what the reference ever shows.
+    var ringSlots = new Float32Array(6);
+    function drawRipples(V, now) {
+        var radii = rippleRadii(now), u = progs.ripple.u, i;
+        if (!radii.length) return;
+        for (i = 0; i < 6; i++) ringSlots[i] = i < radii.length ? radii[i] : 0;
+        var R = 0.46 * VIEW.marker * V.unit;        // the marker's rim, as paintUi() draws it
+        gl.useProgram(progs.ripple.p);
+        gl.uniform2f(u.uAt, V.ox + V.m, V.Hc - (V.oy + V.m));
+        gl.uniform1f(u.uR, R);
+        gl.uniform1fv(u['uRings[0]'], ringSlots);
+        gl.uniform4f(u.uColour, RIPPLE.rgb[0] / 255, RIPPLE.rgb[1] / 255, RIPPLE.rgb[2] / 255, RIPPLE.alpha);
+        gl.uniform2f(u.uSpan, RIPPLE.from, RIPPLE.to);
+        // Never thinner than the screen can show: under about a pixel and a
+        // half across a ring breaks up into dashes as it grows.
+        gl.uniform3f(u.uLine, Math.max(RIPPLE.width / 1.665, 0.7 / R), RIPPLE.wake, Math.max(0.01, RIPPLE.wakeLength));
+        gl.bindVertexArray(progs.quad);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+
+    function drawSprites(V, now) {
         gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         var corner = V.corner, m = V.m;
         var size = VIEW.blip * V.unit, dots = [], marks = [], i, b, p, at, on, cell, cols, rows, cx, cy;
@@ -897,6 +978,8 @@
                 sprite(at.x + m, at.y + m, 10.8 * V.unit, 0, c[0], c[1], c[2], c[3], [1, 1, 1, 1]);
             }
         }
+        flush(uiTex, V);
+        drawRipples(V, now);
         c = uiCell(UI.player);
         sprite(V.ox + m, V.oy + m, VIEW.marker * V.unit, (pos.c - pos.h) * Math.PI / 180, c[0], c[1], c[2], c[3], [1, 1, 1, 1]);
         flush(uiTex, V);
@@ -1056,7 +1139,8 @@
             if (d.config) { merge(VIEW, d.config.view); merge(PAINT, d.config.paint); merge(NIGHT, d.config.paintNight); }
             if (typeof d.night === 'number') night = Math.min(1, Math.max(0, d.night));
             if (d.police !== undefined) setPolice(d.police);
-            if (d.config) merge(POLICE, d.config.police);
+            if (d.ripple !== undefined) setRipple(d.ripple);
+            if (d.config) { merge(POLICE, d.config.police); merge(RIPPLE, d.config.ripple); }
             if (d.load || d.show) boot();
             if (d.show != null) { wanted = d.show === true; setShown(wanted); }
         } else if (d.action === 'map3dRoute') {
@@ -1085,6 +1169,10 @@
         // page nobody is looking at is never offered any.
         draw: function () { dirty = true; queued = false; snapNext = true; frame(performance.now()); },
         POLICE: POLICE, stepFlood: stepFlood,
+        // `rings` puts rings where a picture wants them: seconds since each was born.
+        RIPPLE: RIPPLE, stepRipple: stepRipple, rippleRadii: rippleRadii,
+        rippling: function () { return ripple.on; },
+        rings: function (ages, now) { ripple.rings = ages.map(function (a) { return (now == null ? performance.now() : now) - a * 1000; }).sort(function (a, b) { return a - b; }); },
         route: { tidy: tidy, startOf: startOf },
         VIEW: VIEW, PAINT: PAINT, NIGHT: NIGHT, ink: ink
     };

@@ -715,6 +715,16 @@ What to know about it:
   hangs on officers, their cars and helicopters are left off
   (`policeBlips`), and the two search rings are off by default
   (`Config.PoliceSearch`). Police stations are places and stay.
+- **Spending stamina sends rings out from your marker**, as the reference's
+  does while its player runs: thin and light, a new one from the marker's rim
+  every 0.4 s, each growing 2.65 marker radii a second and faded out by 4, so
+  two or three are on the map at once. They start with the sprint (or with
+  the bar falling, swimming or pedalling flat out) and the last is gone about
+  a second after it ends. `Config.Map3D.ripple` has the numbers; `false`
+  switches them off. The bolt beside the stamina bar marks the same moment:
+  it blinks red as a sprint begins, which is all the reference's does
+  (`Config.Stamina.boltRed = 'drain'` holds it red for as long as the bar is
+  going down instead).
 - **After dark the map is dark**: slate land with the roads standing out of
   it, changing over gradually at dusk and dawn by the game's clock
   (`night`, `nightHours`, `paintNight`).

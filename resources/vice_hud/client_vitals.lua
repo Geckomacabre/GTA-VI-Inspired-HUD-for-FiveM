@@ -16,6 +16,9 @@
     What still crosses the boundary, and nothing else:
       ViceVitals.readStamina / readOxygen / readNeeds / enforceCap
                                     — called by the main status loop each tick
+      ViceVitals.spendingStamina / boltRed
+                                    — same: is stamina being used right now
+                                      (the minimap marker's rings, the red bolt)
       ViceVitals.updateExhaustion   — same, fed the stamina reading
       ViceVitals.focusMeter / focusActive
                                     — read by the loop and by /hudtest; these
@@ -554,6 +557,64 @@ local function readStamina(ped, playerId, dtMs)
     -- fatigue, the health drain — is written against 0..100 and none of it
     -- should have to defend itself against a reading that is not.
     return math.max(0.0, math.min(100.0, value)), true
+end
+
+-- =============================================================================
+-- Stamina being spent
+-- =============================================================================
+-- Two things on the HUD follow the player USING stamina rather than how much
+-- of it is left, and both are measured off the reference footage:
+--
+--   The player's marker on the drawn minimap sends out rings for as long as
+--   it is being spent. client.lua passes spendingStamina()'s answer on to
+--   client_map3d.lua, and html/map3d.js draws them.
+--
+--   The bolt beside the bar blinks red. In the footage that is ONE frame of a
+--   30 fps capture, teal again 0.15 s either side, and it falls on the moment
+--   the bar starts dropping twice as fast -- a sprint being pushed -- not on
+--   every moment the bar is dropping. So by default it is a blink as a sprint
+--   begins. Config.Stamina.boltRed = 'drain' holds it red for as long as the
+--   bar is going down instead; false leaves the bolt alone.
+local staminaSpending = false
+local staminaBefore   = nil     -- the reading at the last poll
+local staminaFellMs   = 0       -- how much longer a fall still counts
+
+-- The native path does not move on every poll: one can land between two of
+-- its steps in the middle of a sprint. A fall therefore counts for this long,
+-- so swimming or pedalling flat out is one spell of spending and not a
+-- stutter of them. On foot none of this is waited for: the ped is sprinting
+-- or it is not.
+local SPEND_HOLD_MS = 600
+
+local function boltMode()
+    local mode = (Config.Stamina or {}).boltRed
+    if mode == nil then return 'press' end
+    return mode
+end
+
+--- Called from the status poll with the reading it has just taken. True while
+--- stamina is being spent.
+local function spendingStamina(ped, stamina, dtMs)
+    local fell = staminaBefore ~= nil and stamina < staminaBefore - 0.001
+    staminaBefore = stamina
+
+    local now
+    if IsPedSprinting(ped) then
+        staminaFellMs = 0
+        now = true
+    elseif fell then
+        staminaFellMs = SPEND_HOLD_MS
+        now = true
+    else
+        staminaFellMs = math.max(0, staminaFellMs - (dtMs or 0))
+        now = staminaFellMs > 0
+    end
+
+    if now and not staminaSpending and boltMode() == 'press' then
+        ui('staminaBolt', { red = true, ms = tonumber((Config.Stamina or {}).boltRedMs) or 150 })
+    end
+    staminaSpending = now
+    return now
 end
 
 -- =============================================================================
@@ -1360,6 +1421,9 @@ end)
 -- pattern) because there are six of them and they belong to one subsystem.
 ViceVitals = {
     readStamina      = readStamina,
+    spendingStamina  = spendingStamina,
+    -- True while the bolt is to be HELD red ('drain'); the blink sends itself.
+    boltRed          = function() return staminaSpending and boltMode() == 'drain' end,
     readOxygen       = readOxygen,
     readNeeds        = readNeeds,
     enforceCap       = enforceCap,
