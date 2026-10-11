@@ -124,6 +124,15 @@ Config.Map3D = {
     -- helicopters as well. The reference has none.
     policeBlips = false,
 
+    -- Stamina. While the player is spending it (sprinting; swimming or
+    -- pedalling flat out) their marker sends out thin rings, as the
+    -- reference's does: one every 0.4 s, growing 2.65 marker radii a second,
+    -- faded out by 4. false switches them off. Lengths are in marker radii.
+    ripple = {
+        -- every = 0.4, speed = 2.65, to = 4.0, alpha = 0.72, width = 0.14,
+        -- rgb = { 255, 255, 255 },
+    },
+
     -- A dark map after dark. true follows the game's clock and changes over
     -- gradually at dusk and dawn; false is the daytime map always; 'always' is
     -- the night one always.
@@ -222,6 +231,17 @@ Config.Stamina = {
     -- how long you can run; at 0 the skill changes nothing here (it still moves
     -- the native GTA stat either way).
     skillBonus = 1.0,
+
+    -- The bolt beside the bar, in red. In the reference it is red for an
+    -- instant as a sprint is pushed -- one frame of a 30 fps capture -- and
+    -- teal for the rest of the time the bar is falling.
+    --   'press'  a blink as a sprint begins (the reference)
+    --   'drain'  red for as long as the bar is going down
+    --   false    never
+    boltRed = 'press',
+    -- How long the blink lasts, ms. The footage only pins it between one
+    -- frame and about 270 ms; this is the middle.
+    boltRedMs = 150,
 }
 
 -- =============================================================================

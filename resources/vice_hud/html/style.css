@@ -429,6 +429,18 @@ html, body {
 .sic.has-badge { background: none; border: none; }
 .sic.has-badge img { width: 100%; height: 100%; border-radius: 50%; display: block; }
 
+/* The stamina bolt in red. In the reference the bolt is red for an instant as
+   a sprint is pushed -- one frame of a 30 fps capture, teal again 0.15 s
+   either side -- and nothing else about the badge changes: the disc reads the
+   same in the frames before, during and after. So this is the same art with
+   only the bolt repainted (icons/badge_stamina_red.png), laid over the teal
+   one and switched on and off with no fade. The red is the reference's, a
+   dusty one: rgb(205,114,116), worked back from that frame against the teal
+   bolt in the frames next to it. */
+.sic.has-badge { position: relative; }
+.sic.has-badge .sic-alt { position: absolute; left: 0; top: 0; visibility: hidden; }
+#s-stamina.bolt-red .sic-alt { visibility: visible; }
+
 /* O2 badge: text glyph, but otherwise .sic's OWN disc-plus-ring (not
    overridden away like a prior version of this did) -- that ring is what
    makes it read as the same badge FAMILY as the has-badge icons above

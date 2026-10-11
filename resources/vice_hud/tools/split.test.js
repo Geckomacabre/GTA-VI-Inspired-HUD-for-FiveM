@@ -136,13 +136,13 @@ for (const f of files) {
 // The seam itself: client.lua calls exactly these, so they must all be there.
 lua.lua_getglobal(L, to_luastring('ViceVitals'));
 const present = [];
-for (const k of ['readStamina', 'readOxygen', 'readNeeds', 'enforceCap',
+for (const k of ['readStamina', 'spendingStamina', 'boltRed', 'readOxygen', 'readNeeds', 'enforceCap',
                  'updateExhaustion', 'focusMeter', 'focusActive']) {
   lua.lua_getfield(L, -1, to_luastring(k));
   if (lua.lua_isfunction(L, -1)) present.push(k);
   lua.lua_pop(L, 1);
 }
-ok(present.length === 7, 'ViceVitals publishes all seven entry points as functions', present);
+ok(present.length === 9, 'ViceVitals publishes all nine entry points as functions', present);
 
 // And that client.lua does not call anything ELSE on it.
 const core = fs.readFileSync(root + 'client.lua', 'utf8');
