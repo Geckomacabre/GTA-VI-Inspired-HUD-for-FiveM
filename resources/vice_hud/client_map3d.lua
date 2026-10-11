@@ -358,10 +358,10 @@ end
 local function describe(blip, sprite)
     local p = GetBlipInfoIdCoord(blip)
     local c = blipColour(blip)
+    -- Nothing about which way the blip is turned: the radar draws every icon
+    -- upright, and turning them with the camera made them spin on the map.
     local flags = IsBlipShortRange(blip) and 0 or 1
-    local rot = GetBlipRotation(blip) or 0
-    if rot ~= 0 then flags = flags + 2 end
-    return { round(p.x, 1), round(p.y, 1), sprite, c[1], c[2], c[3], GetBlipAlpha(blip), flags, rot }
+    return { round(p.x, 1), round(p.y, 1), sprite, c[1], c[2], c[3], GetBlipAlpha(blip), flags }
 end
 
 local moving = {}       -- blip handle -> sprite, for blips riding an entity

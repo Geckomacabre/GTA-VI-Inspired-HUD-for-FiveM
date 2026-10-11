@@ -74,7 +74,6 @@ function GetBlipInfoIdType(b) return blipInfo[b].kind or 4 end
 function GetBlipInfoIdCoord(b) return { x = blipInfo[b].x or 0.0, y = blipInfo[b].y or 0.0, z = 0.0 } end
 function GetBlipHudColour(b) return blipInfo[b].colour or 0 end
 function IsBlipShortRange(b) return blipInfo[b].short == true end
-function GetBlipRotation(b) return blipInfo[b].rot or 0 end
 function DoesBlipHaveGpsRoute(b) return blipInfo[b].route == true end
 function last(action) for i = #sent, 1, -1 do if sent[i].action == action then return sent[i] end end end
 function count(action) local n = 0 for i = 1, #sent do if sent[i].action == action then n = n + 1 end end return n end
@@ -157,14 +156,14 @@ blipInfo = {
     [14] = { kind = 7 },                                   -- a radius circle
     [15] = { kind = 4, display = 3 },                      -- pause map only
     [16] = { kind = 4, alpha = 0 },                        -- invisible
-    [17] = { kind = 4, rot = 90 },
+    [17] = { kind = 4 },
 }
 step(4, 8)
 `);
 ok(get('#last("map3dBlips").list') === '2', 'blips: the two that belong on a minimap', get('#last("map3dBlips").list'));
 ok(get('last("map3dBlips").list[1][1]') === '1.0' && get('last("map3dBlips").list[1][2]') === '2.0', 'a blip set to display 4 is one of them: scripts pass 4 for an ordinary blip, whatever the documentation says');
 ok(get('last("map3dBlips").list[1][3]') === '1' && get('last("map3dBlips").list[1][8]') === '0' && get('last("map3dBlips").list[1][4]') === '3', 'a short-range blip is not pinned to the edge, and carries its colour');
-ok(get('last("map3dBlips").list[2][3]') === '52' && get('last("map3dBlips").list[2][8]') === '3' && get('last("map3dBlips").list[2][9]') === '90', 'a blip that is not short-range is pinned, and a turned one says so');
+ok(get('last("map3dBlips").list[2][3]') === '52' && get('last("map3dBlips").list[2][8]') === '1' && get('#last("map3dBlips").list[2]') === '8', 'a blip that is not short-range is pinned, and nothing is sent about turning its icon: icons stay upright');
 ok(get('last("map3dBlips").list[1][3]') !== '8' && get('last("map3dBlips").list[2][3]') !== '8','the stock waypoint sprite is left out: the page draws the route\'s end itself');
 run('step(5, 2)');
 ok(get('#last("map3dMoving").list') === '1' && get('last("map3dMoving").list[1][1]') === '5.0', 'a blip on a ped is followed separately, and the player\'s own is left out');
