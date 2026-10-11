@@ -3321,8 +3321,8 @@ CreateThread(function()
         if not staminaKnown then stamina = 100.0 end
         ViceVitals.updateExhaustion(stamina)
         -- Stamina being SPENT is its own piece of news: the bolt beside the bar
-        -- marks it starting (client_vitals.lua sends that itself), and the
-        -- drawn minimap's marker sends out rings for as long as it lasts.
+        -- flashes red for as long as it lasts (client_vitals.lua sends those
+        -- itself), and the drawn minimap's marker sends out rings.
         do
             local spending = ViceVitals.spendingStamina(ped, stamina, Config.Tick)
             if ViceMap3D and ViceMap3D.ripple then pcall(ViceMap3D.ripple, spending) end

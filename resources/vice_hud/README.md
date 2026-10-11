@@ -721,10 +721,11 @@ What to know about it:
   two or three are on the map at once. They start with the sprint (or with
   the bar falling, swimming or pedalling flat out) and the last is gone about
   a second after it ends. `Config.Map3D.ripple` has the numbers; `false`
-  switches them off. The bolt beside the stamina bar marks the same moment:
-  it blinks red as a sprint begins, which is all the reference's does
-  (`Config.Stamina.boltRed = 'drain'` holds it red for as long as the bar is
-  going down instead).
+  switches them off. The bolt beside the stamina bar follows the same thing:
+  for as long as the bar is going down it flashes red every 0.9 s, red at
+  once and faded back to teal a fifth of a second later, as the reference's
+  does (`Config.Stamina.boltRedEvery`, `boltRedMs`; `boltRed = 'drain'` holds
+  it red steadily instead, `false` leaves it teal).
 - **After dark the map is dark**: slate land with the roads standing out of
   it, changing over gradually at dusk and dawn by the game's clock
   (`night`, `nightHours`, `paintNight`).

@@ -286,31 +286,31 @@
     var healthFlashTimer = null;
     var healthRecentlyChanged = false;
 
-    /* The bolt beside the stamina bar, in red. Two things can ask for it:
-       a blink (`staminaBolt` with `ms`, sent by client_vitals.lua the moment
-       a sprint begins -- which is what the reference does), and `boltRed` in
-       the status payload, which holds it for as long as the bar is going down
-       (Config.Stamina.boltRed = 'drain'). Either one shows it; it is a class
-       on the row and nothing more, so there is no fade to get stuck in. */
-    var boltBlink = false, boltHeld = false, boltTimer = null;
-
-    function paintBolt() {
-        var row = $('s-stamina');
-        if (row) row.classList.toggle('bolt-red', boltBlink || boltHeld);
-    }
+    /* The bolt beside the stamina bar, in red. Two things can ask for it.
+       A flash (`staminaBolt`, which client_vitals.lua sends every 0.9 s for
+       as long as the bar is going down -- what the reference does): the bolt
+       is red at once and fades back to teal over `ms`. That is .bolt-flash,
+       whose animation in style.css is the fade; it is taken off and put back
+       so each flash starts from full red. And `boltRed` in the status payload
+       (Config.Stamina.boltRed = 'drain'), which holds it red: .bolt-red. */
+    var boltTimer = null;
 
     function onStaminaBolt(d) {
+        var row = $('s-stamina');
         if (boltTimer) { clearTimeout(boltTimer); boltTimer = null; }
-        boltBlink = !!(d && d.red);
-        var ms = Number(d && d.ms);
-        if (boltBlink && isFinite(ms) && ms > 0) {
-            boltTimer = setTimeout(function () {
-                boltTimer = null;
-                boltBlink = false;
-                paintBolt();
-            }, Math.min(ms, 5000));
-        }
-        paintBolt();
+        if (!row) return;
+        row.classList.remove('bolt-flash');
+        if (!d || !d.red) return;
+        var ms = Number(d.ms);
+        if (!isFinite(ms) || ms <= 0) ms = 210;
+        ms = Math.min(ms, 5000);
+        row.style.setProperty('--bolt-ms', ms + 'ms');
+        void row.offsetWidth;       // the animation restarts only if the page has seen the class gone
+        row.classList.add('bolt-flash');
+        boltTimer = setTimeout(function () {
+            boltTimer = null;
+            row.classList.remove('bolt-flash');
+        }, ms);
     }
 
     function onStatus(d) {
@@ -360,8 +360,7 @@
         var focusFx = $('focus-fx');
         if (focusFx) focusFx.classList.toggle('active', focusActive);
         setFill('s-stamina', stamina);
-        boltHeld = d.boltRed === true;
-        paintBolt();
+        if (staminaRow) staminaRow.classList.toggle('bolt-red', d.boltRed === true);
         if (submerged) setFill('s-oxygen', oxygen);
 
         // Nominal state is an empty top-left corner, matching the reference.

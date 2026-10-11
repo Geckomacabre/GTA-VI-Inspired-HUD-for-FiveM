@@ -315,15 +315,21 @@ console.log('\n-- a small, honest overshoot --');
 
 /* Stamina being SPENT, as opposed to how much is left. Two things on the HUD
  * follow it: the rings round the player's marker on the drawn minimap, and the
- * bolt beside the bar, which the reference blinks red as a sprint is pushed. */
+ * bolt beside the bar, which the reference flashes red every 0.9 s for as long
+ * as the bar is going down. */
 console.log('\n-- stamina being spent --');
 {
   const c = src.indexOf('local staminaSpending = false');
   const d = src.indexOf('-- =============================================================================', c);
   if (c < 0 || d < 0) throw new Error('could not locate spendingStamina in client_vitals.lua');
+  // Threads start at once and stop at their Wait, as the game's do; __beat()
+  // is that wait being over.
   const spend = `
-    __sent = {}
+    __sent, __threads, __waited = {}, {}, nil
     function ui(action, data) data.action = action; __sent[#__sent + 1] = data end
+    function CreateThread(f) local co = coroutine.create(f); __threads[#__threads + 1] = co; assert(coroutine.resume(co)) end
+    function Wait(ms) __waited = ms; coroutine.yield() end
+    function __beat() for _, co in ipairs(__threads) do if coroutine.status(co) ~= 'dead' then assert(coroutine.resume(co)) end end end
   ` + src.slice(c, d);
   const say = (...parts) => "print(table.concat({ " + parts.join(', ') + " }, '|'))";
   const table = (lines) => { const g = {}; lines.forEach(l => { const p = l.split('|'); g[p[0]] = p.slice(1); }); return g; };
@@ -333,13 +339,24 @@ console.log('\n-- stamina being spent --');
     ${say("'idle'", 'tostring(spendingStamina(0, 100.0, 250))', '#__sent')}
     __sprinting = true
     ${say("'begins'", 'tostring(spendingStamina(0, 98.0, 250))', '#__sent', 'tostring(__sent[1] and __sent[1].action)',
-          'tostring(__sent[1] and __sent[1].red)', 'tostring(__sent[1] and __sent[1].ms)')}
-    for _ = 1, 8 do spendingStamina(0, 90.0, 250) end
-    ${say("'goeson'", 'tostring(spendingStamina(0, 80.0, 250))', '#__sent')}
+          'tostring(__sent[1] and __sent[1].red)', 'tostring(__sent[1] and __sent[1].ms)', 'tostring(__waited)')}
+    for _ = 1, 3 do spendingStamina(0, 90.0, 250) end
+    ${say("'between'", 'tostring(spendingStamina(0, 88.0, 250))', '#__sent')}
+    __beat()
+    ${say("'second'", '#__sent')}
+    __beat() __beat()
+    ${say("'fourth'", '#__sent')}
     spendingStamina(0, 0.0, 250)
-    ${say("'onempty'", 'tostring(spendingStamina(0, 0.0, 250))', '#__sent')}
+    ${say("'onempty'", 'tostring(spendingStamina(0, 0.0, 250))')}
     __sprinting = false
     ${say("'stops'", 'tostring(spendingStamina(0, 0.0, 250))', '#__sent', 'tostring(staminaSpending and boltMode() == "drain")')}
+    __sprinting = true
+    ${say("'pickedup'", 'tostring(spendingStamina(0, 0.0, 250))', '#__sent')}
+    __beat()
+    ${say("'ontime'", '#__sent')}
+    __sprinting = false spendingStamina(0, 0.0, 250)
+    __beat()
+    ${say("'over'", '#__sent', 'tostring(boltFlashing)')}
     spendingStamina(0, 5.0, 250)
     ${say("'refilling'", 'tostring(spendingStamina(0, 10.0, 250))', '#__sent')}
     __sprinting = true
@@ -347,13 +364,17 @@ console.log('\n-- stamina being spent --');
   `));
   ok(g.idle.join() === 'false,0', 'standing about spends nothing and sends nothing', g.idle.join());
   ok(g.begins[0] === 'true' && g.begins[1] === '1' && g.begins[2] === 'staminaBolt' && g.begins[3] === 'true',
-     'a sprint beginning is stamina being spent, and blinks the bolt red', g.begins.join());
-  ok(g.begins[4] === '150', 'for 150 ms unless told otherwise', g.begins[4]);
-  ok(g.goeson.join() === 'true,1', 'the rest of the sprint is still spending, and does NOT blink it again', g.goeson.join());
-  ok(g.onempty.join() === 'true,1', 'sprinting on an empty bar still counts: the ped is running', g.onempty.join());
-  ok(g.stops[0] === 'false' && g.stops[2] === 'false', 'on foot it ends the moment the sprint does', g.stops.join());
-  ok(g.refilling.join() === 'false,1', 'a bar coming back up is not being spent', g.refilling.join());
-  ok(g.again.join() === 'true,2', 'and the next sprint blinks it again', g.again.join());
+     'a sprint beginning is stamina being spent, and the bolt flashes red at once', g.begins.join());
+  ok(g.begins[4] === '210' && g.begins[5] === '910', 'a flash 210 ms long, the next due 910 ms on: the reference\'s own time', g.begins.join());
+  ok(g.between.join() === 'true,1', 'the polls in between do not add flashes of their own', g.between.join());
+  ok(g.second[0] === '2' && g.fourth[0] === '4', 'it flashes again each time that comes round, for as long as the bar is going down', g.second[0] + ' ' + g.fourth[0]);
+  ok(g.onempty[0] === 'true', 'sprinting on an empty bar still counts: the ped is running', g.onempty[0]);
+  ok(g.stops.join() === 'false,4,false', 'on foot it ends the moment the sprint does', g.stops.join());
+  ok(g.pickedup.join() === 'true,4', 'a sprint picked straight back up does not flash early: stop-start running cannot make it stutter', g.pickedup.join());
+  ok(g.ontime[0] === '5', 'it flashes when the next one was due anyway', g.ontime[0]);
+  ok(g.over.join() === '5,false', 'and once the running has stopped the flashes stop with it', g.over.join());
+  ok(g.refilling.join() === 'false,5', 'a bar coming back up is not being spent', g.refilling.join());
+  ok(g.again.join() === 'true,6', 'the next sprint starts them again, at once', g.again.join());
 
   // Not on foot: nothing says "sprinting", so the falling bar is all there is
   // to go on -- and the native does not move on every poll.
@@ -368,24 +389,26 @@ console.log('\n-- stamina being spent --');
   `));
   ok(g.falls.join() === 'true,1', 'swimming or pedalling flat out: a falling bar is spending too', g.falls.join());
   ok(g.pause.join() === 'true,1' && g.falls2.join() === 'true,1',
-     'a poll that lands between two steps of the native does not end it, or blink the bolt twice', g.pause.join() + ' ' + g.falls2.join());
+     'a poll that lands between two steps of the native does not end it, or start the flashes twice', g.pause.join() + ' ' + g.falls2.join());
   ok(g.over.join() === 'false,1', 'but 600 ms with nothing falling does', g.over.join());
 
   g = table(run(spend + `
-    Config.Stamina = { boltRed = 'drain', boltRedMs = 400 }
+    Config.Stamina = { boltRed = 'drain' }
     __sprinting = true
     ${say("'drain'", 'tostring(spendingStamina(0, 98.0, 250))', '#__sent', 'tostring(staminaSpending and boltMode() == "drain")')}
     Config.Stamina.boltRed = false
-    __sprinting = false spendingStamina(0, 98.0, 250) __sprinting = true
     ${say("'never'", 'tostring(spendingStamina(0, 97.0, 250))', '#__sent', 'tostring(staminaSpending and boltMode() == "drain")')}
-    Config.Stamina.boltRed = 'press'
-    __sprinting = false spendingStamina(0, 97.0, 250) __sprinting = true
+    Config.Stamina = { boltRed = 'flash', boltRedEvery = 500, boltRedMs = 400 }
     spendingStamina(0, 96.0, 250)
-    ${say("'ms'", 'tostring(__sent[1] and __sent[1].ms)')}
+    ${say("'own'", 'tostring(__sent[1] and __sent[1].ms)', 'tostring(__waited)')}
+    Config.Stamina.boltRed = false
+    __beat()
+    ${say("'off'", '#__sent', 'tostring(boltFlashing)')}
   `));
-  ok(g.drain.join() === 'true,0,true', "boltRed = 'drain' sends no blink: the bolt is held red while it lasts", g.drain.join());
+  ok(g.drain.join() === 'true,0,true', "boltRed = 'drain' sends no flashes: the bolt is held red while it lasts", g.drain.join());
   ok(g.never.join() === 'true,0,false', 'boltRed = false leaves the bolt alone, and the rings still get their answer', g.never.join());
-  ok(g.ms[0] === '400', 'boltRedMs sets how long a blink lasts', g.ms[0]);
+  ok(g.own.join() === '400,500', 'boltRedMs and boltRedEvery set how long a flash is and how often', g.own.join());
+  ok(g.off.join() === '1,false', 'and switching it off part-way stops the run', g.off.join());
 
   ok(/boltRed\s*=\s*function\(\) return staminaSpending and boltMode\(\) == 'drain' end/.test(src) && /spendingStamina\s*=\s*spendingStamina/.test(src),
      'both are published on ViceVitals');
@@ -393,9 +416,11 @@ console.log('\n-- stamina being spent --');
   ok(/local spending = ViceVitals\.spendingStamina\(ped, stamina, Config\.Tick\)\s+if ViceMap3D and ViceMap3D\.ripple then pcall\(ViceMap3D\.ripple, spending\) end/.test(client),
      'the status poll asks once a tick and tells the drawn minimap');
   ok(/boltRed = ViceVitals\.boltRed\(\) or nil,/.test(client), 'and the held bolt rides in the status payload, absent unless it is on');
+  const config = fs.readFileSync(root + 'config.lua', 'utf8');
+  ok(/boltRed = 'flash',/.test(config) && /boltRedEvery = 910,/.test(config) && /boltRedMs = 210,/.test(config), 'the config ships the reference\'s flash');
 }
 
-/* The page's half: a class on the stamina row, and nothing else. */
+/* The page's half: a class on the stamina row, and the fade is the style sheet's. */
 console.log('\n-- the bolt, on the page --');
 {
   const { JSDOM } = require('jsdom');
@@ -405,48 +430,55 @@ console.log('\n-- the bolt, on the page --');
   window.Element.prototype.scrollIntoView = function () {};
   window.GetParentResourceName = () => 'vice_hud';
   window.fetch = () => Promise.resolve({ json: () => Promise.resolve({}) });
-  // Timers are held here and fired by hand, so a 150 ms blink is checked
-  // without waiting 150 ms for it.
+  // Timers are held here and fired by hand, so a flash is checked without
+  // waiting for it.
   const timers = [];
   window.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
   window.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].fn = null; };
   const fire = (ms) => timers.forEach((t) => { if (t.fn && t.ms === ms) { const f = t.fn; t.fn = null; f(); } });
+  const live = (ms) => timers.filter((t) => t.fn && t.ms === ms).length;
   window.eval(fs.readFileSync(root + 'html/app.js', 'utf8'));
   window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
   const msg = (data) => window.dispatchEvent(new window.MessageEvent('message', { data }));
   const row = window.document.getElementById('s-stamina');
-  const red = () => row.classList.contains('bolt-red');
+  const flashing = () => row.classList.contains('bolt-flash');
+  const held = () => row.classList.contains('bolt-red');
 
   const imgs = row.querySelectorAll('.sic.has-badge img');
   ok(imgs.length === 2 && /badge_stamina\.png$/.test(imgs[0].getAttribute('src')) && imgs[1].className === 'sic-alt'
      && /badge_stamina_red\.png$/.test(imgs[1].getAttribute('src')), 'the row carries both badges: the teal bolt and, over it, the red');
   ok(fs.existsSync(root + 'html/icons/badge_stamina_red.png'), 'and the red one is there to be shown');
   const css = fs.readFileSync(root + 'html/style.css', 'utf8');
-  ok(/\.sic\.has-badge \.sic-alt \{[^}]*position: absolute;[^}]*visibility: hidden;[^}]*\}/.test(css)
-     && /#s-stamina\.bolt-red \.sic-alt \{ visibility: visible; \}/.test(css), 'hidden until the row says .bolt-red, and switched, not faded');
+  ok(/\.sic\.has-badge \.sic-alt \{[^}]*position: absolute;[^}]*visibility: hidden;[^}]*\}/.test(css), 'the red one is hidden until the row asks for it');
+  ok(/@keyframes bolt-flash \{ 0%, 19% \{ opacity: 1; \} 100% \{ opacity: 0; \} \}/.test(css)
+     && /#s-stamina\.bolt-flash \.sic-alt \{ visibility: visible; animation: bolt-flash var\(--bolt-ms, 210ms\) linear both; \}/.test(css),
+     'a flash is full red for its first fifth and then fades away, which is the red crossing back to teal');
+  ok(/#s-stamina\.bolt-red \.sic-alt \{ visibility: visible; animation: none; opacity: 1; \}/.test(css), 'and held is red with no fade');
 
   msg({ action: 'status', health: 100, stamina: 97 });
-  ok(!red(), 'a bar going down is, by itself, a teal bolt');
-  msg({ action: 'staminaBolt', red: true, ms: 150 });
-  ok(red(), 'a blink turns it red');
+  ok(!flashing() && !held(), 'a bar going down is, by itself, a teal bolt');
+  msg({ action: 'staminaBolt', red: true, ms: 210 });
+  ok(flashing() && row.style.getPropertyValue('--bolt-ms') === '210ms', 'a flash puts the red on, and says how long the fade is');
   msg({ action: 'status', health: 100, stamina: 95 });
-  ok(red(), 'and the next status poll does not cut it short');
-  fire(150);
-  ok(!red(), 'it is teal again when its time is up');
-  msg({ action: 'staminaBolt', red: true, ms: 150 });
-  msg({ action: 'staminaBolt', red: true, ms: 150 });
-  fire(150);
-  ok(!red(), 'two blinks on top of each other end once, cleanly');
+  ok(flashing(), 'the next status poll does not cut it short');
+  fire(210);
+  ok(!flashing(), 'it is off again when its time is up');
+  msg({ action: 'staminaBolt', red: true, ms: 210 });
+  msg({ action: 'staminaBolt', red: true, ms: 210 });
+  ok(flashing() && live(210) === 1, 'a flash on the heels of another starts over, with one timer and not two');
+  fire(210);
+  ok(!flashing(), 'and ends once');
+  msg({ action: 'staminaBolt', red: true });
+  ok(flashing() && row.style.getPropertyValue('--bolt-ms') === '210ms', 'no length given is the reference\'s 210 ms');
+  msg({ action: 'staminaBolt', red: false });
+  ok(!flashing(), 'and a flash can be called off');
 
   msg({ action: 'status', health: 100, stamina: 90, boltRed: true });
-  ok(red(), "held ('drain'): red for as long as the status says so");
+  ok(held(), "held ('drain'): red for as long as the status says so");
   msg({ action: 'status', health: 100, stamina: 88, boltRed: true });
-  ok(red(), 'through every poll of it');
+  ok(held(), 'through every poll of it');
   msg({ action: 'status', health: 100, stamina: 88 });
-  ok(!red(), 'and teal the moment it stops');
-  msg({ action: 'staminaBolt', red: true });
-  msg({ action: 'staminaBolt', red: false });
-  ok(!red(), 'a blink with no time on it can still be called off');
+  ok(!held(), 'and teal the moment it stops');
 }
 
 console.log('\n' + (fails ? fails + ' FAILING' : 'all checks passed'));

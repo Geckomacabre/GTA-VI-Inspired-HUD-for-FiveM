@@ -429,17 +429,20 @@ html, body {
 .sic.has-badge { background: none; border: none; }
 .sic.has-badge img { width: 100%; height: 100%; border-radius: 50%; display: block; }
 
-/* The stamina bolt in red. In the reference the bolt is red for an instant as
-   a sprint is pushed -- one frame of a 30 fps capture, teal again 0.15 s
-   either side -- and nothing else about the badge changes: the disc reads the
-   same in the frames before, during and after. So this is the same art with
-   only the bolt repainted (icons/badge_stamina_red.png), laid over the teal
-   one and switched on and off with no fade. The red is the reference's, a
-   dusty one: rgb(205,114,116), worked back from that frame against the teal
-   bolt in the frames next to it. */
+/* The stamina bolt in red. While the bar is going down the reference's bolt
+   flashes: read frame by frame, it is full red for the first frame or two
+   (about 40 ms), then crosses back to teal through pink over the next 170,
+   and nothing else about the badge changes -- the disc reads the same before,
+   during and after. So this is the same art with only the bolt repainted
+   (icons/badge_stamina_red.png, a strong red: rgb(225,36,50), taken from the
+   first frame of each flash), laid over the teal one and faded out, which is
+   that cross from red to teal. app.js sets --bolt-ms and puts .bolt-flash on
+   the row for each flash. .bolt-red is the other setting: red, steadily. */
 .sic.has-badge { position: relative; }
 .sic.has-badge .sic-alt { position: absolute; left: 0; top: 0; visibility: hidden; }
-#s-stamina.bolt-red .sic-alt { visibility: visible; }
+@keyframes bolt-flash { 0%, 19% { opacity: 1; } 100% { opacity: 0; } }
+#s-stamina.bolt-flash .sic-alt { visibility: visible; animation: bolt-flash var(--bolt-ms, 210ms) linear both; }
+#s-stamina.bolt-red .sic-alt { visibility: visible; animation: none; opacity: 1; }
 
 /* O2 badge: text glyph, but otherwise .sic's OWN disc-plus-ring (not
    overridden away like a prior version of this did) -- that ring is what

@@ -232,16 +232,17 @@ Config.Stamina = {
     -- the native GTA stat either way).
     skillBonus = 1.0,
 
-    -- The bolt beside the bar, in red. In the reference it is red for an
-    -- instant as a sprint is pushed -- one frame of a 30 fps capture -- and
-    -- teal for the rest of the time the bar is falling.
-    --   'press'  a blink as a sprint begins (the reference)
-    --   'drain'  red for as long as the bar is going down
+    -- The bolt beside the bar, in red. In the reference it flashes for as long
+    -- as the bar is going down: red at once, faded back to teal a fifth of a
+    -- second later, and again 0.9 s after the last.
+    --   'flash'  that (the reference)
+    --   'drain'  red, steadily, for as long as the bar is going down
     --   false    never
-    boltRed = 'press',
-    -- How long the blink lasts, ms. The footage only pins it between one
-    -- frame and about 270 ms; this is the middle.
-    boltRedMs = 150,
+    boltRed = 'flash',
+    -- From one flash to the next, ms. Five were timed, 0.83 to 0.97 s apart.
+    boltRedEvery = 910,
+    -- How long one takes to go from red back to teal, ms.
+    boltRedMs = 210,
 }
 
 -- =============================================================================
