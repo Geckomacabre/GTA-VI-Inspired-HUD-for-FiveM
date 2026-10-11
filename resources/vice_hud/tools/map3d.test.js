@@ -54,6 +54,12 @@ function GetEntityCoords() return { x = 10.0, y = 20.0, z = 30.0 } end
 function GetFinalRenderedCamRot() return { x = 0.0, y = 0.0, z = 45.0 } end
 function GetEntityHeading() return 90.0 end
 function GetEntitySpeed() return speed end
+-- Height: over what is beneath the player (an entity's origin is a metre up),
+-- and where the nearest street is. gameMs is the game's clock.
+overGround, streetZ, gameMs = 1.0, 30.0, 0
+function GetEntityHeightAboveGround() return overGround end
+function GetClosestVehicleNode(x, y, z) if streetZ == nil then return false, nil end return true, { x = x, y = y, z = streetZ } end
+function GetGameTimer() return gameMs end
 function IsWaypointActive() return waypoint end
 function GetHudColour(i) return i, 2, 3, 255 end
 -- A road running north for 120 m, a 300 m gap, then 40 m more.
@@ -142,6 +148,19 @@ ok(get('last("map3dPos").x') === '10.0' && get('last("map3dPos").c') === '45.0' 
 ok(get('last("map3dPos").s') === '0.0', 'on foot the speed is zero: walking does not pull the view back');
 run('n = count("map3dPos"); step(1, 5)');
 ok(get('count("map3dPos") - n') === '0', 'standing still sends nothing more');
+ok(get('last("map3dPos").g') === '0.0' && get('last("map3dPos").a') === '0.0', 'standing in the street: nothing under them but the ground, and level with the road');
+// Up a tower: the roof is right under their feet, the street is a long way down.
+run('streetZ = -70.0; gameMs = gameMs + 250; n = count("map3dPos"); step(1, 1)');
+ok(get('count("map3dPos") - n') === '1' && get('last("map3dPos").g') === '0.0' && get('last("map3dPos").a') === '100.0', 'on a roof: still nothing under them, but 100 m over the street', get('last("map3dPos").a'));
+run('overGround = 61.0; gameMs = gameMs + 250; step(1, 1)');
+ok(get('last("map3dPos").g') === '60.0', 'stepping off it: 60 m over whatever is below', get('last("map3dPos").g'));
+run('overGround = 31.0; n = count("map3dPos"); step(1, 3)');
+ok(get('count("map3dPos") - n') === '0', 'height is asked for five times a second, not every frame');
+run('gameMs = gameMs + 250; step(1, 1)');
+ok(get('last("map3dPos").g') === '30.0', 'and passed on when it is', get('last("map3dPos").g'));
+run('streetZ = nil; gameMs = gameMs + 250; step(1, 1)');
+ok(get('last("map3dPos").a') === 'nil' && get('last("map3dPos").g') === '30.0', 'nowhere near a road: the street is left out, and the page goes without it');
+run('overGround, streetZ = 1.0, 30.0; gameMs = gameMs + 250; step(1, 1)');
 
 run('blipsBySprite = { [8] = { 13 } } blipInfo = { [13] = { kind = 4, x = 100.0, y = 200.0 } }');
 run('n = count("map3dRoute"); waypoint = true; step(3, 1)');
@@ -283,6 +302,11 @@ ok(/local engine = on and not drawn\s+radarWanted = engine\s+DisplayRadar\(engin
 ok(/ui\('mapRect', \{ visible = on \}\)/.test(setRadar), 'the frame and badge still follow the HUD\'s own decision');
 ok(/local wstate = wantedState\(ped, wanted\)[\s\S]{0,260}pcall\(ViceMap3D\.police, wstate\)/.test(client), 'the wanted readout tells the drawn map what the police know');
 ok(/Config\.PoliceSearch = \{[\s\S]{0,420}enable = false,/.test(read('config.lua')), 'the two search rings are off: the reference has none');
+const page = read('html/map3d.js');
+ok(/float w = 1\.0 \+ uT \* g - uCam\.z \* z;/.test(page) && /2\.0 \* \(uCam\.x \* g \+ uCam\.y \* z\) \/ uPanel\.y/.test(page), 'every shader places a point through the one camera: squash, rise and lean');
+ok(/var w = 1 \+ V\.T \* g - V\.lean \* z;/.test(page) && /y: V\.oy - \(V\.squash \* g \+ V\.rise \* z\) \/ w/.test(page), 'and what is drawn over the map goes through the same one');
+ok(/float g = \(q \* \(1\.0 \+ uCam\.z \* uAlt\) \+ uCam\.y \* uAlt\) \/ max\(uCam\.x - uT \* q, 0\.0005\);/.test(page), 'the ground is found by running it backwards, from however high the player is');
+ok(/smoothstep\(0\.0, 0\.12, 1\.0 - vW\) \* smoothstep\(1\.0, 3\.0, vOver\)/.test(page), 'only what is above the player AND nearer the camera is seen through: a roof underfoot stays solid');
 const manifest = read('fxmanifest.lua');
 ok(manifest.indexOf("'client_map3d.lua'") > 0 && manifest.indexOf("'client_map3d.lua'") < manifest.indexOf("'client.lua'"), 'client_map3d.lua loads before client.lua');
 ok(/'html\/map3d\.js'/.test(manifest) && /'html\/map3d\/\*\.bin'/.test(manifest), 'the manifest ships the script and whatever world has been built');
@@ -369,7 +393,50 @@ msg({ action: 'map3d', config: { ripple: { every: 1, rgb: [1, 2, 3] } } });
 ok(M3.RIPPLE.every === 1 && M3.RIPPLE.rgb[0] === 1 && M3.RIPPLE.speed === 2.65, 'the rings\' settings come from the config, over the defaults');
 msg({ action: 'map3d', config: { ripple: { every: 0.4, rgb: [255, 255, 255] } } });
 msg({ action: 'map3d', load: true, config: { view: { zoom: 4.5 }, paint: { land: [9, 9, 9] } } });
-ok(window.ViceMap3D.VIEW.zoom === 4.5 && window.ViceMap3D.PAINT.land[0] === 9 && window.ViceMap3D.VIEW.tilt === 0.8, 'config is laid over the defaults, not in place of them');
+ok(window.ViceMap3D.VIEW.zoom === 4.5 && window.ViceMap3D.PAINT.land[0] === 9 && window.ViceMap3D.VIEW.camera.pitch === 27, 'config is laid over the defaults, not in place of them');
+
+// The camera. Its four numbers come from where it is, and they are the
+// reference's: a horizon a fifth of a panel above the top edge, the ground
+// seen from 36 degrees at the player.
+(function () {
+  const V = window.ViceMap3D.VIEW, cam = window.ViceMap3D.camera(100, 100 * V.anchor);
+  const pitch = 27 * Math.PI / 180, off = Math.atan((V.anchor - 0.5) / 1.38);
+  ok(V.anchor === 0.71 && V.opacity === 1, 'the player sits 71% of the way down an opaque panel, as in the reference');
+  ok(Math.abs(cam.squash - Math.sin(pitch + off) / Math.cos(off)) < 1e-9 && cam.squash > 0.58 && cam.squash < 0.60, 'a metre ahead of the player is drawn 0.59 of a metre across', cam.squash);
+  ok(cam.horizon < -19 && cam.horizon > -21, 'the horizon is a fifth of the panel above its top edge', cam.horizon);
+  ok(Math.abs(cam.T - cam.squash / (71 - cam.horizon)) < 1e-12, 'which is what sets the perspective: ground without end lands on it');
+  ok(cam.rise > 0.81 && cam.rise < 0.83, 'a metre of height is drawn 0.82 of a metre across', cam.rise);
+  ok(Math.abs(cam.lean - cam.T * Math.tan(pitch)) < 1e-12, 'and what is tall comes toward the viewer as it rises');
+  const steep = (window.ViceMap3D.VIEW.camera.pitch = 60, window.ViceMap3D.camera(100, 71));
+  ok(steep.squash > cam.squash && steep.rise < cam.rise, 'a steeper camera sees more of the ground and less of the walls');
+  window.ViceMap3D.VIEW.camera.pitch = 27;
+  // A helipad's circle in the reference is 0.30 to 0.38 as tall as wide, a
+  // third of the way down the panel. A circle on the ground is squashed by
+  // squash / w there, w being how much further off than the player it is.
+  const q = 71 - 31, w = cam.squash / (cam.squash - cam.T * q);
+  ok(cam.squash / w > 0.30 && cam.squash / w < 0.38, 'a circle on the ground a third of the way down the panel is as flat as the reference\'s helipad', cam.squash / w);
+})();
+
+// How high the player is. No world is loaded here, so no building is under
+// them: what is beneath them and the street are all there is to go on.
+(function () {
+  const M = window.ViceMap3D, at = (g, a) => { msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0, g: g, a: a }); return M.altitudeWanted(); };
+  ok(at(0, 0) === 0, 'on the ground the camera is on the ground');
+  ok(at(2, 2) === 0, 'a kerb, a jump, a car\'s own height: under 3 m is still the ground');
+  ok(at(150, 150) === 150, 'under a parachute: as high as they are');
+  ok(at(0, 40) === 0, 'on a hillside path far above the nearest road, with the ground under their feet: the ground');
+  ok(at(80, 300) === 80, 'flying over hills: over what is beneath them, whatever the road is doing');
+  ok(at(120, undefined) === 120, 'no street to go by: what is beneath them is enough');
+  ok(at(9000, 9000) === M.VIEW.altitude.max, 'and there is a ceiling');
+  at(150, 150);
+  ok(M.stepAltitude(0.1, false) === true && M.altitude() > 0 && M.altitude() < 150, 'the camera goes up to them over a moment, not in one jump', M.altitude());
+  M.stepAltitude(0, true);
+  ok(M.altitude() === 150 && M.stepAltitude(0.1, false) === false, 'and once it is there, there is nothing left to animate');
+  M.VIEW.altitude = false;
+  ok(M.altitudeWanted() === 0, 'altitude = false keeps the camera on the ground');
+  M.VIEW.altitude = { ease: 3, floor: 3, max: 500 };
+  at(0, 0); M.stepAltitude(0, true);
+})();
 const ready = posts.find((p) => p.name === 'map3dReady');
 ok(ready && ready.body.ok === false && /WebGL2/.test(ready.body.why), 'a browser that cannot draw it says so, and why', JSON.stringify(ready));
 msg({ action: 'map3d', show: true });
