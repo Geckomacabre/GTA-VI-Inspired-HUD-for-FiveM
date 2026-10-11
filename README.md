@@ -91,7 +91,11 @@ included here.
   HUD editor (`/hudedit`), and the theme engine (`/hudtheme`, `/themepublish`)
   that the `patches/` folder plugs into. Has its own `README.md` and
   `docs/INTERNALS.md` inside, so start there for anything HUD-specific.
-  Depends on `ox_lib`.
+  Depends on `ox_lib`. Its drawn 3D minimap is a port of
+  [GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced)
+  by **loneeps** (Discord `@moddims`). The map data is that mod's and is not
+  in this repo, at its author's request that the mod not be re-uploaded: you
+  download the mod and build it (see `vice_hud`'s own `README.md`).
 
 - **`um_gigs`**: "Snarf" and "Ryde Me", two
   parody gig-economy phone apps served through `lb-phone`, styled with the

@@ -15,4 +15,6 @@ resources/vice_hud/theme.json
 
 # The drawn minimap's world and blip sheet: built per server by
 # tools/map3d/build.py and blips.py from files that are not ours to hand out.
+# The world is loneeps' "GTA VI MiniMap (3D Buildings)" mod, whose page asks
+# that it not be re-uploaded: do not commit it.
 resources/vice_hud/html/map3d/

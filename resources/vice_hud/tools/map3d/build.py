@@ -1,12 +1,15 @@
-"""Builds the drawn minimap's world out of the "GTA-VI MiniMap (3D Buildings)"
-mod by @moddims: its roads, building outlines, building heights and its sea
-and sand survey of the whole map.
+"""Builds the drawn minimap's world out of the "GTA VI MiniMap (3D Buildings)
+(Legacy & Enhanced)" mod by loneeps (Discord @moddims): its roads, building
+outlines, building heights and its sea and sand survey of the whole map.
+
+    https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced
 
     python tools/map3d/build.py --mod "path/to/MiniMap.dll"
 
 Writes html/map3d/world.bin and html/map3d/ground.png, which html/map3d.js
-loads. Neither is in this repository: the survey is moddims' work, not ours to
-hand out, so each server builds its own copy from the mod it downloaded.
+loads. Neither is in this repository: the survey is loneeps' work, and the
+mod's page asks that it not be re-uploaded, so each server builds its own copy
+from the mod it downloaded there.
 
 Nothing in the mod is run. Its map is one gzip stream inside the DLL, found by
 its "MMV1" header; --mod also takes that stream already cut out and unpacked.
