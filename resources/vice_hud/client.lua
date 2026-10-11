@@ -3349,6 +3349,9 @@ CreateThread(function()
         -- ---- wanted -------------------------------------------------------
         local wanted = GetPlayerWantedLevel(playerId)
         local wstate = wantedState(ped, wanted)
+        -- The drawn minimap shows the same thing its own way: no police on it,
+        -- the map itself going red or blue. It sends only on a change.
+        if ViceMap3D and ViceMap3D.police then pcall(ViceMap3D.police, wstate) end
         -- Computed every tick, not just when wanted/state change: a tell
         -- can clear (or reappear) mid-pursuit purely from the player changing
         -- clothes or vehicles, with wanted level and state untouched.

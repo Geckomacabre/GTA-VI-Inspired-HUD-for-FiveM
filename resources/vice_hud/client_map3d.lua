@@ -14,6 +14,11 @@
 --                               after its feed has failed)
 --   ViceMap3D.show(on, north)   draw it or do not, and whether north is marked
 --
+-- and one from its wanted readout, which already works out what the police
+-- know for the stars:
+--
+--   ViceMap3D.police(state)     'contact', 'searching', 'red', or nil
+--
 -- Loaded before client.lua so the table exists by the time setRadar runs.
 -- Nothing here reaches back into client.lua.
 --
@@ -38,6 +43,7 @@ local pageUp = false        -- the page is listening
 local pageOk = false        -- the page has loaded its world and can draw
 local pageWhy = nil         -- and if it cannot, what it said
 local drawing = false       -- what the page was last told
+local policeState = nil     -- what the police know, as client.lua last said
 local north = true
 local configSent = false
 local routeDirty = true
@@ -77,10 +83,26 @@ function ViceMap3D.show(on, showNorth)
         for k, v in pairs(C.view or {}) do view[k] = v end
         view.north = north and view.north ~= false
         view.buildings = C.buildings ~= false
-        msg.config = { view = view, paint = C.paint, paintNight = C.paintNight }
+        msg.config = { view = view, paint = C.paint, paintNight = C.paintNight,
+                       police = type(C.police) == 'table' and C.police or nil }
     end
+    -- Said again with every "draw": the page may have been reloaded, or the
+    -- map may have been down while the police found or lost the player.
+    if drawing then msg.police = policeState or false end
     say('map3d', msg)
     if drawing then routeDirty = true end
+end
+
+--- What the police know, in client.lua's own words for it (see wantedState()
+--- there). The reference puts no police on its minimap: it floods the map red
+--- while they can see the player and blue while they are looking, and that is
+--- all this passes on.
+function ViceMap3D.police(state)
+    if C.police == false then state = nil end
+    if state ~= 'contact' and state ~= 'searching' and state ~= 'red' then state = nil end
+    if state == policeState then return end
+    policeState = state
+    if drawing then say('map3d', { police = state or false }) end
 end
 
 -- The page says hello each time it loads, which is also each time it
@@ -343,6 +365,26 @@ local SKIP_SPRITE = { [4] = true, [5] = true, [6] = true, [7] = true, [8] = true
 local NOT_ON_MINIMAP = { [0] = true, [1] = true, [3] = true, [7] = true }
 local BLIP_CAP = 400
 
+-- Police are not drawn. The reference shows none on its minimap, only the
+-- flood of colour (see ViceMap3D.police above), so the blips the game hangs
+-- on officers, their cars and their helicopters are left out: by sprite, and
+-- for a blip riding a ped or a vehicle, by who that is. Stations are places,
+-- not police, and stay. So does another player, whatever their job.
+local POLICE_SPRITE = { [3] = true, [15] = true, [16] = true, [41] = true, [42] = true,
+                        [43] = true, [56] = true, [672] = true }
+local POLICE_PED = { [6] = true, [27] = true, [29] = true }     -- cop, SWAT, army
+
+local function isPolice(blip, sprite, kind)
+    if C.policeBlips == true then return false end
+    if POLICE_SPRITE[sprite] then return true end
+    if kind ~= 1 and kind ~= 2 then return false end
+    local ent = GetBlipInfoIdEntityIndex(blip)
+    if not ent or ent == 0 or not DoesEntityExist(ent) then return false end
+    if IsEntityAVehicle(ent) then ent = GetPedInVehicleSeat(ent, -1) end
+    if not ent or ent == 0 or not IsEntityAPed(ent) or IsPedAPlayer(ent) then return false end
+    return POLICE_PED[GetPedType(ent)] == true
+end
+
 local colourCache = {}
 local function blipColour(blip)
     local index = GetBlipHudColour(blip)
@@ -381,7 +423,9 @@ feed('blip', function()
                         if blip ~= mine and GetBlipAlpha(blip) > 0
                             and not NOT_ON_MINIMAP[GetBlipInfoIdDisplay(blip)] then
                             local kind = GetBlipInfoIdType(blip)
-                            if kind == 1 or kind == 2 or kind == 3 then
+                            if isPolice(blip, sprite, kind) then
+                                -- not drawn
+                            elseif kind == 1 or kind == 2 or kind == 3 then
                                 found[blip] = sprite
                             elseif kind ~= 7 then
                                 static[#static + 1] = describe(blip, sprite)

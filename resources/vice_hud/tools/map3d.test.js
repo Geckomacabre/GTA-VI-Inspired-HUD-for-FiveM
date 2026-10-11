@@ -75,6 +75,15 @@ function GetBlipInfoIdCoord(b) return { x = blipInfo[b].x or 0.0, y = blipInfo[b
 function GetBlipHudColour(b) return blipInfo[b].colour or 0 end
 function IsBlipShortRange(b) return blipInfo[b].short == true end
 function DoesBlipHaveGpsRoute(b) return blipInfo[b].route == true end
+-- What a blip rides: ents[id] = { vehicle = bool, driver = id, player = bool, kind = ped type }
+ents = {}
+function GetBlipInfoIdEntityIndex(b) return blipInfo[b].ent or 0 end
+function DoesEntityExist(e) return ents[e] ~= nil end
+function IsEntityAVehicle(e) return ents[e] ~= nil and ents[e].vehicle == true end
+function IsEntityAPed(e) return ents[e] ~= nil and not ents[e].vehicle end
+function GetPedInVehicleSeat(e) return ents[e].driver or 0 end
+function IsPedAPlayer(e) return ents[e].player == true end
+function GetPedType(e) return ents[e].kind or 4 end
 function last(action) for i = #sent, 1, -1 do if sent[i].action == action then return sent[i] end end end
 function count(action) local n = 0 for i = 1, #sent do if sent[i].action == action then n = n + 1 end end return n end
 -- Run thread i until it has slept n times.
@@ -168,6 +177,55 @@ ok(get('last("map3dBlips").list[1][3]') !== '8' && get('last("map3dBlips").list[
 run('step(5, 2)');
 ok(get('#last("map3dMoving").list') === '1' && get('last("map3dMoving").list[1][1]') === '5.0', 'a blip on a ped is followed separately, and the player\'s own is left out');
 
+console.log('\n-- police --');
+// The reference draws no police on its minimap. A station is a place and stays.
+run(`
+ents = { [501] = { kind = 6 }, [502] = { vehicle = true, driver = 503 }, [503] = { kind = 27 },
+         [504] = { kind = 6, player = true }, [505] = { vehicle = true, driver = 506 }, [506] = { kind = 4 } }
+blipsBySprite[3] = { 30 }      blipInfo[30] = { kind = 2 }                           -- the game's own police-ped blip
+blipsBySprite[1] = { 11, 12, 99, 31, 32 }
+blipInfo[31] = { kind = 2, ent = 501, x = 7.0 }                                      -- a plain dot on an officer
+blipInfo[32] = { kind = 2, ent = 504, x = 8.0 }                                      -- a plain dot on a PLAYER who is police
+blipsBySprite[225] = { 33, 34 }
+blipInfo[33] = { kind = 1, ent = 502, x = 9.0 }                                      -- a car driven by SWAT
+blipInfo[34] = { kind = 1, ent = 505, x = 10.0 }                                     -- a car driven by anybody else
+blipsBySprite[60] = { 35 }     blipInfo[35] = { kind = 4, x = 300.0, y = 300.0 }     -- a police station
+rescan() step(5, 2)
+`);
+const riding = [];
+for (let i = 1; i <= Number(get('#last("map3dMoving").list')); i++) riding.push(get('last("map3dMoving").list[' + i + '][1]'));
+ok(riding.sort().join() === '10.0,5.0,8.0', 'officers and the cars they drive are left off; a player who is police, and anyone else\'s car, are not', riding.join());
+const places = [];
+for (let i = 1; i <= Number(get('#last("map3dBlips").list')); i++) places.push(get('last("map3dBlips").list[' + i + '][3]'));
+ok(places.indexOf('60') >= 0 && places.indexOf('3') < 0, 'the game\'s own police blip is left off by its sprite, and a police station stays', places.join());
+run('ViceMap3D.show(false, true) n = count("map3d") ViceMap3D.police("contact")');
+ok(get('count("map3d") - n') === '0', 'what the police know is not sent to a page that is not drawing');
+run('ViceMap3D.show(true, true)');
+ok(get('last("map3d").police') === 'contact' && get('last("map3d").show') === 'true', 'it goes with the next "draw"');
+run('n = count("map3d") ViceMap3D.police("contact") ViceMap3D.police("contact")');
+ok(get('count("map3d") - n') === '0', 'the same thing is not sent twice');
+run('ViceMap3D.police("searching")');
+ok(get('last("map3d").police') === 'searching', 'losing sight of the player is passed on');
+run('ViceMap3D.police("hollow")');
+ok(get('last("map3d").police') === 'false', 'a crime reported with nobody near is not a flood');
+run('ViceMap3D.police("red") ViceMap3D.police(nil)');
+ok(get('last("map3d").police') === 'false', 'and it ends when the wanted level does');
+fresh('{ enabled = true, police = false, policeBlips = true }');
+run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true) n = count("map3d") ViceMap3D.police("contact")');
+ok(get('count("map3d") - n') === '0', 'police = false switches the flood off');
+
+fresh('{ enabled = true }');
+run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true)');
+run(`
+blipsBySprite = { [1] = { 11, 12, 99 }, [8] = { 13 }, [9] = { 14 }, [52] = { 15, 16, 17 } }
+blipInfo = {
+    [11] = { kind = 2, x = 5.0, y = 6.0 }, [12] = { kind = 4, x = 1.0, y = 2.0, short = true, colour = 3, display = 4 },
+    [99] = { kind = 2 }, [13] = { kind = 4, x = 100.0, y = 200.0 }, [14] = { kind = 7 },
+    [15] = { kind = 4, display = 3 }, [16] = { kind = 4, alpha = 0 }, [17] = { kind = 4 },
+}
+rescan()
+`);
+
 console.log('\n-- a route that ends at a place --');
 // The waypoint is moved onto blip 17 (sprite 52), which the scan above has seen.
 run('blipInfo[13].x, blipInfo[13].y = 60.0, 70.0; blipInfo[17].x, blipInfo[17].y, blipInfo[17].colour = 60.0, 70.0, 7; rescan(); waypoint = true; step(3, 2)');
@@ -203,6 +261,8 @@ ok(/pcall\(ViceMap3D\.owns\)/.test(setRadar) && /drawn = on and okay and owns ==
 ok(/if not pcall\(ViceMap3D\.show, on and drawn, northBlip\) then drawn = false end/.test(setRadar), 'and a fault in the drawn map leaves the engine\'s radar in charge');
 ok(/local engine = on and not drawn\s+radarWanted = engine\s+DisplayRadar\(engine\)/.test(setRadar), 'the engine\'s radar is shown only when the drawn one is not, and held to that');
 ok(/ui\('mapRect', \{ visible = on \}\)/.test(setRadar), 'the frame and badge still follow the HUD\'s own decision');
+ok(/local wstate = wantedState\(ped, wanted\)[\s\S]{0,260}pcall\(ViceMap3D\.police, wstate\)/.test(client), 'the wanted readout tells the drawn map what the police know');
+ok(/Config\.PoliceSearch = \{[\s\S]{0,420}enable = false,/.test(read('config.lua')), 'the two search rings are off: the reference has none');
 const manifest = read('fxmanifest.lua');
 ok(manifest.indexOf("'client_map3d.lua'") > 0 && manifest.indexOf("'client_map3d.lua'") < manifest.indexOf("'client.lua'"), 'client_map3d.lua loads before client.lua');
 ok(/'html\/map3d\.js'/.test(manifest) && /'html\/map3d\/\*\.bin'/.test(manifest), 'the manifest ships the script and whatever world has been built');
@@ -240,6 +300,26 @@ ok(Math.abs(window.ViceMap3D.ink('land')[0] - (window.ViceMap3D.PAINT.land[0] + 
 msg({ action: 'map3d', night: 7 });
 ok(window.ViceMap3D.ink('road')[2] === window.ViceMap3D.NIGHT.road[2] && window.ViceMap3D.ink('route')[0] === window.ViceMap3D.PAINT.route[0], 'at night it is the night ones, and what has no night colour keeps its own');
 msg({ action: 'map3d', night: 0 });
+const F = () => window.ViceMap3D.state().flood;
+ok(F().cover === 0 && F().to === null, 'not wanted: no flood');
+msg({ action: 'map3d', police: 'contact' });
+window.ViceMap3D.stepFlood(0, true);
+ok(F().cover === 1 && F().rgb[0] === window.ViceMap3D.POLICE.contact.rgb[0], 'the police can see the player: the ground floods red');
+msg({ action: 'map3d', police: 'searching' });
+const half = window.ViceMap3D.stepFlood(0.1, false);
+ok(half === true && F().rgb[2] > window.ViceMap3D.POLICE.contact.rgb[2] && F().rgb[2] < window.ViceMap3D.POLICE.searching.rgb[2], 'they lose sight: it turns to blue through the colours between, not in one jump', F().rgb.map(Math.round).join());
+window.ViceMap3D.stepFlood(0, true);
+ok(F().rgb[2] === window.ViceMap3D.POLICE.searching.rgb[2] && window.ViceMap3D.stepFlood(0.1, false) === false, 'and once it is blue there is nothing left to animate');
+msg({ action: 'map3d', police: 'red' });
+window.ViceMap3D.stepFlood(0, true);
+ok(Math.abs(F().cover - window.ViceMap3D.POLICE.red.cover) < 1e-6 && F().cover < 1, 'shaken off but still wanted: a faded red', F().cover);
+msg({ action: 'map3d', police: false });
+window.ViceMap3D.stepFlood(0, true);
+ok(F().cover === 0, 'and it drains away when it is over');
+msg({ action: 'map3d', police: 'nonsense' });
+ok(F().to === null, 'a word it does not know is no flood');
+msg({ action: 'map3d', config: { police: { radius: 150, contact: { rgb: [1, 2, 3] } } } });
+ok(window.ViceMap3D.POLICE.radius === 150 && window.ViceMap3D.POLICE.contact.rgb[0] === 1 && window.ViceMap3D.POLICE.contact.cover === 1, 'its reach and colours come from the config');
 msg({ action: 'map3d', load: true, config: { view: { zoom: 4.5 }, paint: { land: [9, 9, 9] } } });
 ok(window.ViceMap3D.VIEW.zoom === 4.5 && window.ViceMap3D.PAINT.land[0] === 9 && window.ViceMap3D.VIEW.tilt === 0.8, 'config is laid over the defaults, not in place of them');
 const ready = posts.find((p) => p.name === 'map3dReady');

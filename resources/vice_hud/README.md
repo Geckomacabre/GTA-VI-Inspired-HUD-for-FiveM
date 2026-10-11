@@ -706,6 +706,15 @@ What to know about it:
 - **Where a route ends is ringed**: four arcs in the route's colour, as the
   reference marks a destination. In the ring is a plain disc of that colour,
   or, when the waypoint was set on a place, that place's own blip.
+- **Wanted, the map says so and nothing else does.** The reference puts no
+  police on its minimap. The ground round the player floods one flat colour,
+  roads and all: red while the police can see you, blue while they have lost
+  sight and are searching, a faded red once they are shaken off but the
+  wanted level has not gone. It is driven by the same state the wanted stars
+  use (fenix-police's contact model when it is running). The blips the game
+  hangs on officers, their cars and helicopters are left off
+  (`policeBlips`), and the two search rings are off by default
+  (`Config.PoliceSearch`). Police stations are places and stay.
 - **After dark the map is dark**: slate land with the roads standing out of
   it, changing over gradually at dusk and dawn by the game's clock
   (`night`, `nightHours`, `paintNight`).
