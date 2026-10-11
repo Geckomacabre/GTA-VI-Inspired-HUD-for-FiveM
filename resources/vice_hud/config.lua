@@ -112,6 +112,18 @@ Config.Map3D = {
         north = true,       -- the N badge (also follows /movehud's north toggle)
     },
 
+    -- Wanted. The reference shows no police on its minimap: the ground round
+    -- the player floods red while they can see you and blue while they are
+    -- searching, and that is the whole of it. false switches the flood off.
+    -- Colours 0-255; `radius` is how far round the player it reaches, metres.
+    police = {
+        -- contact = { rgb = { 178, 54, 68 } }, searching = { rgb = { 32, 96, 206 } },
+        -- radius = 270, buildings = 0.78,
+    },
+    -- true draws the game's own blips for officers, police cars and police
+    -- helicopters as well. The reference has none.
+    policeBlips = false,
+
     -- A dark map after dark. true follows the game's clock and changes over
     -- gradually at dusk and dawn; false is the daytime map always; 'always' is
     -- the night one always.
@@ -607,7 +619,11 @@ Config.Chips = {
 -- Entirely optional: if `fenix-police` isn't running, this whole block is a
 -- no-op.
 Config.PoliceSearch = {
-    enable = true,
+    -- Off: the reference draws no rings round a search. Its minimap goes blue
+    -- while the police are looking and red while they can see you, which the
+    -- drawn minimap (Config.Map3D.police) does. true puts the two rings back
+    -- on the engine's radar.
+    enable = false,
 
     -- Resource that owns FenixPursuit.isSearching/.searchRadius/.targetCoords
     -- and exports SearchCentre/SearchRadiusBounds off them.

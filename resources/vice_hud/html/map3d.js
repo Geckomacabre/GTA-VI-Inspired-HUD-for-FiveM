@@ -12,9 +12,12 @@
  * frame is a few dozen draw calls over the 256 m squares around the player,
  * and a frame is only drawn when client_map3d.lua says something moved.
  *
- *   map3d       { load, show, config, night }   fetch the world; on or off;
- *                                           Config.Map3D's view and paints;
- *                                           how far into the night it is, 0-1
+ *   map3d       { load, show, config, night, police }
+ *               fetch the world; on or off; Config.Map3D's view and paints;
+ *               how far into the night it is, 0-1; and what the police know:
+ *               'contact' (they can see the player), 'searching' (they have
+ *               lost sight and are looking), 'red' (shaken off, still wanted),
+ *               or false
  *   map3dPos    { x, y, c, h, s }           position, camera and ped heading
  *                                           (degrees), speed (m/s)
  *   map3dRoute  { routes: [{ pts, rgb, rim, head }], ends: [{ x, y, rgb, ring, icon, iconRgb }] }
@@ -76,6 +79,43 @@
         roof: [62, 62, 86], wall: [36, 36, 54], shadow: 34 / 255
     };
     var night = 0;
+
+    // Wanted. The reference draws no police on its minimap at all: it floods
+    // the ground round the player with one flat colour, roads and all, and
+    // leaves the buildings and the blips standing on it. Red while the police
+    // can see the player, blue while they are searching, measured off the
+    // footage; each holds for as long as that stays true, and one gives way to
+    // the other in a fraction of a second. `cover` is how much of the ground's
+    // own colour it replaces.
+    var POLICE = {
+        contact: { rgb: [178, 54, 68], cover: 1 },
+        searching: { rgb: [32, 96, 206], cover: 1 },
+        red: { rgb: [178, 54, 68], cover: 0.45 },
+        radius: 270,        // metres round the player: the whole panel at rest,
+                            // its far edge coming into view at speed
+        soft: 30,           // the edge of it, metres
+        buildings: 0.78,    // how far a building is taken toward it: in the
+                            // reference they show as a slightly lighter shape
+        ease: 6             // per second
+    };
+    var flood = { rgb: [178, 54, 68], cover: 0, to: null };
+    function setPolice(kind) {
+        var want = (typeof kind === 'string' && POLICE[kind] && POLICE[kind].rgb) ? POLICE[kind] : null;
+        flood.to = want;
+        // Coming up from nothing there is no colour to cross-fade from.
+        if (want && flood.cover < 0.01) flood.rgb = want.rgb.slice();
+    }
+    // One step of the fade. True while it still has somewhere to go.
+    function stepFlood(dt, snap) {
+        var to = flood.to, cover = to ? to.cover : 0, k = snap ? 1 : 1 - Math.exp(-dt * POLICE.ease), moving = false, i;
+        if (Math.abs(cover - flood.cover) > 0.004) { flood.cover += (cover - flood.cover) * k; moving = true; } else flood.cover = cover;
+        if (to) {
+            for (i = 0; i < 3; i++) {
+                if (Math.abs(to.rgb[i] - flood.rgb[i]) > 0.6) { flood.rgb[i] += (to.rgb[i] - flood.rgb[i]) * k; moving = true; } else flood.rgb[i] = to.rgb[i];
+            }
+        }
+        return moving;
+    }
     function ink(name) {
         var d = PAINT[name], n = NIGHT[name];
         if (n == null || night <= 0) return d;
@@ -137,8 +177,12 @@
 
     var SHADERS = {
         flat: {
-            vs: PLACE + '\nlayout(location = 0) in vec2 aPos; void main() { gl_Position = place(aPos, 0.0); }',
-            fs: 'uniform vec4 uColour; out vec4 o; void main() { o = uColour; }'
+            vs: PLACE + '\nlayout(location = 0) in vec2 aPos; out vec2 vFrom;' +
+                'void main() { vFrom = aPos - uCentre; gl_Position = place(aPos, 0.0); }',
+            // Under the wanted flood a road is not a road: it is the flood.
+            fs: 'in vec2 vFrom; uniform vec4 uColour; uniform vec4 uFlood; uniform vec2 uFloodEdge; out vec4 o;' +
+                'void main() { float f = uFlood.a * (1.0 - smoothstep(uFloodEdge.x, uFloodEdge.y, length(vFrom)));' +
+                ' o = vec4(mix(uColour.rgb, uFlood.rgb, f), mix(uColour.a, 1.0, f)); }'
         },
         ground: {
             vs: 'layout(location = 0) in vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }',
@@ -147,6 +191,7 @@
                 'uniform vec2 uPanel; uniform vec2 uOrigin; uniform float uT; uniform vec2 uMargin;',
                 'uniform sampler2D uGround; uniform vec2 uGroundAt; uniform vec2 uGroundSize;',
                 'uniform vec3 uLand; uniform vec3 uWater; uniform vec3 uSand; uniform float uAlpha;',
+                'uniform vec4 uFlood; uniform vec2 uFloodEdge;',
                 'out vec4 o;',
                 'float edge(float v) { float e = max(fwidth(v) * 0.7, 0.02); return smoothstep(0.5 - e, 0.5 + e, v); }',
                 'void main() {',
@@ -162,6 +207,7 @@
                 '    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) t = vec2(1.0, 0.0);',
                 '    vec3 c = mix(uLand, uSand, edge(t.g));',
                 '    c = mix(c, uWater, edge(t.r));',
+                '    c = mix(c, uFlood.rgb, uFlood.a * (1.0 - smoothstep(uFloodEdge.x, uFloodEdge.y, length(p - uCentre))));',
                 '    o = vec4(c * uAlpha, uAlpha);',
                 '}'
             ].join('\n')
@@ -183,9 +229,10 @@
                 '',
                 'layout(location = 0) in vec4 aVert; layout(location = 1) in float aOwner;',
                 'uniform float uLift; uniform float uLiftCap; uniform float uInside;',
-                'uniform vec3 uRoof; uniform vec3 uWall; out vec3 vColour; out float vFade;',
+                'uniform vec3 uRoof; uniform vec3 uWall; out vec3 vColour; out float vFade; out vec2 vFrom;',
                 'void main() {',
                 '    vFade = abs(aOwner - uInside) < 0.5 ? 1.0 : 0.0;',
+                '    vFrom = aVert.xy - uCentre;',
                 '    float h = aVert.z * uScale * uLift;',
                 '    h = h / (1.0 + h / uLiftCap);',
                 '    gl_Position = place(aVert.xy, h);',
@@ -200,14 +247,16 @@
                 '}'
             ].join('\n'),
             fs: [
-                'in vec3 vColour; in float vFade; uniform vec2 uPanel; uniform vec2 uFadeAt; uniform vec2 uFadeSize;',
-                'uniform float uFadeMin; uniform float uFadeNear; uniform float uAlpha; uniform vec2 uMargin; out vec4 o;',
+                'in vec3 vColour; in float vFade; in vec2 vFrom; uniform vec2 uPanel; uniform vec2 uFadeAt; uniform vec2 uFadeSize;',
+                'uniform float uFadeMin; uniform float uFadeNear; uniform float uAlpha; uniform vec2 uMargin;',
+                'uniform vec4 uFlood; uniform vec2 uFloodEdge; out vec4 o;',
                 'void main() {',
                 '    vec2 p = vec2(gl_FragCoord.x - uMargin.x, uPanel.y - (gl_FragCoord.y - uMargin.y));',
                 '    float d = length((p - uFadeAt) / uFadeSize);',
                 '    float t = clamp((d - uFadeNear) / (1.0 - uFadeNear), 0.0, 1.0);',
                 '    float a = uFadeMin + (1.0 - uFadeMin) * t * t * (3.0 - 2.0 * t);',
-                '    o = vec4(vColour * uAlpha, mix(1.0, a, vFade));',
+                '    float f = uFlood.a * (1.0 - smoothstep(uFloodEdge.x, uFloodEdge.y, length(vFrom)));',
+                '    o = vec4(mix(vColour, uFlood.rgb, f) * uAlpha, mix(1.0, a, vFade));',
                 '}'
             ].join('\n')
         },
@@ -462,6 +511,8 @@
 
     /* --- a frame ---------------------------------------------------------- */
 
+    var snapNext = false;      // the next frame jumps to the end of any fade
+
     function invalidate() {
         dirty = true;
         if (queued || !shown || !loaded || !gl) return;
@@ -555,6 +606,9 @@
         var W = Math.max(2, Math.round(canvas.clientWidth * dpr)), H = Math.max(2, Math.round(canvas.clientHeight * dpr));
         if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
         var dt = Math.min(0.25, lastDraw ? (now - lastDraw) / 1000 : 0.25);
+        var fading = stepFlood(dt, snapNext);
+        snapNext = false;
+        var floodEdge = [POLICE.radius - POLICE.soft, POLICE.radius];
         lastDraw = now;
         var V = view(W, H, dt), A = VIEW.opacity, R = reach(V), u;
 
@@ -582,6 +636,8 @@
         gl.uniform3f(u.uLand, land[0] / 255, land[1] / 255, land[2] / 255);
         gl.uniform3f(u.uWater, water[0] / 255, water[1] / 255, water[2] / 255);
         gl.uniform3f(u.uSand, sand[0] / 255, sand[1] / 255, sand[2] / 255);
+        gl.uniform4f(u.uFlood, flood.rgb[0] / 255, flood.rgb[1] / 255, flood.rgb[2] / 255, flood.cover);
+        gl.uniform2f(u.uFloodEdge, floodEdge[0], floodEdge[1]);
         gl.uniform1f(u.uAlpha, A);
         gl.bindVertexArray(progs.quad);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -593,6 +649,8 @@
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         u = shared(progs.flat, V);
+        gl.uniform4f(u.uFlood, flood.rgb[0] / 255 * A, flood.rgb[1] / 255 * A, flood.rgb[2] / 255 * A, flood.cover);
+        gl.uniform2f(u.uFloodEdge, floodEdge[0], floodEdge[1]);
         ['footprint', 'rail', 'road', 'bridge', 'lot', 'lane'].forEach(function (name) {
             if (!layers[name]) return;
             var c = ink(name === 'bridge' ? 'road' : name);
@@ -652,6 +710,8 @@
             gl.uniform1f(u.uFadeNear, VIEW.fade.near);
             gl.uniform1f(u.uAlpha, A);
             gl.uniform1f(u.uInside, standingIn());
+            gl.uniform4f(u.uFlood, flood.rgb[0] / 255, flood.rgb[1] / 255, flood.rgb[2] / 255, flood.cover * POLICE.buildings);
+            gl.uniform2f(u.uFloodEdge, floodEdge[0], floodEdge[1]);
             gl.colorMask(false, false, false, false);
             drawChunks(bld.roof, R); drawChunks(bld.wall, R);
             gl.colorMask(true, true, true, false);
@@ -673,6 +733,8 @@
         gl.viewport(0, 0, W, H);
         drawSprites(V);
         gl.bindVertexArray(null);
+        // A fade has to be carried through even if the player is standing still.
+        if (fading) invalidate();
     }
 
     /* --- what sits on top: blips, north, the player ----------------------- */
@@ -993,6 +1055,8 @@
         } else if (d.action === 'map3d') {
             if (d.config) { merge(VIEW, d.config.view); merge(PAINT, d.config.paint); merge(NIGHT, d.config.paintNight); }
             if (typeof d.night === 'number') night = Math.min(1, Math.max(0, d.night));
+            if (d.police !== undefined) setPolice(d.police);
+            if (d.config) merge(POLICE, d.config.police);
             if (d.load || d.show) boot();
             if (d.show != null) { wanted = d.show === true; setShown(wanted); }
         } else if (d.action === 'map3dRoute') {
@@ -1015,11 +1079,12 @@
 
     // For tests and the browser preview.
     window.ViceMap3D = {
-        state: function () { return { booted: booted, shown: shown, loaded: loaded, failed: glFailed, zoom: zoomNow, routes: routes.length, ends: ends, night: night, blips: blips.length, hasAtlas: !!atlasTex }; },
+        state: function () { return { booted: booted, shown: shown, loaded: loaded, failed: glFailed, zoom: zoomNow, routes: routes.length, ends: ends, night: night, flood: { rgb: flood.rgb.slice(), cover: flood.cover, to: flood.to }, blips: blips.length, hasAtlas: !!atlasTex }; },
         project: function (x, y) { var V = view(canvas.width, canvas.height, 0); return project(V, x, y); },
         // A frame right now, without waiting for the browser to offer one: a
         // page nobody is looking at is never offered any.
-        draw: function () { dirty = true; queued = false; frame(performance.now()); },
+        draw: function () { dirty = true; queued = false; snapNext = true; frame(performance.now()); },
+        POLICE: POLICE, stepFlood: stepFlood,
         route: { tidy: tidy, startOf: startOf },
         VIEW: VIEW, PAINT: PAINT, NIGHT: NIGHT, ink: ink
     };
