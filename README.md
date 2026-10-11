@@ -93,9 +93,9 @@ included here.
   `docs/INTERNALS.md` inside, so start there for anything HUD-specific.
   Depends on `ox_lib`. Its drawn 3D minimap is a port of
   [GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced)
-  by **loneeps** (Discord `@moddims`). The map data is that mod's and is not
-  in this repo, at its author's request that the mod not be re-uploaded: you
-  download the mod and build it (see `vice_hud`'s own `README.md`).
+  by **loneeps** (Discord `@moddims`), made with their permission and credited
+  to them. The map it draws is converted from the mod and ships with the
+  resource: there is nothing to build.
 
 - **`um_gigs`**: "Snarf" and "Ryde Me", two
   parody gig-economy phone apps served through `lb-phone`, styled with the

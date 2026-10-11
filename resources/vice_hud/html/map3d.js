@@ -2,11 +2,11 @@
  * buildings standing up, where the engine's radar would otherwise be.
  *
  * It began as a port of the "GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)"
- * mod by loneeps (Discord @moddims):
+ * mod by loneeps (Discord @moddims), made with their permission:
  *   https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced
  * The world it draws is that mod's survey of the map, converted by
- * tools/map3d/build.py and kept out of this repository; the idea is theirs
- * too. The camera in VIEW and the colours in PAINT have since been measured
+ * tools/map3d/build.py; the idea is theirs too, and both are credited to
+ * them. The camera in VIEW and the colours in PAINT have since been measured
  * off the reference footage, and say so where they are set. The mod paints
  * its picture straight onto the game's frame from a plugin, which a server
  * cannot hand to its players, so here the same picture is drawn by WebGL on
