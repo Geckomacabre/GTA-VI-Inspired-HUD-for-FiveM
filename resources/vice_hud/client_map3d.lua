@@ -335,7 +335,12 @@ local SPRITES_PER_FRAME = 150
 -- 4, 5, 9: radius and area shapes. 6, 7: the player and north, which the page
 -- draws itself. 8: the waypoint, which the page draws as the route's end.
 local SKIP_SPRITE = { [4] = true, [5] = true, [6] = true, [7] = true, [8] = true, [9] = true }
-local NOT_ON_MINIMAP = { [0] = true, [1] = true, [3] = true, [4] = true }
+-- SET_BLIP_DISPLAY values that keep a blip off the radar: 0, 1 and 7 hide it
+-- everywhere, 3 is the pause map only. NOT 4. FiveM's documentation lists 4 as
+-- "main map only", but it is what almost every script passes
+-- (SetBlipDisplay(blip, 4)) and the engine's radar shows those blips; leaving
+-- 4 in this list threw away nearly every blip on a real server.
+local NOT_ON_MINIMAP = { [0] = true, [1] = true, [3] = true, [7] = true }
 local BLIP_CAP = 400
 
 local colourCache = {}

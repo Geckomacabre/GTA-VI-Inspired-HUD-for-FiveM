@@ -151,7 +151,7 @@ run(`
 blipsBySprite = { [1] = { 11, 12, 99 }, [8] = { 13 }, [9] = { 14 }, [52] = { 15, 16, 17 } }
 blipInfo = {
     [11] = { kind = 2, x = 5.0, y = 6.0 },                 -- on a ped: follows it
-    [12] = { kind = 4, x = 1.0, y = 2.0, short = true, colour = 3 },
+    [12] = { kind = 4, x = 1.0, y = 2.0, short = true, colour = 3, display = 4 },   -- what nearly every script passes
     [99] = { kind = 2 },                                   -- the player's own
     [13] = { kind = 4, x = 100.0, y = 200.0, route = true, colour = 5 },
     [14] = { kind = 7 },                                   -- a radius circle
@@ -162,6 +162,7 @@ blipInfo = {
 step(4, 8)
 `);
 ok(get('#last("map3dBlips").list') === '2', 'blips: the two that belong on a minimap', get('#last("map3dBlips").list'));
+ok(get('last("map3dBlips").list[1][1]') === '1.0' && get('last("map3dBlips").list[1][2]') === '2.0', 'a blip set to display 4 is one of them: scripts pass 4 for an ordinary blip, whatever the documentation says');
 ok(get('last("map3dBlips").list[1][3]') === '1' && get('last("map3dBlips").list[1][8]') === '0' && get('last("map3dBlips").list[1][4]') === '3', 'a short-range blip is not pinned to the edge, and carries its colour');
 ok(get('last("map3dBlips").list[2][3]') === '52' && get('last("map3dBlips").list[2][8]') === '3' && get('last("map3dBlips").list[2][9]') === '90', 'a blip that is not short-range is pinned, and a turned one says so');
 ok(get('last("map3dBlips").list[1][3]') !== '8' && get('last("map3dBlips").list[2][3]') !== '8','the stock waypoint sprite is left out: the page draws the route\'s end itself');
