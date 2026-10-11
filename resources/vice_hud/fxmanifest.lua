@@ -121,10 +121,10 @@ files {
     'html/index.html',
     'html/style.css',
     'html/app.js',
-    -- The drawn minimap (Config.Map3D), and the world it draws. The world is
-    -- built per server by tools/map3d/build.py and blips.py, and is not in the
-    -- repository: until it is built these three lines match nothing, the page
-    -- says so, and the engine's radar carries on.
+    -- The drawn minimap (Config.Map3D), and the world it draws. The world
+    -- ships with the resource (tools/map3d/build.py and blips.py rebuild it).
+    -- If it is ever missing these three lines match nothing, the page says so,
+    -- and the engine's radar carries on.
     'html/map3d.js',
     'html/map3d/*.bin',
     'html/map3d/*.png',

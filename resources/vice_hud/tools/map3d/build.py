@@ -7,9 +7,9 @@ outlines, building heights and its sea and sand survey of the whole map.
     python tools/map3d/build.py --mod "path/to/MiniMap.dll"
 
 Writes html/map3d/world.bin and html/map3d/ground.png, which html/map3d.js
-loads. Neither is in this repository: the survey is loneeps' work, and the
-mod's page asks that it not be re-uploaded, so each server builds its own copy
-from the mod it downloaded there.
+loads. The survey is loneeps' work, ported with their permission and credited
+to them in the READMEs. Both files ship with the resource; this is what made
+them, and what remakes them if the mod is updated.
 
 Nothing in the mod is run. Its map is one gzip stream inside the DLL, found by
 its "MMV1" header; --mod also takes that stream already cut out and unpacked.

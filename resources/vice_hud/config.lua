@@ -74,21 +74,21 @@ Config.HideSatNav = true
 -- The drawn minimap: the island in flat colour seen at a slant, sea and sand
 -- in their own colours and the buildings standing up, in place of the engine's
 -- radar. The idea and the world it draws come from the "GTA VI MiniMap (3D
--- Buildings) (Legacy & Enhanced)" mod by loneeps (Discord @moddims):
+-- Buildings) (Legacy & Enhanced)" mod by loneeps (Discord @moddims), ported
+-- to FiveM with their permission:
 --     https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced
 -- The camera it is seen through and its colours are measured off the
 -- reference footage. The frame, the player marker, the route colour, the
 -- distance figure and everything around the map stay this HUD's own.
 --
--- IT NEEDS BUILDING FIRST. The world is that mod's survey of the map and is
--- not in this repository (its author asks that the mod not be re-uploaded).
--- Download the mod from the page above, then:
+-- There is nothing to build: the world, converted from that mod's survey of
+-- the map, ships with the resource in html/map3d/. To rebuild it:
 --
 --     python tools/map3d/build.py --mod "path/to/MiniMap.dll"
 --     python tools/map3d/blips.py --docs path/to/fivem-docs     (blip pictures)
 --
--- Until then the page reports there is no world, one line is printed, and the
--- engine's radar carries on exactly as before.
+-- If it is ever missing the page reports there is no world, one line is
+-- printed, and the engine's radar carries on exactly as before.
 --
 -- It is drawn on the HUD's page, by WebGL, because nothing else a server can
 -- hand its players is able to draw it: the engine's radar is a flat picture

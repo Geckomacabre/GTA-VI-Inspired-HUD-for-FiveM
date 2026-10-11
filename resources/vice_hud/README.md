@@ -662,7 +662,8 @@ engine's radar.
 
 It began as a port of, and the world it draws is that of,
 [GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced),
-a single-player mod by **loneeps** (Discord `@moddims`):
+a single-player mod by **loneeps** (Discord `@moddims`), ported to FiveM with
+their permission:
 its roads, its 3,589 building outlines and their heights, and its survey of
 where the map is water and where it is sand. The idea of a minimap drawn this
 way, and the week of work that mapped the island for it, are theirs; this is
@@ -673,23 +674,28 @@ this HUD's: the frame and where it sits, the player marker measured off the
 reference, the route in the HUD's accent colour, the distance figure, the
 direction panel, and the game's own blips.
 
-**It has to be built first.** The world is that mod's work and is not in this
-repository: its author asks that the mod not be re-uploaded, and the map
-inside it is the mod. Download it from the page above and point the converter
-at your copy.
+**There is nothing to build.** The map ships with the resource, in
+`html/map3d/`: `world.bin` and `ground.png` are the mod's map, converted, and
+`blips.png` / `blips.json` are the game's blip pictures. Drop the resource in
+and it draws.
+
+They can be rebuilt, if the mod is updated or you want to change how its map
+is converted:
 
 ```bash
 python tools/map3d/build.py --mod "path/to/MiniMap.dll"
 python tools/map3d/blips.py --docs path/to/fivem-docs
 ```
 
-- `build.py` writes `html/map3d/world.bin` and `ground.png`. Nothing in the
-  mod is run; its map is read out of the file. Needs numpy, scipy and Pillow.
+- `build.py` writes `world.bin` and `ground.png` from a copy of the mod.
+  Nothing in the mod is run; its map is read out of the file. Needs numpy,
+  scipy and Pillow.
 - `blips.py` writes the sheet of blip pictures, from a clone of
-  [fivem-docs](https://github.com/citizenfx/fivem-docs). Without it every
-  blip is a round dot in its own colour. Needs numpy and Pillow.
-- Until `world.bin` exists the page says so, one line is printed, and the
-  engine's radar carries on. Nothing else changes.
+  [fivem-docs](https://github.com/citizenfx/fivem-docs). Needs numpy and
+  Pillow.
+- If `world.bin` is ever missing the page says so, one line is printed, and
+  the engine's radar carries on. Without the blip sheet every blip is a round
+  dot in its own colour.
 
 What to know about it:
 
@@ -830,9 +836,10 @@ by **loneeps** (Discord `@moddims`) on GTA5-Mods.com, and the world it draws
 (roads, building outlines and heights, sea and sand) is all that mod's, as is
 the idea. What is ours is the WebGL redraw that lets a FiveM server show it,
 the camera and colours since measured off the reference, and what sits on top
-of it. The mod's map is
-not included here, at its author's request that the mod not be re-uploaded;
-`tools/map3d/build.py` converts a copy you have downloaded from that page.
+of it. It is ported with loneeps' permission, given on the one condition that
+they are credited, which this is. The converted map ships in `html/map3d/`;
+`tools/map3d/build.py` is what made it. The blip pictures beside it are the
+game's own, taken from [fivem-docs](https://github.com/citizenfx/fivem-docs).
 
 Thanks to GravityExploitz for BuckMe's satire paragraph and for help with the
 BuckMe card design.
