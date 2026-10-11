@@ -89,6 +89,7 @@ function ViceMap3D.show(on, showNorth)
         for k, v in pairs(C.view or {}) do view[k] = v end
         view.north = north and view.north ~= false
         view.buildings = C.buildings ~= false
+        if C.altitude == false then view.altitude = false end
         msg.config = { view = view, paint = C.paint, paintNight = C.paintNight,
                        police = type(C.police) == 'table' and C.police or nil,
                        ripple = type(C.ripple) == 'table' and C.ripple or nil }
@@ -178,8 +179,28 @@ end
 -- ---- where the player is -----------------------------------------------------
 -- Every frame while the map is up, and only what changed: a parked player
 -- costs four native calls a frame and no messages at all.
+-- How high the player is, for the camera that rides at their height. Two
+-- readings, because neither is right alone (the page puts them together, with
+-- what it knows of the building under the player; see altitudeWanted() in
+-- html/map3d.js):
+--
+--   over what is beneath them    nothing at all on a roof; everything in the air
+--   over the nearest street      right on a roof; anything at all on a hillside
+--
+-- An entity's own origin is about a metre off the ground it stands on, which
+-- is taken off. No street found is nil, and the page goes without it.
+local function heightOf(ent, p)
+    local over = math.max(0.0, (GetEntityHeightAboveGround(ent) or 0.0) - 1.0)
+    local street = nil
+    local found, node = GetClosestVehicleNode(p.x, p.y, p.z, 1, 3.0, 0)
+    if found and node then street = p.z - node.z end
+    return over, street
+end
+
 feed('position', function()
     local lx, ly, lc, lh, ls = 0.0, 0.0, 0.0, 0.0, -1.0
+    local over, street, lo, lst = 0.0, nil, -1.0, nil
+    local heightAt = 0
     local sentFor = false
     while true do
         if not drawing then
@@ -194,13 +215,23 @@ feed('position', function()
             local head = GetEntityHeading(ent)
             -- Only a vehicle's speed pulls the view back, as on the radar.
             local speed = veh ~= 0 and GetEntitySpeed(veh) or 0.0
+            -- Height is asked for five times a second, not every frame: the
+            -- street lookup is a search, and the page eases between answers.
+            local now = GetGameTimer()
+            if C.altitude ~= false and (not sentFor or now - heightAt >= 200) then
+                heightAt = now
+                over, street = heightOf(ent, p)
+            end
             if not sentFor
                 or math.abs(p.x - lx) + math.abs(p.y - ly) > 0.03
                 or math.abs(cam - lc) > 0.05 or math.abs(head - lh) > 0.4
-                or math.abs(speed - ls) > 0.4 then
+                or math.abs(speed - ls) > 0.4
+                or math.abs(over - lo) > 0.4 or (street == nil) ~= (lst == nil)
+                or (street ~= nil and math.abs(street - lst) > 0.4) then
                 sentFor = true
-                lx, ly, lc, lh, ls = p.x, p.y, cam, head, speed
-                say('map3dPos', { x = round(p.x, 2), y = round(p.y, 2), c = round(cam, 2), h = round(head, 1), s = round(speed, 1) })
+                lx, ly, lc, lh, ls, lo, lst = p.x, p.y, cam, head, speed, over, street
+                say('map3dPos', { x = round(p.x, 2), y = round(p.y, 2), c = round(cam, 2), h = round(head, 1), s = round(speed, 1),
+                                  g = round(over, 1), a = street and round(street, 1) or nil })
             end
             Wait(0)
         end

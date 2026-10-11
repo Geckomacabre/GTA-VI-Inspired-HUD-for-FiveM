@@ -660,13 +660,15 @@ seen at a slant, with the sea and the beach in their own colours and the
 buildings standing up off the ground. `Config.Map3D` draws that in place of the
 engine's radar.
 
-The look, the projection and the world it draws are those of
+It began as a port of, and the world it draws is that of,
 [GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced),
 a single-player mod by **loneeps** (Discord `@moddims`):
 its roads, its 3,589 building outlines and their heights, and its survey of
 where the map is water and where it is sand. The idea of a minimap drawn this
 way, and the week of work that mapped the island for it, are theirs; this is
-that map redrawn on the HUD's page so a server can show it. Around it everything is still
+that map redrawn on the HUD's page so a server can show it. The camera it is
+seen through and its colours have since been measured off the reference
+footage (see below). Around it everything is still
 this HUD's: the frame and where it sits, the player marker measured off the
 reference, the route in the HUD's accent colour, the distance figure, the
 direction panel, and the game's own blips.
@@ -691,6 +693,24 @@ python tools/map3d/blips.py --docs path/to/fivem-docs
 
 What to know about it:
 
+- **It is seen through a real camera, the reference's.** The reference's
+  minimap is a camera behind and above the player, looking down past them at
+  about 27 degrees, and this is that camera: its pitch and lens are read off
+  the footage (a rectangular roof gives two vanishing points and so the
+  horizon; a helipad's circle, drawn a third as tall as it is wide, agrees).
+  A metre ahead of the player is drawn 0.59 of a metre across, buildings
+  stand their own height through the same lens, the far end of the map pales
+  toward the horizon, and the panel is opaque. `Config.Map3D.view.camera`.
+- **The camera rides at your height.** On a roof the city falls away below
+  you; under a parachute or in an aircraft it shrinks, and what is on the
+  ground directly beneath you slides toward the bottom edge. A wall or roof
+  that stands between the camera and you is seen through round your marker;
+  a roof you are standing on is not. `Config.Map3D.altitude = false` keeps
+  it on the ground. The ground itself is flat: the map has no hills.
+- **Its colours are the reference's**, sampled off its opaque panel: pale
+  pinkish paving with the roads a shade lighter, a deep teal sea that is
+  lighter along the shore, and lavender-slate buildings darker than the
+  ground they stand on.
 - **It is drawn on the HUD's page, by WebGL.** The mod paints straight onto
   the game's frame from a plugin, which a server cannot give its players, and
   the engine's own radar is a flat picture that cannot stand a building up.
@@ -744,7 +764,7 @@ What to know about it:
   when the map does.
 - `/hudmap3d` switches between it and the game's radar for that player.
 
-`Config.Map3D.view` has the zoom, the tilt, where the player sits on the panel
+`Config.Map3D.view` has the zoom, the camera, where the player sits on the panel
 and the opacity; `Config.Map3D.paint` the colours.
 
 ## The player marker on the minimap
@@ -804,12 +824,13 @@ mod on GTA5-Mods.com. The BuckMe bank icon and its ring
 (`html/icons/buckme.png`, `html/icons/buckme_ring/`,
 `html/icons/fill_purple.png`) are original, made in-house.
 
-The drawn minimap (`Config.Map3D`) is a port of
+The drawn minimap (`Config.Map3D`) began as a port of
 [GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced)
-by **loneeps** (Discord `@moddims`) on GTA5-Mods.com: its look, its
-projection, its colours, and the world it draws (roads, building outlines and
-heights, sea and sand) are all that mod's. What is ours is the WebGL redraw
-that lets a FiveM server show it, and what sits on top of it. The mod's map is
+by **loneeps** (Discord `@moddims`) on GTA5-Mods.com, and the world it draws
+(roads, building outlines and heights, sea and sand) is all that mod's, as is
+the idea. What is ours is the WebGL redraw that lets a FiveM server show it,
+the camera and colours since measured off the reference, and what sits on top
+of it. The mod's map is
 not included here, at its author's request that the mod not be re-uploaded;
 `tools/map3d/build.py` converts a copy you have downloaded from that page.
 

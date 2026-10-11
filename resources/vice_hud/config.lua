@@ -73,11 +73,12 @@ Config.HideSatNav = true
 
 -- The drawn minimap: the island in flat colour seen at a slant, sea and sand
 -- in their own colours and the buildings standing up, in place of the engine's
--- radar. The look and the world it draws come from the "GTA VI MiniMap (3D
+-- radar. The idea and the world it draws come from the "GTA VI MiniMap (3D
 -- Buildings) (Legacy & Enhanced)" mod by loneeps (Discord @moddims):
 --     https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced
--- The frame, the player marker, the route colour, the distance figure and
--- everything around the map stay this HUD's own.
+-- The camera it is seen through and its colours are measured off the
+-- reference footage. The frame, the player marker, the route colour, the
+-- distance figure and everything around the map stay this HUD's own.
 --
 -- IT NEEDS BUILDING FIRST. The world is that mod's survey of the map and is
 -- not in this repository (its author asks that the mod not be re-uploaded).
@@ -107,13 +108,25 @@ Config.Map3D = {
     route = { length = 500.0 },     -- metres of GPS line to draw; false for none
 
     view = {
-        zoom = 2.58,        -- map pixels per metre, on a panel 115 pixels tall
+        zoom = 2.58,        -- map pixels per metre across, at the player, on a panel 115 pixels tall
         speedZoom = 0.25,   -- how far the view pulls back at speed (0 = never)
-        tilt = 0.8,         -- 0 = straight down; nearer 1 = flatter, further
-        anchor = 0.725,     -- the player marker, as a fraction down the panel
-        opacity = 0.87,     -- of the map itself; marker and blips stay solid
+        -- The camera, read off the reference: it looks down past the player
+        -- from behind and above them. `pitch` is degrees below the horizon
+        -- (higher looks more nearly straight down: more ground, less wall),
+        -- `focal` its lens in panel heights (longer flattens the perspective).
+        camera = { pitch = 27, focal = 1.38 },
+        anchor = 0.71,      -- the player marker, as a fraction down the panel
+        opacity = 1.0,      -- of the map itself: the reference's hides what is behind it
         north = true,       -- the N badge (also follows /movehud's north toggle)
+        -- haze = { to = 0.42, most = 0.34 },   -- how far down the panel the horizon's pallor reaches, and how strong
+        -- liftCap = 300,                       -- lower to keep towers shorter
     },
+
+    -- The camera rides at the player's own height, as the reference's does:
+    -- on a roof the city falls away below, and under a parachute or in an
+    -- aircraft it shrinks. false keeps it on the ground whatever the player
+    -- is doing. (The ground itself is drawn flat: the map has no hills.)
+    altitude = true,
 
     -- Wanted. The reference shows no police on its minimap: the ground round
     -- the player floods red while they can see you and blue while they are
@@ -145,13 +158,14 @@ Config.Map3D = {
     -- Colours, 0-255. Left out, each keeps the value in html/map3d.js.
     -- paintNight is the same list for the night map.
     paintNight = {
-        -- land = { 42, 42, 62 }, road = { 90, 86, 100 }, water = { 27, 35, 58 },
-        -- roof = { 62, 62, 86 }, wall = { 36, 36, 54 },
+        -- land = { 37, 37, 55 }, road = { 79, 76, 88 }, water = { 24, 31, 51 },
+        -- roof = { 55, 55, 76 }, wall = { 32, 32, 48 }, haze = { 58, 58, 84 },
     },
     paint = {
-        -- land = { 160, 155, 149 }, water = { 118, 152, 158 }, sand = { 178, 162, 134 },
-        -- road = { 172, 167, 161 }, lot = { 182, 177, 170 }, rail = { 148, 144, 140 },
-        -- roof = { 158, 159, 166 }, wall = { 146, 150, 160 },
+        -- land = { 142, 134, 141 }, water = { 70, 124, 142 }, shallow = { 104, 152, 166 },
+        -- sand = { 156, 144, 148 }, road = { 152, 144, 152 }, lot = { 158, 150, 157 },
+        -- rail = { 130, 124, 130 }, roof = { 134, 130, 151 }, wall = { 126, 125, 150 },
+        -- haze = { 170, 166, 186 },
     },
 }
 

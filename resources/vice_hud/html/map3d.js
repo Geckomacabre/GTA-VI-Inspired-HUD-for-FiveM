@@ -1,12 +1,13 @@
 /* The drawn minimap: the island as flat colour seen at a slant, with its
  * buildings standing up, where the engine's radar would otherwise be.
  *
- * The look, the projection and the numbers in VIEW and PAINT are those of the
- * "GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)" mod by loneeps (Discord
- * @moddims), read out of it:
+ * It began as a port of the "GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)"
+ * mod by loneeps (Discord @moddims):
  *   https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced
  * The world it draws is that mod's survey of the map, converted by
- * tools/map3d/build.py and kept out of this repository. The mod paints
+ * tools/map3d/build.py and kept out of this repository; the idea is theirs
+ * too. The camera in VIEW and the colours in PAINT have since been measured
+ * off the reference footage, and say so where they are set. The mod paints
  * its picture straight onto the game's frame from a plugin, which a server
  * cannot hand to its players, so here the same picture is drawn by WebGL on
  * the HUD's own page.
@@ -22,8 +23,11 @@
  *               lost sight and are looking), 'red' (shaken off, still wanted),
  *               or false; and whether the player is spending stamina, which
  *               sends rings out from their marker
- *   map3dPos    { x, y, c, h, s }           position, camera and ped heading
- *                                           (degrees), speed (m/s)
+ *   map3dPos    { x, y, c, h, s, g, a }     position, camera and ped heading
+ *                                           (degrees), speed (m/s), and height:
+ *                                           metres above whatever is beneath
+ *                                           the player, and above the nearest
+ *                                           street (left out if there is none)
  *   map3dRoute  { routes: [{ pts, rgb, rim, head }], ends: [{ x, y, rgb, ring, icon, iconRgb }] }
  *               the GPS line(s) as world x,y pairs, `head` on the one that
  *               starts at the player; and where each ends -- ringed, with the
@@ -42,19 +46,41 @@
 (function () {
     'use strict';
 
-    // How the ground is seen. A point `g` pixels ahead of the player is drawn
-    // 1 / (1 + T * g) as large, with T = tilt / (anchor * panel height).
+    // How the world is seen. The reference's minimap is a real camera, behind
+    // and above the player and looking down past them, and this is that
+    // camera. Its numbers are read off the reference: a rectangular roof in
+    // one clip gives two vanishing points, which fix the horizon (a fifth of
+    // the panel above its top edge), the lens and the pitch; a helipad's
+    // circle in another, drawn 0.30 to 0.38 as tall as wide a third of the way
+    // down the panel, agrees with them. What follows from it is in camera():
+    // a metre ahead of the player is drawn 0.59 of a metre across, a metre of
+    // height 0.82, and anything tall leans toward the viewer as it rises.
     var VIEW = {
-        zoom: 2.58,         // pixels per metre, on a panel 115 pixels tall
+        zoom: 2.58,         // pixels per metre across, at the player, on a panel 115 pixels tall
         speedZoom: 0.25,    // how much of that is given up at full speed
         speedFull: 50,      // m/s that counts as full speed
         zoomEase: 7,        // per second
-        tilt: 0.8,
-        anchor: 0.725,      // the player, as a fraction of the way down the panel
-        lift: 0.3,          // a metre of height is this much of a metre on screen
-        liftCap: 400,       // tall buildings stop growing, in panel pixels
-        opacity: 0.87,
-        fade: { rx: 30, ry: 40, up: 6, min: 0.18, near: 0.3 },
+        camera: {
+            pitch: 27,      // degrees below the horizon the camera looks
+            focal: 1.38     // its lens, in panel heights (about 40 degrees top to bottom)
+        },
+        anchor: 0.71,       // the player, as a fraction of the way down the panel
+        liftCap: 300,       // tall buildings stop growing: a tower 280 m high is drawn 80
+        // The camera rides at the player's own height: on a roof the city falls
+        // away below, and under a parachute it shrinks. `ease` is how fast it
+        // follows, per second; under `floor` metres counts as on the ground.
+        altitude: { ease: 3, floor: 3, max: 500 },
+        opacity: 1,         // the reference's panel hides what is behind it completely
+        // The far end of the map pales toward the horizon: `most` of the haze
+        // colour along the panel's top edge, none of it by `to` of the way
+        // down. It goes by where a thing is DRAWN, not how far off it is: from
+        // a parachute everything is far off, and the reference stays clear.
+        haze: { to: 0.42, most: 0.34 },
+        // What stands between the camera and the player is seen through round
+        // the marker: down to `min` of itself at the middle of an oval rx by
+        // ry (panel pixels, centred `up` above the marker), solid at its rim.
+        // `far` under 1 makes such things see-through everywhere else too.
+        fade: { rx: 30, ry: 40, up: 6, min: 0.18, near: 0.3, far: 1 },
         // The line starts `gap` metres ahead of the player and comes in over
         // the next `fade`, as the reference's does; it never touches the marker.
         route: { lane: 3.5, minWidth: 6, rim: 1.2, gap: 5, fade: 10 },
@@ -64,11 +90,17 @@
         north: true
     };
 
+    // Sampled off the reference, whose panel is opaque, so these are the
+    // colours as they reach the screen: paving a pale pinkish grey with the
+    // roads a shade lighter, the sea a deep teal that is lighter along the
+    // shore, and the buildings a lavender slate that is DARKER than the
+    // ground they stand on, lit from one side.
     var PAINT = {
-        land: [160, 155, 149], water: [118, 152, 158], sand: [178, 162, 134],
-        footprint: [158, 159, 166], rail: [148, 144, 140], road: [172, 167, 161],
-        lot: [182, 177, 170], lane: [120, 117, 114, 70 / 255],
-        roof: [158, 159, 166], wall: [146, 150, 160], shadow: 20 / 255,
+        land: [142, 134, 141], water: [70, 124, 142], shallow: [104, 152, 166], sand: [156, 144, 148],
+        footprint: [128, 125, 147], rail: [130, 124, 130], road: [152, 144, 152],
+        lot: [158, 150, 157], lane: [108, 104, 110, 70 / 255],
+        roof: [134, 130, 151], wall: [126, 125, 150], shadow: 20 / 255,
+        haze: [170, 166, 186],
         route: [250, 116, 165]
     };
 
@@ -77,10 +109,11 @@
     // runs from 0 (day) to 1 and every colour is mixed by it, so dusk and dawn
     // are a slow change and not a switch.
     var NIGHT = {
-        land: [42, 42, 62], water: [27, 35, 58], sand: [58, 56, 70],
-        footprint: [50, 50, 72], rail: [60, 59, 76], road: [90, 86, 100],
-        lot: [66, 64, 82], lane: [132, 130, 146, 0.2],
-        roof: [62, 62, 86], wall: [36, 36, 54], shadow: 34 / 255
+        land: [37, 37, 55], water: [24, 31, 51], shallow: [33, 43, 66], sand: [51, 49, 62],
+        footprint: [44, 44, 63], rail: [53, 52, 67], road: [79, 76, 88],
+        lot: [58, 56, 72], lane: [116, 114, 128, 0.2],
+        roof: [55, 55, 76], wall: [32, 32, 48], shadow: 34 / 255,
+        haze: [58, 58, 84]
     };
     var night = 0;
 
@@ -179,8 +212,9 @@
     var blips = [], fixed = [], moving = [], routeSrc = [], ends = [];
     var booted = false;
     var shown = false, wanted = false, loaded = false, dirty = false, queued = false;
-    var pos = { x: 0, y: 0, c: 0, h: 0, s: 0 };
+    var pos = { x: 0, y: 0, c: 0, h: 0, s: 0, g: 0, a: null };
     var zoomNow = -1, lastDraw = 0;
+    var altNow = 0;             // metres the player is above the ground, as drawn
 
     function post(name, data) {
         try {
@@ -204,56 +238,70 @@
     /* --- shaders ----------------------------------------------------------
        Every one of them places a world point the same way, so that part is
        written once. `u` is pixels to the right of the player, `g` pixels
-       ahead; the divide by `w` is the slant. */
+       ahead, `z` pixels above the player's own height; `w` is how far the
+       point is from the camera, as a multiple of the player's distance, and
+       the divide by it is the perspective. uCam is camera()'s squash, rise
+       and lean; uAlt how far the ground is below the player. haze() is how
+       much of the horizon's pallor a pixel takes on, by how near the top of
+       the panel it is. */
     var PLACE = [
         'uniform vec2 uCentre; uniform vec2 uRot; uniform float uScale;',
         'uniform vec2 uPanel; uniform vec2 uOrigin; uniform float uT;',
-        'vec4 place(vec2 p, float lift) {',
+        'uniform vec3 uCam; uniform float uAlt;',
+        'vec4 place(vec2 p, float height) {',
         '    vec2 d = p - uCentre;',
         '    float u = uScale * (d.x * uRot.x + d.y * uRot.y);',
         '    float g = uScale * (d.y * uRot.x - d.x * uRot.y);',
-        '    float w = 1.0 + uT * g;',
-        '    float up = lift * (w < 1.0 ? w : 1.0);',
-        '    float z = clamp((g + 1.5 * uPanel.y) / (8.0 * uPanel.y), 0.0, 1.0) * 2.0 - 1.0;',
+        '    float z = height - uAlt;',
+        '    float w = 1.0 + uT * g - uCam.z * z;',
         '    return vec4((2.0 * uOrigin.x / uPanel.x - 1.0) * w + 2.0 * u / uPanel.x,',
-        '                (1.0 - 2.0 * uOrigin.y / uPanel.y) * w + 2.0 * (g + up) / uPanel.y,',
-        '                z * w, w);',
+        '                (1.0 - 2.0 * uOrigin.y / uPanel.y) * w + 2.0 * (uCam.x * g + uCam.y * z) / uPanel.y,',
+        '                w - 0.2, w);',
         '}'
     ].join('\n');
+    var HAZE = 'uniform vec4 uHaze; uniform float uHazeTo; uniform vec2 uPanel; uniform vec2 uMargin;' +
+        'float haze() { float down = 1.0 - (gl_FragCoord.y - uMargin.y) / uPanel.y;' +
+        ' return uHaze.a * (1.0 - smoothstep(0.0, uHazeTo, down)); }\n';
 
     var SHADERS = {
         flat: {
             vs: PLACE + '\nlayout(location = 0) in vec2 aPos; out vec2 vFrom;' +
                 'void main() { vFrom = aPos - uCentre; gl_Position = place(aPos, 0.0); }',
             // Under the wanted flood a road is not a road: it is the flood.
-            fs: 'in vec2 vFrom; uniform vec4 uColour; uniform vec4 uFlood; uniform vec2 uFloodEdge; out vec4 o;' +
+            fs: HAZE + 'in vec2 vFrom; uniform vec4 uColour; uniform vec4 uFlood; uniform vec2 uFloodEdge; out vec4 o;' +
                 'void main() { float f = uFlood.a * (1.0 - smoothstep(uFloodEdge.x, uFloodEdge.y, length(vFrom)));' +
-                ' o = vec4(mix(uColour.rgb, uFlood.rgb, f), mix(uColour.a, 1.0, f)); }'
+                ' o = vec4(mix(mix(uColour.rgb, uFlood.rgb, f), uHaze.rgb, haze()), mix(uColour.a, 1.0, f)); }'
         },
+        // The ground is one sheet over the whole panel: each pixel is taken
+        // back through the camera to the spot on the ground it shows (which is
+        // place(), run the other way), and coloured by the survey there.
         ground: {
             vs: 'layout(location = 0) in vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }',
-            fs: [
+            fs: HAZE + [
                 'uniform vec2 uCentre; uniform vec2 uRot; uniform float uScale;',
-                'uniform vec2 uPanel; uniform vec2 uOrigin; uniform float uT; uniform vec2 uMargin;',
+                'uniform vec2 uOrigin; uniform float uT;',
+                'uniform vec3 uCam; uniform float uAlt;',
                 'uniform sampler2D uGround; uniform vec2 uGroundAt; uniform vec2 uGroundSize;',
-                'uniform vec3 uLand; uniform vec3 uWater; uniform vec3 uSand; uniform float uAlpha;',
+                'uniform vec3 uLand; uniform vec3 uWater; uniform vec3 uShallow; uniform vec3 uSand; uniform float uAlpha;',
                 'uniform vec4 uFlood; uniform vec2 uFloodEdge;',
                 'out vec4 o;',
                 'float edge(float v) { float e = max(fwidth(v) * 0.7, 0.02); return smoothstep(0.5 - e, 0.5 + e, v); }',
                 'void main() {',
                 '    vec2 f = gl_FragCoord.xy - uMargin;',
                 '    float q = uOrigin.y - (uPanel.y - f.y);',
-                '    float k = max(1.0 - uT * q, 0.001);',
-                '    float g = q / k;',
-                '    float u = (f.x - uOrigin.x) / k;',
+                '    float g = (q * (1.0 + uCam.z * uAlt) + uCam.y * uAlt) / max(uCam.x - uT * q, 0.0005);',
+                '    float w = 1.0 + uT * g + uCam.z * uAlt;',
+                '    float u = (f.x - uOrigin.x) * w;',
                 '    vec2 p = uCentre + vec2(u * uRot.x - g * uRot.y, u * uRot.y + g * uRot.x) / uScale;',
                 '    vec2 uv = (p - uGroundAt) / uGroundSize;',
                 '    vec2 t = texture(uGround, uv).rg;',
                 // Past the survey's edge there is only sea.
                 '    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) t = vec2(1.0, 0.0);',
                 '    vec3 c = mix(uLand, uSand, edge(t.g));',
-                '    c = mix(c, uWater, edge(t.r));',
+                // The survey's edges are soft, which is how far out the shallows reach.
+                '    c = mix(c, mix(uShallow, uWater, smoothstep(0.6, 0.985, t.r)), edge(t.r));',
                 '    c = mix(c, uFlood.rgb, uFlood.a * (1.0 - smoothstep(uFloodEdge.x, uFloodEdge.y, length(p - uCentre))));',
+                '    c = mix(c, uHaze.rgb, haze());',
                 '    o = vec4(c * uAlpha, uAlpha);',
                 '}'
             ].join('\n')
@@ -270,18 +318,25 @@
             fs: 'in float vAlong; uniform float uStart; uniform float uFade; uniform vec4 uColour; out vec4 o;' +
                 'void main() { float a = smoothstep(uStart, uStart + uFade, vAlong); if (a < 0.004) discard; o = vec4(uColour.rgb, a); }'
         },
+        // A building stands its full height, through the same camera as the
+        // ground it is on. What is in the camera's way is another matter: a
+        // wall or a roof that is above the player and nearer the camera than
+        // they are is standing between the two, and round the marker it is
+        // seen through. (A roof the player is standing ON is neither, and
+        // stays solid.)
         building: {
             vs: PLACE + [
                 '',
-                'layout(location = 0) in vec4 aVert; layout(location = 1) in float aOwner;',
-                'uniform float uLift; uniform float uLiftCap; uniform float uInside;',
-                'uniform vec3 uRoof; uniform vec3 uWall; out vec3 vColour; out float vFade; out vec2 vFrom;',
+                'layout(location = 0) in vec4 aVert;',
+                'uniform float uLiftCap;',
+                'uniform vec3 uRoof; uniform vec3 uWall; out vec3 vColour; out float vW; out float vOver; out vec2 vFrom;',
                 'void main() {',
-                '    vFade = abs(aOwner - uInside) < 0.5 ? 1.0 : 0.0;',
                 '    vFrom = aVert.xy - uCentre;',
-                '    float h = aVert.z * uScale * uLift;',
+                '    float h = aVert.z * uScale;',
                 '    h = h / (1.0 + h / uLiftCap);',
                 '    gl_Position = place(aVert.xy, h);',
+                '    vW = gl_Position.w;',
+                '    vOver = (h - uAlt) / uScale;',
                 '    if (aVert.w > 8.0) { vColour = uRoof; }',
                 '    else {',
                 '        vec2 n = vec2(cos(aVert.w), sin(aVert.w));',
@@ -292,17 +347,18 @@
                 '    }',
                 '}'
             ].join('\n'),
-            fs: [
-                'in vec3 vColour; in float vFade; in vec2 vFrom; uniform vec2 uPanel; uniform vec2 uFadeAt; uniform vec2 uFadeSize;',
-                'uniform float uFadeMin; uniform float uFadeNear; uniform float uAlpha; uniform vec2 uMargin;',
+            fs: HAZE + [
+                'in vec3 vColour; in float vW; in float vOver; in vec2 vFrom; uniform vec2 uFadeAt; uniform vec2 uFadeSize;',
+                'uniform float uFadeMin; uniform float uFadeNear; uniform float uFadeFar; uniform float uAlpha;',
                 'uniform vec4 uFlood; uniform vec2 uFloodEdge; out vec4 o;',
                 'void main() {',
                 '    vec2 p = vec2(gl_FragCoord.x - uMargin.x, uPanel.y - (gl_FragCoord.y - uMargin.y));',
                 '    float d = length((p - uFadeAt) / uFadeSize);',
                 '    float t = clamp((d - uFadeNear) / (1.0 - uFadeNear), 0.0, 1.0);',
-                '    float a = uFadeMin + (1.0 - uFadeMin) * t * t * (3.0 - 2.0 * t);',
+                '    float a = uFadeMin + (uFadeFar - uFadeMin) * t * t * (3.0 - 2.0 * t);',
+                '    float between = smoothstep(0.0, 0.12, 1.0 - vW) * smoothstep(1.0, 3.0, vOver);',
                 '    float f = uFlood.a * (1.0 - smoothstep(uFloodEdge.x, uFloodEdge.y, length(vFrom)));',
-                '    o = vec4(mix(vColour, uFlood.rgb, f) * uAlpha, mix(1.0, a, vFade));',
+                '    o = vec4(mix(mix(vColour, uFlood.rgb, f), uHaze.rgb, haze()) * uAlpha, mix(1.0, a, between));',
                 '}'
             ].join('\n')
         },
@@ -312,9 +368,9 @@
         shadow: {
             vs: PLACE + [
                 '',
-                'layout(location = 0) in vec4 aVert; uniform float uLift; uniform float uLiftCap; uniform float uShadowMax;',
+                'layout(location = 0) in vec4 aVert; uniform float uLiftCap; uniform float uShadowMax;',
                 'void main() {',
-                '    float h = aVert.z * uScale * uLift;',
+                '    float h = aVert.z * uScale * uCam.y;',
                 '    h = min(h / (1.0 + h / uLiftCap), uShadowMax);',
                 '    gl_Position = place(aVert.xy, 0.0);',
                 '    float k = min(1.0 / gl_Position.w, 1.0);',
@@ -587,6 +643,34 @@
     var OVERHANG = 0.1;
     var cornerCss = -1;
 
+    /* What the camera does to a point, worked out from where it is. With the
+       lens's axis through the middle of a panel H tall, and the player `oy`
+       down it:
+
+         squash   a metre ahead of the player, against a metre across them.
+                  The player is seen from sin(pitch + their angle off the
+                  axis) above the ground, and that is how much of the ground's
+                  depth survives.
+         T        the perspective: a point g pixels ahead is 1 + T * g times
+                  as far away as the player, and drawn that much smaller. Set
+                  by where the horizon falls (g without end lands on it).
+         rise     a metre of height, against a metre across.
+         lean     what height does to distance: the top of something tall is
+                  nearer the camera than its foot, so it is drawn larger.
+
+       place() in the shaders and project() below are these four and nothing
+       else. */
+    function camera(H, oy) {
+        var c = VIEW.camera || {};
+        var pitch = Math.max(5, Math.min(80, Number(c.pitch) || 27)) * Math.PI / 180;
+        var f = Math.max(0.3, Number(c.focal) || 1.38) * H;
+        var off = Math.atan((oy - H / 2) / f);
+        var squash = Math.sin(pitch + off) / Math.cos(off);
+        var horizon = H / 2 - f * Math.tan(pitch);
+        var T = squash / Math.max(1, oy - horizon);
+        return { squash: squash, T: T, rise: 1 / Math.cos(pitch) - squash * Math.tan(pitch), lean: T * Math.tan(pitch), horizon: horizon };
+    }
+
     function view(Wc, Hc, dt) {
         var m = Math.round(Hc * OVERHANG / (1 + 2 * OVERHANG)), H = Hc - 2 * m, W = Wc - 2 * m;
         var unit = H / PANEL_H;
@@ -596,8 +680,10 @@
         var oy = H * VIEW.anchor;
         if (cornerCss < 0) cornerCss = parseFloat(getComputedStyle(canvas).letterSpacing) || 0;
         var corner = canvas.clientHeight ? cornerCss * Hc / canvas.clientHeight : 0;
-        return { W: W, H: H, Wc: Wc, Hc: Hc, m: m, corner: corner, unit: unit, s: zoomNow * unit,
-                 cos: Math.cos(rad), sin: Math.sin(rad), ox: W / 2, oy: oy, T: VIEW.tilt / oy, rad: rad };
+        var cam = camera(H, oy), s = zoomNow * unit;
+        return { W: W, H: H, Wc: Wc, Hc: Hc, m: m, corner: corner, unit: unit, s: s,
+                 cos: Math.cos(rad), sin: Math.sin(rad), ox: W / 2, oy: oy, rad: rad,
+                 T: cam.T, squash: cam.squash, rise: cam.rise, lean: cam.lean, alt: altNow * s };
     }
 
     function shared(prog, V) {
@@ -610,14 +696,36 @@
         gl.uniform2f(u.uMargin, V.m, V.m);
         gl.uniform2f(u.uOrigin, V.ox, V.oy);
         gl.uniform1f(u.uT, V.T);
+        gl.uniform3f(u.uCam, V.squash, V.rise, V.lean);
+        gl.uniform1f(u.uAlt, V.alt);
         return u;
     }
 
+    // The haze every part of the island takes on with distance. `A` is the
+    // panel's own see-through, which the colours drawn over the ground carry.
+    function hazed(u, A) {
+        var c = ink('haze'), h = VIEW.haze || {};
+        gl.uniform4f(u.uHaze, c[0] / 255 * A, c[1] / 255 * A, c[2] / 255 * A, Math.max(0, Math.min(1, Number(h.most) || 0)));
+        gl.uniform1f(u.uHazeTo, Math.max(0.01, Number(h.to) || 0.42));
+    }
+
+    // Where on the ground a point of the panel is looking: place(), backwards.
+    // x and y are panel pixels from its top left; the answer is pixels right
+    // of and ahead of the player.
+    function ground(V, x, y) {
+        var q = V.oy - y;
+        var g = (q * (1 + V.lean * V.alt) + V.rise * V.alt) / Math.max(V.squash - V.T * q, 0.0005);
+        var w = 1 + V.T * g + V.lean * V.alt;
+        return { u: (x - V.ox) * w, g: g, w: w };
+    }
+
     // Which squares of the world can be on the panel: everything within reach
-    // of its far top corners, and one square more for what stands tall.
+    // of the furthest ground its corners look at, and one square more for
+    // what stands tall. From high up that is a great deal of ground, most of
+    // it lost in the haze, so there is a limit.
     function reach(V) {
-        var far = 1 / Math.max(0.05, 1 - VIEW.tilt);
-        var r = Math.hypot(V.oy * far, V.W / 2 * far) / V.s + world.chunk;
+        var far = ground(V, 0, 0), near = ground(V, 0, V.H);
+        var r = Math.min(3000, Math.max(Math.hypot(far.u, far.g), Math.hypot(near.u, near.g)) / V.s) + world.chunk;
         var b = world.bounds, c = world.chunk;
         return {
             x0: Math.max(0, Math.floor((pos.x - r - b[0]) / c)), x1: Math.min(world.gw - 1, Math.floor((pos.x + r - b[0]) / c)),
@@ -638,10 +746,10 @@
     // through around the marker; the rest of the street stays solid. Looked up
     // again once the player has moved half a metre, over the roofs of the
     // squares around them.
-    var inside = { x: 1e9, y: 1e9, id: -1 };
+    var inside = { x: 1e9, y: 1e9, id: -1, h: 0 };
     function standingIn() {
         if (Math.abs(pos.x - inside.x) + Math.abs(pos.y - inside.y) < 0.5) return inside.id;
-        inside.x = pos.x; inside.y = pos.y; inside.id = -1;
+        inside.x = pos.x; inside.y = pos.y; inside.id = -1; inside.h = 0;
         var b = world.bounds, c = world.chunk, v = bld.verts, t = bld.roofTris, s = bld.roof.starts;
         var cx = Math.floor((pos.x - b[0]) / c), cy = Math.floor((pos.y - b[1]) / c), px = pos.x, py = pos.y;
         for (var y = Math.max(0, cy - 1); y <= Math.min(world.gh - 1, cy + 1); y++) {
@@ -652,10 +760,39 @@
                 var d1 = (px - v[d]) * (v[a + 1] - v[d + 1]) - (v[a] - v[d]) * (py - v[d + 1]);
                 var d2 = (px - v[e]) * (v[d + 1] - v[e + 1]) - (v[d] - v[e]) * (py - v[e + 1]);
                 var d3 = (px - v[a]) * (v[e + 1] - v[a + 1]) - (v[e] - v[a]) * (py - v[a + 1]);
-                if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) { inside.id = v[a + 4]; return inside.id; }
+                if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) { inside.id = v[a + 4]; inside.h = v[a + 2]; return inside.id; }
             }
         }
         return -1;
+    }
+
+    /* How high the player is above the ground the map is drawn on. The game
+       says two things, and neither is right alone:
+
+         pos.g   how far they are above whatever is under them. On a roof
+                 that is nothing at all.
+         pos.a   how far they are above the nearest street. On a hillside
+                 path that can be anything.
+
+       Above whatever is under them, PLUS the height of the building the map
+       knows is there, is right on a roof and right in the air. The street is
+       the limit on it, which is what keeps someone under a canopy, or on the
+       third floor of a car park, from being put on its roof. */
+    function altitudeWanted() {
+        var A = VIEW.altitude || {};
+        if (A === false || VIEW.altitude === false) return 0;
+        var under = (bld && world && standingIn() >= 0) ? inside.h : 0;
+        var over = Math.max(0, Number(pos.g) || 0) + under;
+        var z = (typeof pos.a === 'number') ? Math.min(over, Math.max(0, pos.a)) : over;
+        if (z < (Number(A.floor) || 3)) return 0;
+        return Math.min(z, Number(A.max) || 500);
+    }
+    // One step of the camera following it. True while it still has to move.
+    function stepAltitude(dt, snap) {
+        var to = altitudeWanted(), ease = Number((VIEW.altitude || {}).ease) || 3;
+        if (snap || Math.abs(to - altNow) < 0.05) { var moved = altNow !== to && !snap; altNow = to; return moved; }
+        altNow += (to - altNow) * (1 - Math.exp(-dt * ease));
+        return true;
     }
 
     function frame(now) {
@@ -669,6 +806,7 @@
         var dt = Math.min(0.25, lastDraw ? (now - lastDraw) / 1000 : 0.25);
         var fading = stepFlood(dt, snapNext);
         var rippling = stepRipple(now);
+        var climbing = stepAltitude(dt, snapNext);
         snapNext = false;
         var floodEdge = [POLICE.radius - POLICE.soft, POLICE.radius];
         lastDraw = now;
@@ -697,10 +835,13 @@
         var land = ink('land'), water = ink('water'), sand = ink('sand');
         gl.uniform3f(u.uLand, land[0] / 255, land[1] / 255, land[2] / 255);
         gl.uniform3f(u.uWater, water[0] / 255, water[1] / 255, water[2] / 255);
+        var shallow = ink('shallow');
+        gl.uniform3f(u.uShallow, shallow[0] / 255, shallow[1] / 255, shallow[2] / 255);
         gl.uniform3f(u.uSand, sand[0] / 255, sand[1] / 255, sand[2] / 255);
         gl.uniform4f(u.uFlood, flood.rgb[0] / 255, flood.rgb[1] / 255, flood.rgb[2] / 255, flood.cover);
         gl.uniform2f(u.uFloodEdge, floodEdge[0], floodEdge[1]);
         gl.uniform1f(u.uAlpha, A);
+        hazed(u, 1);
         gl.bindVertexArray(progs.quad);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
 
@@ -713,6 +854,7 @@
         u = shared(progs.flat, V);
         gl.uniform4f(u.uFlood, flood.rgb[0] / 255 * A, flood.rgb[1] / 255 * A, flood.rgb[2] / 255 * A, flood.cover);
         gl.uniform2f(u.uFloodEdge, floodEdge[0], floodEdge[1]);
+        hazed(u, A);
         ['footprint', 'rail', 'road', 'bridge', 'lot', 'lane'].forEach(function (name) {
             if (!layers[name]) return;
             var c = ink(name === 'bridge' ? 'road' : name);
@@ -749,7 +891,6 @@
         if (bld && VIEW.buildings !== false) {
             var cap = VIEW.liftCap * V.unit;
             u = shared(progs.shadow, V);
-            gl.uniform1f(u.uLift, VIEW.lift);
             gl.uniform1f(u.uLiftCap, cap);
             gl.uniform1f(u.uShadowMax, 20 * V.unit);
             gl.uniform4f(u.uColour, 0, 0, 0, ink('shadow'));
@@ -761,8 +902,8 @@
             // Depth first, colour second: whatever is nearest at a pixel is
             // laid over the ground once, however many walls stand behind it.
             u = shared(progs.building, V);
-            gl.uniform1f(u.uLift, VIEW.lift);
             gl.uniform1f(u.uLiftCap, cap);
+            hazed(u, 1);
             var roof = ink('roof'), wall = ink('wall');
             gl.uniform3f(u.uRoof, roof[0] / 255, roof[1] / 255, roof[2] / 255);
             gl.uniform3f(u.uWall, wall[0] / 255, wall[1] / 255, wall[2] / 255);
@@ -770,8 +911,8 @@
             gl.uniform2f(u.uFadeSize, VIEW.fade.rx * V.unit, VIEW.fade.ry * V.unit);
             gl.uniform1f(u.uFadeMin, VIEW.fade.min);
             gl.uniform1f(u.uFadeNear, VIEW.fade.near);
+            gl.uniform1f(u.uFadeFar, VIEW.fade.far == null ? 1 : VIEW.fade.far);
             gl.uniform1f(u.uAlpha, A);
-            gl.uniform1f(u.uInside, standingIn());
             gl.uniform4f(u.uFlood, flood.rgb[0] / 255, flood.rgb[1] / 255, flood.rgb[2] / 255, flood.cover * POLICE.buildings);
             gl.uniform2f(u.uFloodEdge, floodEdge[0], floodEdge[1]);
             gl.colorMask(false, false, false, false);
@@ -796,17 +937,28 @@
         drawSprites(V, now);
         gl.bindVertexArray(null);
         // A fade has to be carried through even if the player is standing
-        // still, and the rings keep moving for as long as there are any.
-        if (fading || rippling) invalidate();
+        // still, the rings keep moving for as long as there are any, and the
+        // camera has to finish catching up with the player's height.
+        if (fading || rippling || climbing) invalidate();
     }
 
     /* --- what sits on top: blips, north, the player ----------------------- */
 
-    function project(V, x, y) {
+    // A world point through the camera: place() in the shaders, here. `high`
+    // is metres above the ground; everything the game marks is put on it.
+    // `to` is which way it lies from the marker ON THE PANEL, which is what
+    // pins it to the edge when it is out of view: from high up, something on
+    // the ground straight below is toward the bottom edge, not at the marker.
+    function project(V, x, y, high) {
         var dx = x - pos.x, dy = y - pos.y;
         var u = V.s * (dx * V.cos + dy * V.sin), g = V.s * (dy * V.cos - dx * V.sin);
-        var w = 1 + V.T * g;
-        return { u: u, g: g, w: w, x: V.ox + u / w, y: V.oy - g / w };
+        var z = (high || 0) * V.s - V.alt;
+        var w = 1 + V.T * g - V.lean * z;
+        var p = { u: u, g: g, w: w, x: V.ox + u / w, y: V.oy - (V.squash * g + V.rise * z) / w };
+        var behind = w < 0.1, tx = behind ? u : p.x - V.ox, ty = behind ? -(V.squash * g + V.rise * z) : p.y - V.oy;
+        if (Math.abs(tx) + Math.abs(ty) < 1e-6) { tx = 0; ty = 1; }
+        p.to = [tx, ty];
+        return p;
     }
 
     // Distance outside the panel's rounded outline (negative inside).
@@ -915,7 +1067,7 @@
         for (i = 0; i < ends.length; i++) {
             p = project(V, ends[i].x, ends[i].y);
             on = p.w > 0.25 && outline(V, p.x, p.y, corner) < -size * 0.25;
-            marks.push({ end: ends[i], at: on ? p : clear(edgePoint(V, p.u, -p.g, corner, 0), VIEW.end.ring * V.unit * 0.9) });
+            marks.push({ end: ends[i], at: on ? p : clear(edgePoint(V, p.to[0], p.to[1], corner, 0), VIEW.end.ring * V.unit * 0.9) });
         }
         function taken(blip) {
             for (var k = 0; k < ends.length; k++) {
@@ -932,7 +1084,7 @@
             on = p.w > 0.25 && outline(V, p.x, p.y, corner) < -size * 0.25;
             if (!on) {
                 if (!(b[7] & 1)) continue;
-                at = clear(edgePoint(V, p.u, -p.g, corner, 0), size * 0.8);
+                at = clear(edgePoint(V, p.to[0], p.to[1], corner, 0), size * 0.8);
             } else at = p;
             var tint = [b[3] / 255, b[4] / 255, b[5] / 255, b[6] / 255];
             cell = atlas && atlas.cells[b[2]];
@@ -971,7 +1123,7 @@
         // North gives way to a route's end: heading north, the two are pinned
         // to the same spot, and the destination is the one worth seeing.
         if (VIEW.north) {
-            at = clear(edgePoint(V, Math.sin(V.rad), -Math.cos(V.rad), corner, 0), 10.8 * V.unit);
+            at = clear(edgePoint(V, Math.sin(V.rad), -V.squash * Math.cos(V.rad), corner, 0), 10.8 * V.unit);
             var room = (VIEW.end.ring + 10.8) * V.unit * 0.5, crowded = false;
             for (i = 0; i < marks.length; i++) {
                 if (Math.hypot(marks[i].at.x - at.x, marks[i].at.y - at.y) < room) crowded = true;
@@ -1138,6 +1290,7 @@
         if (!d || typeof d.action !== 'string' || d.action.indexOf('map3d') !== 0) return;
         if (d.action === 'map3dPos') {
             pos.x = d.x; pos.y = d.y; pos.c = d.c; pos.h = d.h; pos.s = d.s || 0;
+            pos.g = Number(d.g) || 0; pos.a = (typeof d.a === 'number') ? d.a : null;
         } else if (d.action === 'map3d') {
             if (d.config) { merge(VIEW, d.config.view); merge(PAINT, d.config.paint); merge(NIGHT, d.config.paintNight); }
             if (typeof d.night === 'number') night = Math.min(1, Math.max(0, d.night));
@@ -1167,7 +1320,10 @@
     // For tests and the browser preview.
     window.ViceMap3D = {
         state: function () { return { booted: booted, shown: shown, loaded: loaded, failed: glFailed, zoom: zoomNow, routes: routes.length, ends: ends, night: night, flood: { rgb: flood.rgb.slice(), cover: flood.cover, to: flood.to }, blips: blips.length, hasAtlas: !!atlasTex }; },
-        project: function (x, y) { var V = view(canvas.width, canvas.height, 0); return project(V, x, y); },
+        project: function (x, y, high) { var V = view(canvas.width, canvas.height, 0); return project(V, x, y, high); },
+        // The camera on a panel that tall with the player that far down it, and
+        // how high the map has the player.
+        camera: camera, altitude: function () { return altNow; }, altitudeWanted: altitudeWanted, stepAltitude: stepAltitude,
         // A frame right now, without waiting for the browser to offer one: a
         // page nobody is looking at is never offered any.
         draw: function () { dirty = true; queued = false; snapNext = true; frame(performance.now()); },
