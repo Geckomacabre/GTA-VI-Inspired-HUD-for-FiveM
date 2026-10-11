@@ -660,16 +660,21 @@ seen at a slant, with the sea and the beach in their own colours and the
 buildings standing up off the ground. `Config.Map3D` draws that in place of the
 engine's radar.
 
-The look, the projection and the world it draws are those of the
-"GTA-VI MiniMap (3D Buildings)" mod by **@moddims**:
+The look, the projection and the world it draws are those of
+[GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced),
+a single-player mod by **loneeps** (Discord `@moddims`):
 its roads, its 3,589 building outlines and their heights, and its survey of
-where the map is water and where it is sand. Around it everything is still
+where the map is water and where it is sand. The idea of a minimap drawn this
+way, and the week of work that mapped the island for it, are theirs; this is
+that map redrawn on the HUD's page so a server can show it. Around it everything is still
 this HUD's: the frame and where it sits, the player marker measured off the
 reference, the route in the HUD's accent colour, the distance figure, the
 direction panel, and the game's own blips.
 
 **It has to be built first.** The world is that mod's work and is not in this
-repository; point the converter at the mod you downloaded.
+repository: its author asks that the mod not be re-uploaded, and the map
+inside it is the mod. Download it from the page above and point the converter
+at your copy.
 
 ```bash
 python tools/map3d/build.py --mod "path/to/MiniMap.dll"
@@ -799,9 +804,14 @@ mod on GTA5-Mods.com. The BuckMe bank icon and its ring
 (`html/icons/buckme.png`, `html/icons/buckme_ring/`,
 `html/icons/fill_purple.png`) are original, made in-house.
 
-The drawn minimap's look, its projection and the world it draws are from the
-GTA-VI MiniMap (3D Buildings) mod by @moddims. That world is not included
-here; `tools/map3d/build.py` converts a copy of the mod you have downloaded.
+The drawn minimap (`Config.Map3D`) is a port of
+[GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced)
+by **loneeps** (Discord `@moddims`) on GTA5-Mods.com: its look, its
+projection, its colours, and the world it draws (roads, building outlines and
+heights, sea and sand) are all that mod's. What is ours is the WebGL redraw
+that lets a FiveM server show it, and what sits on top of it. The mod's map is
+not included here, at its author's request that the mod not be re-uploaded;
+`tools/map3d/build.py` converts a copy you have downloaded from that page.
 
 Thanks to GravityExploitz for BuckMe's satire paragraph and for help with the
 BuckMe card design.

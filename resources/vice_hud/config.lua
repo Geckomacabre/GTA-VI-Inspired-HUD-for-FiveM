@@ -73,12 +73,15 @@ Config.HideSatNav = true
 
 -- The drawn minimap: the island in flat colour seen at a slant, sea and sand
 -- in their own colours and the buildings standing up, in place of the engine's
--- radar. The look and the world it draws come from the "GTA-VI MiniMap (3D
--- Buildings)" mod by @moddims; the frame, the player marker, the route colour,
--- the distance figure and everything around the map stay this HUD's own.
+-- radar. The look and the world it draws come from the "GTA VI MiniMap (3D
+-- Buildings) (Legacy & Enhanced)" mod by loneeps (Discord @moddims):
+--     https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced
+-- The frame, the player marker, the route colour, the distance figure and
+-- everything around the map stay this HUD's own.
 --
 -- IT NEEDS BUILDING FIRST. The world is that mod's survey of the map and is
--- not in this repository:
+-- not in this repository (its author asks that the mod not be re-uploaded).
+-- Download the mod from the page above, then:
 --
 --     python tools/map3d/build.py --mod "path/to/MiniMap.dll"
 --     python tools/map3d/blips.py --docs path/to/fivem-docs     (blip pictures)

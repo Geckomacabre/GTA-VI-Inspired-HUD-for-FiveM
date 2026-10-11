@@ -2,8 +2,11 @@
  * buildings standing up, where the engine's radar would otherwise be.
  *
  * The look, the projection and the numbers in VIEW and PAINT are those of the
- * "GTA-VI MiniMap (3D Buildings)" mod by @moddims, read out of it; the world it
- * draws is that mod's survey, converted by tools/map3d/build.py. The mod paints
+ * "GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)" mod by loneeps (Discord
+ * @moddims), read out of it:
+ *   https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced
+ * The world it draws is that mod's survey of the map, converted by
+ * tools/map3d/build.py and kept out of this repository. The mod paints
  * its picture straight onto the game's frame from a plugin, which a server
  * cannot hand to its players, so here the same picture is drawn by WebGL on
  * the HUD's own page.
