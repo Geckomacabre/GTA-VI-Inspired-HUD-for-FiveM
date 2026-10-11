@@ -569,15 +569,18 @@ end
 --   it is being spent. client.lua passes spendingStamina()'s answer on to
 --   client_map3d.lua, and html/map3d.js draws them.
 --
---   The bolt beside the bar blinks red. In the footage that is ONE frame of a
---   30 fps capture, teal again 0.15 s either side, and it falls on the moment
---   the bar starts dropping twice as fast -- a sprint being pushed -- not on
---   every moment the bar is dropping. So by default it is a blink as a sprint
---   begins. Config.Stamina.boltRed = 'drain' holds it red for as long as the
---   bar is going down instead; false leaves the bolt alone.
+--   The bolt beside the bar flashes red, over and over, for as long as the bar
+--   is going down. Read frame by frame off the footage: five flashes in the
+--   four seconds the bar was falling, 0.83 to 0.97 s apart, none once it had
+--   stopped. Each one is red at once and back to teal about a fifth of a
+--   second later (the page does the fading). An earlier version blinked once,
+--   as a sprint began: that came of looking at stills half a second apart,
+--   which the flashes fall between. Config.Stamina.boltRed = 'drain' holds it
+--   red steadily instead; false leaves the bolt alone.
 local staminaSpending = false
 local staminaBefore   = nil     -- the reading at the last poll
 local staminaFellMs   = 0       -- how much longer a fall still counts
+local boltFlashing    = false   -- a run of flashes is going
 
 -- The native path does not move on every poll: one can land between two of
 -- its steps in the middle of a sprint. A fall therefore counts for this long,
@@ -588,8 +591,26 @@ local SPEND_HOLD_MS = 600
 
 local function boltMode()
     local mode = (Config.Stamina or {}).boltRed
-    if mode == nil then return 'press' end
+    if mode == nil then return 'flash' end
     return mode
+end
+
+-- A run of flashes: one now, then one every boltRedEvery for as long as
+-- stamina is still being spent. There is only ever one run. A sprint picked
+-- up again before the next flash is due carries on in the old one's time, so
+-- stop-start running cannot make the bolt stutter: two flashes are never
+-- closer together than the reference's.
+local function flashBolt()
+    if boltFlashing then return end
+    boltFlashing = true
+    CreateThread(function()
+        while staminaSpending and boltMode() == 'flash' do
+            local sc = Config.Stamina or {}
+            ui('staminaBolt', { red = true, ms = tonumber(sc.boltRedMs) or 210 })
+            Wait(math.max(100, math.floor(tonumber(sc.boltRedEvery) or 910)))
+        end
+        boltFlashing = false
+    end)
 end
 
 --- Called from the status poll with the reading it has just taken. True while
@@ -610,10 +631,9 @@ local function spendingStamina(ped, stamina, dtMs)
         now = staminaFellMs > 0
     end
 
-    if now and not staminaSpending and boltMode() == 'press' then
-        ui('staminaBolt', { red = true, ms = tonumber((Config.Stamina or {}).boltRedMs) or 150 })
-    end
+    -- Set before the flashes are asked for: the run reads it straight away.
     staminaSpending = now
+    if now and boltMode() == 'flash' then flashBolt() end
     return now
 end
 
@@ -1422,7 +1442,7 @@ end)
 ViceVitals = {
     readStamina      = readStamina,
     spendingStamina  = spendingStamina,
-    -- True while the bolt is to be HELD red ('drain'); the blink sends itself.
+    -- True while the bolt is to be HELD red ('drain'); the flashes send themselves.
     boltRed          = function() return staminaSpending and boltMode() == 'drain' end,
     readOxygen       = readOxygen,
     readNeeds        = readNeeds,
