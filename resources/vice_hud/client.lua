@@ -4118,11 +4118,21 @@ local function pushLayout()
     applyNotify()
 end
 
---- Other resources read their offset from here.
+--- Has the player taken this element off the HUD? (The speed limit sign and
+--- the seatbelt light: their "Show on HUD" row in /movehud, /hudspeedlimit,
+--- /hudseatbelt.)
+function isElementHidden(name)
+    local o = layout[name]
+    return o ~= nil and (o.hide == 1 or o.hide == true)
+end
+
+--- Other resources read their offset from here. The fourth value is whether
+--- the player has hidden the element (see isElementHidden).
 exports('GetHudOffset', function(name)
     local o = layout[name]
-    return o and o.x or 0.0, o and o.y or 0.0, o and o.s or 1.0
+    return o and o.x or 0.0, o and o.y or 0.0, o and o.s or 1.0, isElementHidden(name)
 end)
+exports('IsHudElementHidden', function(name) return isElementHidden(name) end)
 
 -- Arrow keys on the "Minimap position" / "Minimap size" rows land here. The
 -- native map is engine-drawn, so CSS cannot touch it — we re-apply the
@@ -4704,6 +4714,34 @@ RegisterCommand('hudmove', function(_, args)
     local o = layout[name]
     print(('^2[vice_hud]^7 %s now x=%+.2f y=%+.2f'):format(name, o.x, o.y))
 end, false)
+
+-- The speed limit sign and the seatbelt light can be taken off the HUD
+-- altogether, from their "Show on HUD" row in /movehud or with the commands
+-- below. Both are drawn by their own resources, so the choice travels the way
+-- their position already does: `hide = 1` in their layout entry, broadcast on
+-- vice_hud:layout and readable through GetHudOffset / IsHudElementHidden.
+-- 1 or nil rather than true/false, as the editor stores its list values.
+local HIDEABLE = { speedlimit = 'Speed limit sign', seatbelt = 'Seatbelt icon' }
+
+local function hideElement(name, hidden)
+    layout[name] = layout[name] or { x = 0.0, y = 0.0 }
+    layout[name].hide = hidden and 1 or nil
+    hasPersonalLayout = true
+    saveLayout(); pushLayout()
+    lib.notify({ title = 'HUD', description = ('%s %s'):format(HIDEABLE[name], hidden and 'hidden' or 'shown'), type = 'inform' })
+end
+
+--- /hudseatbelt, /hudspeedlimit   toggle; `on` / `off` to say which.
+for name, cmd in pairs({ seatbelt = 'hudseatbelt', speedlimit = 'hudspeedlimit' }) do
+    RegisterCommand(cmd, function(_, args)
+        local want = args[1] and args[1]:lower()
+        local hidden
+        if want == 'on' or want == 'show' then hidden = false
+        elseif want == 'off' or want == 'hide' then hidden = true
+        else hidden = not isElementHidden(name) end
+        hideElement(name, hidden)
+    end, false)
+end
 
 -- =============================================================================
 -- Server-wide layout  (/hudpublish)

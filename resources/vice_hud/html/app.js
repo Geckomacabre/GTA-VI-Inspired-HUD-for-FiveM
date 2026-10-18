@@ -3586,9 +3586,20 @@
         { k: 'anchor', label: 'Corner', def: 'top-right', list: NOTIFY_ANCHORS }
     ].concat(POS_PROPS);
 
+    /* The speed limit sign and the seatbelt light can be taken off the HUD
+       altogether. Both are drawn by their own resources, which read `hide` off
+       the layout broadcast the same way they read their position (client.lua,
+       isElementHidden); /hudspeedlimit and /hudseatbelt flip the same value.
+       1 / null like Follow map, so it round-trips through Lua's json. First in
+       those two elements' rows, so it is the first thing you see on them. */
+    var HIDEABLE = { speedlimit: 1, seatbelt: 1 };
+    var HIDE_PROP = { k: 'hide', label: 'Show on HUD', def: null,
+        list: [[null, 'Shown'], [1, 'Hidden']],
+        hint: 'Hidden takes it off the HUD altogether. Also /hudspeedlimit and /hudseatbelt.' };
+
     // Keys that are neither a CSS property nor a position, and so are not in
     // PROPS — but still have to survive the trip to Lua.
-    var EXTRA_KEYS = ['anchor'];
+    var EXTRA_KEYS = ['anchor', 'hide'];
 
     /* Money is Pricedown and stays Pricedown — GTA's own display face, and the
        one piece of this HUD whose identity is the typeface. So it gets no Font
@@ -3701,6 +3712,7 @@
         list = list.filter(function (p) { return !p.only || p.only[key]; });
         var drop = NO_ROWS[key];
         if (drop) list = list.filter(function (p) { return !drop[p.k]; });
+        if (HIDEABLE[key]) list = [HIDE_PROP].concat(list);
         return list;
     }
 
@@ -3933,6 +3945,7 @@
         // has not been touched — treating any anchor as a change would light
         // this dot for every player from the moment they opened the editor.
         if (o.anchor != null && o.anchor !== 'top-right') return true;
+        if (o.hide != null) return true;
         return false;
     }
 

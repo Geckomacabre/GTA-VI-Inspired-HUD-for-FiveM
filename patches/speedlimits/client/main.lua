@@ -3,6 +3,16 @@ local UIOpen = false
 local currentStreet = nil
 local frequency = Config.updateFrequency * 1000
 
+-- The sign stands beside vice_hud's minimap, and goes when the minimap goes:
+-- the pause menu, the inventory, a cutscene. vice_hud says so (see the handler
+-- at the bottom of this file). True until told otherwise, so without vice_hud
+-- nothing here changes.
+local mapShown = true
+-- Taken off the HUD by the player: the sign's "Show on HUD" row in vice_hud's
+-- /movehud, or /hudspeedlimit. It rides in the same layout broadcast as the
+-- sign's position (`hide` on layout.speedlimit).
+local hudHidden = false
+
 CreateThread(function()
     local savedState = GetResourceKvpString("speedLimit")
     if savedState then
@@ -52,7 +62,7 @@ end)
 Citizen.CreateThread(function()
     while true do
         Wait(frequency)
-        if IsPedInAnyVehicle(PlayerPedId()) and enabled then
+        if IsPedInAnyVehicle(PlayerPedId()) and enabled and mapShown and not hudHidden then
             if not UIOpen then
                 SendNUIMessage({action = "show"})
                 UIOpen = true
@@ -81,6 +91,23 @@ end)
 -- here meant the offset message matched no case at all and was dropped, so the
 -- sign never moved from /movehud. Both keys are sent now: `action` is the one
 -- this page reads, `type` keeps any other listener working.
+-- Shows or hides the sign at once for whatever just changed (the map, the
+-- player's hide choice) rather than waiting for the loop above, which only
+-- looks every few seconds: the sign should be gone the moment the pause menu
+-- is up, not after it.
+local function refresh()
+    if not mapShown or hudHidden then
+        if UIOpen then
+            SendNUIMessage({ action = 'hide' })
+            UIOpen = false
+            currentStreet = nil   -- so the limit is re-sent when it is back
+        end
+    elseif enabled and not UIOpen and IsPedInAnyVehicle(PlayerPedId()) then
+        SendNUIMessage({ action = 'show' })
+        UIOpen = true
+    end
+end
+
 AddEventHandler('vice_hud:layout', function(layout)
     local o = layout and layout.speedlimit
     SendNUIMessage({
@@ -89,14 +116,31 @@ AddEventHandler('vice_hud:layout', function(layout)
         y = o and o.y or 0.0,
         s = o and o.s or 1.0,
     })
+    hudHidden = o ~= nil and (o.hide == 1 or o.hide == true)
+    refresh()
 end)
+
+-- vice_hud raises this each time its minimap comes or goes.
+local function followMap(shown)
+    mapShown = shown ~= false
+    refresh()
+end
+
+AddEventHandler('vice_hud:minimap', followMap)
 
 CreateThread(function()
     Wait(2500)
     if GetResourceState('vice_hud') == 'started' then
-        local ok, x, y, s = pcall(function() return exports.vice_hud:GetHudOffset('speedlimit') end)
+        local ok, x, y, s, hidden = pcall(function() return exports.vice_hud:GetHudOffset('speedlimit') end)
         if ok then
             SendNUIMessage({ action = 'offset', type = 'offset', x = x or 0.0, y = y or 0.0, s = s or 1.0 })
+            -- (an older vice_hud returns no fourth value: shown, as before)
+            hudHidden = hidden == true
+            refresh()
         end
+        -- Started after vice_hud: the event has already been and gone, so ask.
+        -- An older vice_hud has no such export, and then the sign simply stays.
+        local asked, shown = pcall(function() return exports.vice_hud:IsMinimapShown() end)
+        if asked and shown ~= nil then followMap(shown) end
     end
 end)

@@ -750,6 +750,14 @@ shape, hand-merge the vice_hud hook (the `.stage` wrapper, the `--off-*`
 transform, and the `case "offset":` branch in the message listener) instead
 of overwriting.
 
+`client/main.lua` also follows two vice_hud signals. The sign goes when
+vice_hud's minimap goes (the pause menu, the inventory, a cutscene: the
+`vice_hud:minimap` event, or `IsMinimapShown` when it starts after vice_hud).
+And a player can take it off the HUD altogether: the sign's **Show on HUD**
+row in `/movehud`, or `/hudspeedlimit` (`hide` on the layout entry it already
+reads its position from). Without vice_hud neither applies, and
+`/togglespeed` works as before.
+
 ## zseatbelt
 
 Same kind of positioning hook as `speedlimits`, for the seatbelt icon.
@@ -768,6 +776,11 @@ drew its own belt icon, and vice_hud's vehicle panel does not. If you've
 already set that config value deliberately for your own reasons, don't
 overwrite it — only the `client/` and `html/` changes are the actual
 vice_hud hook.
+
+Like the speed limit sign, the light goes when vice_hud's minimap goes, and a
+player can take it off the HUD with its **Show on HUD** row in `/movehud` or
+`/hudseatbelt`. Hiding the light hides only the light: the belt, its key and
+its sounds work as before.
 
 No `fxmanifest.lua` edit needed.
 

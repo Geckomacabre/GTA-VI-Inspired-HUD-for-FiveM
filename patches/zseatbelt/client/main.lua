@@ -8,7 +8,16 @@
 -- the actual belt state.
 
 local seatbeltOn = false
-local uiActive   = false
+local uiActive   = false   -- what the page is showing
+local uiWanted   = false   -- what the belt's state says it should show
+-- The light stands beside vice_hud's minimap, and goes when the minimap goes:
+-- the pause menu, the inventory, a cutscene. True until vice_hud says
+-- otherwise, so without vice_hud nothing here changes.
+local mapShown   = true
+-- Taken off the HUD by the player: the light's "Show on HUD" row in vice_hud's
+-- /movehud, or /hudseatbelt. It rides in the same layout broadcast as the
+-- light's position (`hide` on layout.seatbelt). The belt itself still works.
+local hudHidden  = false
 
 local function isExemptVehicle(vehicle)
     return vehicle and Config.exemptClasses[GetVehicleClass(vehicle)] or false
@@ -43,12 +52,25 @@ local function playSound(action)
     end
 end
 
+local function applyUI()
+    local show = uiWanted and mapShown and not hudHidden
+    if uiActive == show then return end
+    uiActive = show
+    SendNUIMessage({ type = show and 'showindicator' or 'hideindicator' })
+end
+
 local function toggleUI(status)
     if not Config.showUnbuckledIndicator then return end
-    if uiActive == status then return end
-    uiActive = status
-    SendNUIMessage({ type = status and 'showindicator' or 'hideindicator' })
+    uiWanted = status and true or false
+    applyUI()
 end
+
+-- vice_hud raises this each time its minimap comes or goes. The belt's own
+-- state is kept (uiWanted), so the light is back, right, when the map is.
+AddEventHandler('vice_hud:minimap', function(shown)
+    mapShown = shown ~= false
+    applyUI()
+end)
 
 ---Set the belt to an absolute state and fan that state out to everything.
 ---@param state boolean
@@ -138,12 +160,26 @@ AddEventHandler('vice_hud:layout', function(layout)
         y = o and o.y or 0.0,
         s = o and o.s or 1.0,
     })
+    hudHidden = o ~= nil and (o.hide == 1 or o.hide == true)
+    applyUI()
 end)
 
 CreateThread(function()
     Wait(2500)
     if GetResourceState('vice_hud') == 'started' then
-        local ok, x, y = pcall(function() return exports.vice_hud:GetHudOffset('seatbelt') end)
-        if ok then SendNUIMessage({ type = 'offset', x = x or 0.0, y = y or 0.0 }) end
+        local ok, x, y, _, hidden = pcall(function() return exports.vice_hud:GetHudOffset('seatbelt') end)
+        if ok then
+            SendNUIMessage({ type = 'offset', x = x or 0.0, y = y or 0.0 })
+            -- (an older vice_hud returns no fourth value: shown, as before)
+            hudHidden = hidden == true
+            applyUI()
+        end
+        -- Started after vice_hud: the event has already been and gone, so ask.
+        -- An older vice_hud has no such export, and then the light simply stays.
+        local asked, shown = pcall(function() return exports.vice_hud:IsMinimapShown() end)
+        if asked and shown ~= nil then
+            mapShown = shown ~= false
+            applyUI()
+        end
     end
 end)

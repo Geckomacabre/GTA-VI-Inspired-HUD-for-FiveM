@@ -212,7 +212,8 @@ exports.vice_hud:ClearWantedTellOverrides(source)
 
 exports.vice_hud:SetHudVisible(visible)
 exports.vice_hud:SetHudOffsetX(pixels)
-exports.vice_hud:GetHudOffset(element)             -- returns x, y
+exports.vice_hud:GetHudOffset(element)             -- returns x, y, scale, hidden
+exports.vice_hud:IsHudElementHidden(element)       -- 'speedlimit' / 'seatbelt' taken off the HUD by the player
 exports.vice_hud:GetMinimapOnFoot()                -- /hudminimap's choice: true = the map on foot too
 exports.vice_hud:SetMinimapOnFoot(state)           -- set it (saved, as /hudminimap does)
 
@@ -444,6 +445,7 @@ anything shipped in this repo.
 | `/hudmask` · `/hudmaskmode` · `/hudmaskoff` | The rounded corner mask |
 | `/hudrects` · `/hudmatch` · `/hudcross` | Draw the engine's own component rects, and line them up |
 | `/hudminimap` | Show the map on foot |
+| `/hudspeedlimit` · `/hudseatbelt` | Hide or show the speed limit sign / seatbelt light (toggle, or `on` / `off`). Same as their "Show on HUD" row in `/movehud`; saved with the layout |
 | `/hudmap3d` | The drawn minimap or the game's radar, per player |
 
 </details>
