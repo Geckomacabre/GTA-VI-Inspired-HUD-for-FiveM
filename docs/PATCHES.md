@@ -612,9 +612,20 @@ retheme without touching component code.
 ### Weapon art
 
 `patches/ox_inventory/web/images/WEAPON_*.png` (96 files) replace ox_inventory's
-own square, diagonal weapon thumbnails with the side-profile art from this
-HUD's single-player build (GTA6Hud's `scripts/Hud/Weapons`). Copy them over the
-files of the same name in your `ox_inventory/web/images/`. They use the
+own square, diagonal weapon thumbnails with side-profile art by **FBICat**
+([gta5-mods.com/users/fbicat](https://www.gta5-mods.com/users/fbicat)), from
+FBICat's single-player GTA VI HUD mod (GTA6Hud, its `scripts/Hud/Weapons`).
+They are FBICat's work, not this project's. FBICat's release gives its
+license as *"Personal use. Contains art cut from GTA VI footage and the
+Grand Figma Kit VI (CC BY 4.0)"*. That kit is
+[Grand Figma Kit VI: A Grand Theft Auto 6 UI Pack](https://www.figma.com/community/file/1675253765382840726/grand-figma-kit-vi-a-grand-theft-auto-6-ui-pack)
+by **Axel Latuff**,
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The only change
+made here is the scaling described below. "Personal use" doesn't clearly
+cover publishing them, so see the main README's License section before
+redistributing them.
+
+Copy them over the files of the same name in your `ox_inventory/web/images/`. They use the
 names ox_inventory already uses, so nothing references them differently,
 and vice_hud's top-right weapon icon (which reads ox_inventory's images)
 shows the same art.
@@ -625,7 +636,7 @@ readout at `$gta6-art-w auto`) inside a box that is wider than it is tall, so
 a rifle fills the box's width. A square canvas would have shrunk every long
 gun to fit the box's height.
 
-Weapons the single-player set has no art for (newer DLC guns such as the
+Weapons FBICat's set has no art for (newer DLC guns such as the
 tactical rifle or the TEC pistol, and anything added by other resources) keep
 ox_inventory's own image. Restart ox_inventory after copying them, and a
 player who already loaded the inventory may need to reconnect: the images are

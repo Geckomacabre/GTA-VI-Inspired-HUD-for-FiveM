@@ -836,6 +836,14 @@ mod on GTA5-Mods.com. The BuckMe bank icon and its ring
 (`html/icons/buckme.png`, `html/icons/buckme_ring/`,
 `html/icons/fill_purple.png`) are original, made in-house.
 
+The top-right weapon icon draws whatever ox_inventory has for that weapon.
+With this repo's ox_inventory patch installed, that is
+[FBICat](https://www.gta5-mods.com/users/fbicat)'s side-profile weapon art
+from their single-player GTA VI HUD. It includes material from the
+[Grand Figma Kit VI](https://www.figma.com/community/file/1675253765382840726/grand-figma-kit-vi-a-grand-theft-auto-6-ui-pack)
+by Axel Latuff ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
+The full credit and terms are in the repository's main README, under License.
+
 The drawn minimap (`Config.Map3D`) began as a port of
 [GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced)
 by **loneeps** (Discord `@moddims`) on GTA5-Mods.com, and the world it draws

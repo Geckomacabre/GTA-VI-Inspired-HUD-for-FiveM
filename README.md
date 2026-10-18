@@ -324,7 +324,10 @@ Overlays for resources you install separately:
   icon cell held in reserve. See the
   [weapon wheel](docs/screenshots/weapon-wheel.png) and
   [items wheel](docs/screenshots/item-wheel.png) screenshots. Not part of
-  the vice_hud glass system above.
+  the vice_hud glass system above. Its weapon icons are
+  [FBICat](https://www.gta5-mods.com/users/fbicat)'s art from their
+  single-player GTA VI HUD, not this project's; see
+  [License](#license) for the credit and terms.
 - **`speedlimits`**, **`zseatbelt`**: positioning hooks, so vice_hud's
   `/movehud` editor can move each one's on-screen icon even though both
   draw through their own NUI page.
@@ -717,6 +720,25 @@ under any of the licenses above. Nothing of lb-phone's own code or assets is
 included here, only the handful of files this project changed or added on
 top of it (`patches/lb-phone/`), which is why that patch needs an lb-phone
 install of your own to apply onto in the first place.
+
+The weapon icons in `patches/ox_inventory/web/images/WEAPON_*.png` are not
+this project's work and not under its license. They are **FBICat**'s
+([gta5-mods.com/users/fbicat](https://www.gta5-mods.com/users/fbicat)),
+taken from FBICat's single-player GTA VI HUD mod (GTA6Hud), and scaled down
+here to 320 px on the long side, with no other changes. FBICat's own release
+gives its license as *"Personal use. Contains art cut from GTA VI footage
+and the Grand Figma Kit VI (CC BY 4.0)."* The Grand Figma Kit VI is
+[Grand Figma Kit VI: A Grand Theft Auto 6 UI Pack](https://www.figma.com/community/file/1675253765382840726/grand-figma-kit-vi-a-grand-theft-auto-6-ui-pack)
+by **Axel Latuff**, licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Any of its art in
+these icons is used under that license, and this credit is its attribution.
+Art cut from GTA VI footage is Rockstar's.
+
+> **Note:** FBICat's "personal use" terms don't clearly cover republishing
+> those icons in a public repository. Treat it as unresolved rather than
+> clear. If you're redistributing this bundle, get FBICat's OK first, or
+> leave `patches/ox_inventory/web/images/WEAPON_*.png` out and keep
+> ox_inventory's own icons.
 
 Check each project's own repository for its full license text before
 redistributing patched files from this bundle outside your own server.
