@@ -74,8 +74,8 @@ GTA VI Resources/
 │                  vice_hud to resources you install separately (ox_lib,
 │                  ox_target, ox_inventory, qb-menu, qb-input, speedlimits,
 │                  zseatbelt, qbx_smallresources, dpclothing, qbx_core,
-│                  qbx_medical), plus a standalone lb-phone Wallet app
-│                  rebrand that doesn't touch vice_hud at all. See
+│                  qbx_medical, Renewed-Banking), plus a standalone lb-phone
+│                  Wallet app rebrand that doesn't touch vice_hud at all. See
 │                  docs/PATCHES.md for exact install steps per resource.
 │
 └── docs/          Extra documentation, including the patch install guide.
@@ -328,6 +328,12 @@ Overlays for resources you install separately:
   "BuckMe" (card front/back with a tap-to-flip signature and CVV, a bottom
   tab bar, a Pay/Request toggle). Standalone, not part of the vice_hud glass
   system, doesn't touch vice_hud at all.
+- **`Renewed-Banking`**: GTA VI's BuckMe ATM. The camera pushes in on the
+  cash machine's own screen, which becomes the BuckMe page (Deposit /
+  Withdraw / Transactions, the amount stepped to "Maximum", "Thank you for
+  bucking with us"), drawn as a DUI over the glass of each ATM model and
+  driven by keys or pad with vice_hud's prompts as the hints. Bank tellers
+  keep the stock popup. See `docs/PATCHES.md`'s Renewed-Banking section.
 
 **Read [`docs/PATCHES.md`](docs/PATCHES.md) before touching any of these.**
 Each one needs a couple of files copied into an existing install plus, for
@@ -641,6 +647,7 @@ their own upstream license:
 | `qbx_core` | GPL-3.0 | [Qbox-project/qbx_core](https://github.com/Qbox-project/qbx_core) |
 | `qbx_medical` | GPL-3.0 | [Qbox-project/qbx_medical](https://github.com/Qbox-project/qbx_medical) |
 | `SY_PauseMenu` (base of `gk_pausemenu`) | GPL-3.0 (see above) | [syno-sy/SY_PauseMenu](https://github.com/syno-sy/SY_PauseMenu) |
+| `Renewed-Banking` | CC BY-NC-SA 4.0 | [Renewed-Scripts/Renewed-Banking](https://github.com/Renewed-Scripts/Renewed-Banking) |
 | `dpclothing` | **Unpublished — see note below** | [andristum/dpclothing](https://github.com/andristum/dpclothing) |
 
 > [!WARNING]

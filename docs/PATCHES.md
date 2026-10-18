@@ -6,9 +6,9 @@ it into your server's `resources/` folder, add it to `server.cfg`, done.
 Everything under `patches/` is **not** a resource on its own. Each folder is
 a small set of files that overlay onto a resource you already have installed
 (ox_lib, ox_target, ox_inventory, qb-menu, qb-input, speedlimits, zseatbelt,
-qbx_smallresources, dpclothing, qbx_core, qbx_medical, lb-phone) to connect
-it to vice_hud. Copy the files into place, then make the one- or two-line
-edit shown below for that resource.
+qbx_smallresources, dpclothing, qbx_core, qbx_medical, lb-phone,
+Renewed-Banking) to connect it to vice_hud. Copy the files into place, then
+make the one- or two-line edit shown below for that resource.
 
 `lb-phone` is the one exception to "connect it to vice_hud" above; its patch
 is a standalone rebrand of that resource's own Wallet app (see the lb-phone
@@ -29,7 +29,7 @@ WASTED cinematic (via fenix-police) isn't delayed by ragdoll settling.
 
 **Version pinned against:** ox_lib 3.32.3, ox_target 1.18.0, ox_inventory
 2.45.0, qb-menu 1.2.0, qb-input 1.2.0, speedlimits 1.2.0, zseatbelt 1.1.0-um,
-dpclothing 1.0.3.
+dpclothing 1.0.3, Renewed-Banking 2.1.4.
 If your copy of any of these is on a different version, check the target
 file still looks like the snippet below before you paste the patch in — a
 big upstream version jump can move things around.
@@ -846,3 +846,59 @@ number row and `card-back.png`'s blank signature strip — new art needs
 those percentages (`.card-number`, `.card-signature-strip`, `.card-cvv` in
 `Wallet-BB8GWuDZ.css`) nudged to match wherever the new art puts them, they
 won't move on their own.
+
+## Renewed-Banking (BuckMe ATM)
+
+GTA VI's ATM. Using a cash machine walks the player up to it, plays the ATM
+animation and pushes the camera in on the machine's own screen, which becomes
+the BuckMe page: Deposit / Withdraw / Transactions on a purple patterned
+screen with a cream header and footer, the amount stepped left and right up
+to "Maximum" (with a `$15,000 Limit` per transaction), and "Thank you for bucking
+with us" before the camera pulls back out.
+
+The page is a DUI drawn as a flat quad over each machine's glass (only the
+player using it sees it; anyone watching sees the stock screen). Where each
+screen is was measured from the game's own models (`prop_atm_01`,
+`prop_atm_02`, `prop_atm_03`, `prop_fleeca_atm`), so it lines up without any
+per-location setup. Input is the player's keys or pad (arrows/WASD,
+Enter, Backspace/Esc, Space for "deposit all", and a typed amount on
+keyboard); the hints are vice_hud's own action prompts, bottom right. Bank
+tellers keep Renewed-Banking's usual popup, and so does any ATM model not
+listed in `Config.atm.screens` or a screen that fails to load.
+
+**Version pinned against:** Renewed-Banking 2.1.4.
+
+Copy into your `Renewed-Banking/` install:
+
+```
+patches/Renewed-Banking/client/atm.lua                (new)
+patches/Renewed-Banking/web/atm/index.html            (new)
+patches/Renewed-Banking/web/atm/atm.css               (new)
+patches/Renewed-Banking/web/atm/atm.js                (new)
+patches/Renewed-Banking/client/main.lua
+patches/Renewed-Banking/client/main.lua.pre-vice_hud  (restore point — the un-patched original)
+patches/Renewed-Banking/config.lua
+patches/Renewed-Banking/config.lua.pre-vice_hud       (restore point — the un-patched original)
+patches/Renewed-Banking/fxmanifest.lua
+patches/Renewed-Banking/fxmanifest.lua.pre-vice_hud   (restore point — the un-patched original)
+```
+
+The three modified files mark their changes with `BEGIN (added by GTA VI
+Resources: the BuckMe ATM) ... END` comments. If your copies are a different
+version or already edited, add just those blocks by hand: the three-line
+early return at the top of the `Renewed-Banking:client:openBankUI` handler in
+`client/main.lua`, the `atm = { ... }` table at the end of `Config` in
+`config.lua`, and `client/atm.lua` / `web/atm/*` in the manifest. The server
+side is untouched: deposits and withdrawals go through Renewed-Banking's own
+callbacks.
+
+Settings are in `Config.atm`: `mode` (`'dui'`, or `'nui'` for the old popup
+at ATMs too), `limit`, the `amounts` the arrows step through, the camera's
+`fov` / `fill` / ease times, and per-model `screens` (corners in the prop's
+own space, and where the player stands). With vice_hud running, the cash and
+BuckMe rows show top right while the ATM is open (it sets
+`LocalPlayer.state.atmOpen`) and a deposit shows as one "$23 →" pop. Without
+vice_hud the hints fall back to `lib.showTextUI`.
+
+The page loads Rubik and Nunito from Google Fonts and falls back to system
+fonts offline.

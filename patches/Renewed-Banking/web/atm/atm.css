@@ -1,0 +1,362 @@
+/* BuckMe ATM screen. Everything is in vw/vh of the DUI, which client/atm.lua sizes to each machine's glass, so the
+   same page fits a squarer Fleeca screen and a wider Bank of Liberty one. Positions are the reference frame's own
+   (header 7.2% of the height, footer 10.4%, option rows 8.15% apart ...). */
+
+:root {
+    --cream-hi: #e3ded3;
+    --cream-lo: #d2ccc0;
+    --btn-hi: #dcd8ce;
+    --btn-lo: #ccc7bc;
+    --ink: #5d2b8c;            /* header title */
+    --ink-soft: #8a68a3;       /* header balance */
+    --label: #a46fcb;          /* text on a cream button */
+    --deep-hi: #5c2391;        /* footer buttons */
+    --deep-lo: #451470;
+    --deep-text: #c6a9de;
+    --on-purple: #f3eaf7;
+    --ring: #f7f3fb;
+    --font: 'Rubik', 'Segoe UI', Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #3b0f57;
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+}
+
+#atm { position: absolute; inset: 0; overflow: hidden; }
+
+/* Body: a soft lavender glow low of centre, falling off to deep purple at the edges. */
+.bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 78% 72% at 50% 60%,
+        #ba7bcf 0%, #a95ec8 28%, #8e3fb5 54%, #6a2493 78%, #46116c 100%);
+}
+
+/* The small tilted "b"s all over the body (#bm-tile in index.html). */
+.pattern {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.11;
+}
+
+/* The screen's own falloff -- the reference is a lit screen in a dark recess, darker at every edge. */
+.vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 72% 70% at 50% 54%, rgba(16, 0, 26, 0) 58%, rgba(16, 0, 26, 0.42) 100%);
+}
+
+/* ---- header / footer ------------------------------------------------------ */
+#hdr, #ftr {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, var(--cream-hi), var(--cream-lo));
+    transition: transform 0.25s ease;
+}
+#hdr { top: 0; height: 7.2vh; display: flex; align-items: center; }
+#ftr { bottom: 0; height: 10.4vh; }
+
+.hdr-logo {
+    position: absolute;
+    left: 1.9vw;
+    top: 50%;
+    width: 3.1vh;
+    height: 3.5vh;
+    transform: translateY(-50%);
+    color: var(--ink);
+}
+#title {
+    width: 100%;
+    text-align: center;
+    font-size: 3.35vh;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+}
+#bal {
+    position: absolute;
+    right: 1.9vw;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2.9vh;
+    font-weight: 700;
+    color: var(--ink-soft);
+}
+
+/* No header or footer on the logo screens. */
+.scr-welcome #hdr, .scr-splash #hdr, .scr-off #hdr { transform: translateY(-100%); }
+.scr-welcome #ftr, .scr-splash #ftr, .scr-off #ftr { transform: translateY(100%); }
+
+#btns { position: absolute; inset: 0; }
+
+.fbtn {
+    position: absolute;
+    top: 50%;
+    height: 4.9vh;
+    width: 36.5vw;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.7vh;
+    background: linear-gradient(180deg, var(--deep-hi), var(--deep-lo));
+    color: var(--deep-text);
+    font-size: 2.55vh;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+.fbtn.solo { left: 50%; transform: translate(-50%, -50%); }
+.fbtn.left { left: 12.2vw; }
+.fbtn.right { right: 12.6vw; }
+
+/* ---- focus ring: white, with a gap, as on the reference's Deposit button and amount box ---- */
+.opt, .fbtn, .box, .tx { outline: 0.36vh solid transparent; outline-offset: 0.42vh; transition: outline-color 0.12s ease; }
+.opt.focus, .fbtn.focus, .box.focus, .tx.focus { outline-color: var(--ring); }
+
+/* ---- body text ------------------------------------------------------------- */
+#view { position: absolute; inset: 0; }
+#view > * { position: absolute; }
+
+.sub, .limit {
+    left: 0;
+    right: 0;
+    transform: translateY(-50%);
+    text-align: center;
+    color: var(--on-purple);
+    font-size: 2.75vh;
+    font-weight: 400;
+    letter-spacing: 0.005em;
+    text-shadow: 0 0.1vh 0.3vh rgba(40, 0, 60, 0.25);
+}
+.limit { font-size: 2.6vh; display: flex; align-items: center; justify-content: center; gap: 0.6vh; }
+.card {
+    display: inline-block;
+    width: 1.9vh;
+    height: 1.25vh;
+    border-radius: 0.25vh;
+    background: var(--on-purple);
+    position: relative;
+}
+.card::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0.3vh;
+    height: 0.25vh;
+    background: #8d48b6;
+}
+
+/* ---- main menu -------------------------------------------------------------- */
+.opt {
+    left: 50%;
+    width: 37.4vw;
+    height: 5.3vh;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.7vh;
+    background: linear-gradient(180deg, var(--btn-hi), var(--btn-lo));
+    color: var(--label);
+    font-size: 2.5vh;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+}
+.acct {
+    left: 0;
+    right: 0;
+    top: 70%;
+    text-align: center;
+    color: var(--on-purple);
+    opacity: 0.75;
+    font-size: 2.1vh;
+}
+
+/* ---- amount ----------------------------------------------------------------- */
+.box {
+    left: 50%;
+    top: 46.8%;
+    width: 38.2vw;
+    height: 20.2vh;
+    transform: translateX(-50%);
+    border-radius: 1vh;
+    background: linear-gradient(180deg, #dbd7cd, #cfcabf);
+}
+.amt {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 26%;
+    transform: translateY(-50%);
+    text-align: center;
+    color: #9d56c9;
+    font-size: 5.7vh;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+.box.empty .amt { color: #b9a5c6; }
+.row {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 74%;
+    height: 4vh;
+    transform: translateY(-50%);
+}
+.lbl {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    color: #c5bdc9;
+    font-size: 2.35vh;
+    letter-spacing: 0.02em;
+}
+.chev {
+    position: absolute;
+    top: 50%;
+    width: 1.5vh;
+    height: 1.5vh;
+    border-left: 0.26vh solid #5f5a64;
+    border-bottom: 0.26vh solid #5f5a64;
+}
+.chev.l { left: 5.5%; transform: translateY(-50%) rotate(45deg); }
+.chev.r { right: 5.5%; transform: translateY(-50%) rotate(-135deg); }
+.err {
+    left: 50%;
+    top: 72%;
+    transform: translateX(-50%);
+    padding: 0.7vh 1.8vh;
+    border-radius: 0.8vh;
+    background: rgba(60, 0, 40, 0.38);
+    color: #ffd9ea;
+    font-size: 2.3vh;
+    white-space: nowrap;
+}
+
+/* ---- transactions ----------------------------------------------------------- */
+.tx {
+    left: 50%;
+    width: 74vw;
+    height: 7.6vh;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2vw;
+    padding: 0 2.2vw;
+    border-radius: 0.9vh;
+    background: linear-gradient(180deg, var(--btn-hi), var(--btn-lo));
+}
+.tx-l { min-width: 0; display: flex; flex-direction: column; gap: 0.35vh; }
+.tx-t {
+    color: #7e4aa6;
+    font-size: 2.35vh;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tx-d { color: #a89cb0; font-size: 1.8vh; }
+.tx-a { flex: none; font-size: 2.6vh; font-weight: 600; }
+.tx-a.in { color: #9d56c9; }
+.tx-a.out { color: #77697f; }
+.more {
+    left: 50%;
+    width: 1.6vh;
+    height: 1.6vh;
+    border-left: 0.3vh solid var(--on-purple);
+    border-bottom: 0.3vh solid var(--on-purple);
+    opacity: 0.7;
+}
+.more.up { transform: translateX(-50%) rotate(135deg); }
+.more.down { transform: translateX(-50%) rotate(-45deg); }
+
+/* ---- logo screens ----------------------------------------------------------- */
+.logo {
+    left: 50%;
+    top: 39%;
+    height: 17.5vh;
+    width: 15.3vh;
+    transform: translate(-50%, -50%);
+    color: #ece7de;
+    filter: drop-shadow(0 0.3vh 0.8vh rgba(40, 0, 60, 0.25));
+}
+.word {
+    left: 0;
+    right: 0;
+    top: 54%;
+    transform: translateY(-50%);
+    text-align: center;
+    color: #ece7de;
+    font-family: 'Nunito', var(--font);
+    font-weight: 800;
+    font-size: 6.6vh;
+    letter-spacing: -0.005em;
+    line-height: 1;
+}
+.tag {
+    left: 0;
+    right: 0;
+    top: 65.8%;
+    transform: translateY(-50%);
+    text-align: center;
+    color: var(--on-purple);
+    font-size: 2.6vh;
+}
+
+/* ---- the help mark and its busy spinner, bottom left as on the reference ------ */
+.help {
+    position: absolute;
+    left: 11.3vw;
+    top: 95.8vh;
+    width: 3vh;
+    height: 3vh;
+    transform: translate(-50%, -50%);
+}
+.help .q {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: #8c5bbd;
+    color: #fff;
+    font-size: 2vh;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 0.25vh rgba(255, 255, 255, 0.55);
+}
+.help .spin {
+    position: absolute;
+    left: -1.5vh;
+    top: 1.6vh;
+    width: 1.5vh;
+    height: 1.5vh;
+    border-radius: 50%;
+    border: 0.28vh solid transparent;
+    border-left-color: #d9d2e2;
+    border-bottom-color: #d9d2e2;
+    opacity: 0;
+}
+.busy .help .spin { opacity: 1; animation: spin 0.8s linear infinite; }
+.busy #view { opacity: 0.72; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---- screen changes: a quick fade, like the reference's page swaps ------------ */
+.enter > * { animation: enter 0.18s ease-out both; }
+@keyframes enter { from { opacity: 0; } to { opacity: 1; } }

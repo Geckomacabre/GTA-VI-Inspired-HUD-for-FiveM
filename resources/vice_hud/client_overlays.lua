@@ -369,6 +369,11 @@ end)
 --- ... }, selected = index, afford = false, note }. BUY / EXIT are ordinary
 --- action prompts; they sit in a row while the panel is up, and
 --- ShowActionPrompt's opts.off greys one that cannot be used.
+--- Strip mode, as GTA VI's barber shows its hairstyles (illenium-appearance's
+--- client/parlour.lua): strip = true makes the swatches the items themselves,
+--- each picture filling its tile; counter = '3 / 40' over the row's end,
+--- more = true an arrow after it, progress = { first, shown, total } a
+--- hairline under it, status = 'Not applied' a plain line under that.
 exports('ShowShopItem', function(data)
     if type(data) ~= 'table' then ui('shop', { show = false }) return end
     data.show = true

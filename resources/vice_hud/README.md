@@ -248,6 +248,8 @@ put the button on the point itself, and `{ id = 'my_resource' }` so that
 `HideWorldActions('my_resource')` only takes down a prompt that is still that
 resource's. `SetWorldActionsCoords(coords, id)` moves a prompt that is up.
 The merged targeting's walk-up prompts (`Config.Proximity`) are drawn with it.
+It is drawn at 70% of the corner prompts' size: `--wa-scale` on
+`#world-actions` in `html/style.css` (1 is the same size as the corner ones).
 
 `ShowActionPrompt` and `ShowWorldActions` take a control id (or an ox_lib
 keybind's `.hash`) as before and need nothing new: the button is resolved from
@@ -359,7 +361,7 @@ one is optional, `nil` is the element's own default and `0` is "until hidden".
 | `ShowFeed(text, { icon, duration })` | a line in the feed on the right: `'Crime reported'` (3.5 s) |
 | `ShowTitleCard(text, style, ms)` | `'center'` (PROLOGUE), `'stack'` (one word a line), `'location'` (a place name) |
 | `SetBinocularOverlay(on, { label, key })` | the lens mask; see `resources/vi_binoculars` for the binoculars themselves |
-| `ShowShopItem(data)` / `HideShopItem()` | store, category, price, item, variant, swatches, and why it cannot be bought |
+| `ShowShopItem(data)` / `HideShopItem()` | store, category, price, item, variant, swatches, and why it cannot be bought; `strip = true` (with `counter`, `more`, `progress`, `status`) turns the swatches into a row of item pictures, as GTA VI's barber shows its hairstyles |
 | `ShowVehicleStats(data)` / `HideVehicleStats()` | make over model, rated bars, the two ratings |
 | `SetCinematicFx(on, { strength, bars, pulse })` | the Focus effect in black with bars; stays up while the HUD is hidden (the crash cam uses it) |
 

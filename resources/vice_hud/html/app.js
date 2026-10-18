@@ -604,6 +604,40 @@
         moneyPopTimer = setTimeout(function () { show(el, false); }, 2200);
     }
 
+    // A deposit or withdrawal takes the same amount out of one and puts it in
+    // the other -- in one push, or split across two when the framework sets
+    // cash and bank separately. Either way it is one event, "$23 → BuckMe",
+    // as the reference shows an ATM deposit, rather than a "− $23" that a
+    // "+ $23" overwrites a moment later.
+    var TRANSFER_PAIR_MS = 1500;
+    var lastMoneyMove = null;   // { cur: 'cash'|'bank', delta, at }
+    var MONEY_ICON = { cash: 'icons/cash.png', bank: 'icons/buckme.png' };
+
+    function onMoneyTransfer(amount, icon) {
+        var el = $('money-pop');
+        if (!el) return;
+        el.className = 'transfer';
+        var sign = $('money-pop-sign');
+        if (sign) sign.textContent = money(amount) + ' →';
+        var img = $('money-pop-icon');
+        if (img) img.src = icon;
+        show(el, true);
+        if (moneyPopTimer) clearTimeout(moneyPopTimer);
+        moneyPopTimer = setTimeout(function () { show(el, false); }, 2200);
+    }
+
+    function onMoneyMove(cur, delta) {
+        var now = Date.now();
+        var prev = lastMoneyMove;
+        if (prev && prev.cur !== cur && prev.delta === -delta && now - prev.at < TRANSFER_PAIR_MS) {
+            lastMoneyMove = null;
+            onMoneyTransfer(Math.abs(delta), MONEY_ICON[delta > 0 ? cur : prev.cur]);
+            return;
+        }
+        lastMoneyMove = { cur: cur, delta: delta, at: now };
+        onMoneyPop(delta, MONEY_ICON[cur]);
+    }
+
     // Last payload the money rows' visibility was computed from -- ui('cash')
     // only pushes on a dedup-key change (see the `key` diff in client.lua),
     // unlike ui('status') which pushes every tick, so the flash timers below
@@ -624,7 +658,7 @@
 
         if (d.cash != null) {
             if (lastCashSeen !== null && d.cash !== lastCashSeen) {
-                onMoneyPop(d.cash - lastCashSeen, 'icons/cash.png');
+                onMoneyMove('cash', d.cash - lastCashSeen);
                 cashRecentlyChanged = true;
                 if (cashFlashTimer) clearTimeout(cashFlashTimer);
                 cashFlashTimer = setTimeout(function () {
@@ -637,7 +671,7 @@
         }
         if (d.bank != null) {
             if (lastBankSeen !== null && d.bank !== lastBankSeen) {
-                onMoneyPop(d.bank - lastBankSeen, 'icons/buckme.png');
+                onMoneyMove('bank', d.bank - lastBankSeen);
                 bankRecentlyChanged = true;
                 if (bankFlashTimer) clearTimeout(bankFlashTimer);
                 bankFlashTimer = setTimeout(function () {
@@ -2747,8 +2781,17 @@
     }
 
     // { store, category, price, pay: ['bank','cash'], name, variant,
-    //   swatches: [{ color, locked }], selected (1-based), note, afford }
+    //   swatches: [{ color, image, locked }], selected (1-based), note, afford,
+    //   strip, counter, more, progress: { first, shown, total }, status }
+    // A swatch with an image (an https address) shows that picture of the
+    // variant on a plain tile; one without is its colour.
+    // strip: the row is the items themselves, as the GTA VI barber shows its
+    // hairstyles - each picture fills its tile, "counter" ("1 / 9") over the
+    // row's end, "more" an arrow after it when the list goes on, "progress" a
+    // hairline under it as long and as far along as the tiles shown are of the
+    // whole list, and "status" ("Not applied") a plain line under that.
     var SHOP_PAY = { cash: 'icons/cash.png', bank: 'icons/buckme.png' };
+    var SHOP_IMAGE = /^https:\/\/[\w.\-\/]+$/;
 
     function onShop(d) {
         var el = $('shop');
@@ -2779,9 +2822,32 @@
         (d.swatches || []).forEach(function (sw, i) {
             var cell = document.createElement('div');
             cell.className = 'shop-swatch' + (i + 1 === d.selected ? ' on' : '') + (sw && sw.locked ? ' locked' : '');
-            cell.style.backgroundColor = (sw && sw.color) || '#888';
+            if (sw && typeof sw.image === 'string' && SHOP_IMAGE.test(sw.image)) {
+                cell.className += ' pic';
+                cell.style.backgroundImage = 'url("' + sw.image + '")';
+            } else {
+                cell.style.backgroundColor = (sw && sw.color) || '#888';
+            }
             row.appendChild(cell);
         });
+
+        el.classList.toggle('strip', !!d.strip);
+        show($('shop-strip'), (d.swatches || []).length > 0);
+        $('shop-counter').textContent = d.counter || '';
+        show($('shop-more'), !!d.more);
+        var prog = d.progress, total = prog && Number(prog.total);
+        var showBar = !!(total && Number(prog.shown) < total);
+        show($('shop-progress'), showBar);
+        if (showBar) {
+            // (no shorter than a twentieth, so that it shows on a long list, and kept inside its track)
+            var thumb = $('shop-progress-thumb');
+            var width = Math.max(Number(prog.shown) / total, 0.05);
+            var left = Math.min(Math.max(0, Number(prog.first) - 1) / total, 1 - width);
+            thumb.style.left = (left * 100) + '%';
+            thumb.style.width = (width * 100) + '%';
+        }
+        show($('shop-status'), !!d.status);
+        $('shop-status').textContent = d.status || '';
 
         var cant = d.afford === false;
         el.classList.toggle('cant', cant);
@@ -4773,6 +4839,8 @@
         layout: onLayout,
         openEditor: openEditor,
         hudVisible: function (d) { if (stage) stage.style.display = d.show === false ? 'none' : ''; },
+        // (the money and its pop off the screen while a clothing / barber / tattoo store is open: client.lua)
+        moneyHidden: function (d) { if (stage) stage.classList.toggle('money-off', d.hidden === true); },
         exportMinimapMask: onExportMinimapMask
     };
 

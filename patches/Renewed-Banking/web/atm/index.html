@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<!--
+    Renewed-Banking / web / atm
+    The BuckMe ATM screen. Rendered into a DUI that client/atm.lua draws over the cash machine's own glass, sized to that
+    machine's screen, so everything here is laid out in vw/vh of whatever size the DUI is. It only draws: the state
+    arrives whole in each 'render' message (see payload() in client/atm.lua) and input never reaches this page.
+    Layout and colours are measured off GTA VI footage of the BuckMe ATM.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BuckMe ATM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Nunito:wght@800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="atm.css">
+</head>
+<body>
+    <!-- The BuckMe "b": a stem with three speed lines off it and a round bowl with a tab in its counter. Drawn from
+         the ATM's splash screen; coordinates are that frame's own pixels, hence the odd viewBox. -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <defs>
+            <mask id="bm-b-cut" maskUnits="userSpaceOnUse" x="250" y="175" width="320" height="365">
+                <rect x="250" y="175" width="320" height="365" fill="#fff"/>
+                <ellipse cx="424" cy="388" rx="60" ry="64" fill="#000"/>
+                <rect x="452" y="357" width="64" height="23" rx="11.5" fill="#fff"/>
+            </mask>
+            <symbol id="bm-b" viewBox="250 175 320 365">
+                <g mask="url(#bm-b-cut)" fill="currentColor">
+                    <path d="M287 183H371a14 14 0 0 1 14 14V505H335V213H287a15 15 0 0 1 0-30z"/>
+                    <rect x="278" y="283" width="72" height="23" rx="11.5"/>
+                    <rect x="248" y="395" width="102" height="23" rx="11.5"/>
+                    <rect x="288" y="502" width="162" height="27" rx="13"/>
+                    <ellipse cx="440" cy="390" rx="120" ry="140"/>
+                </g>
+            </symbol>
+            <!-- The background's little b's are outlines, not the solid mark: a stroke for the top bar and stem and a ring
+                 for the bowl. Coloured here, not inherited -- a pattern's content takes its colour from where the
+                 pattern is defined (this hidden svg), not from what it fills. -->
+            <g id="bm-mini" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2.5 3H7.5V19.5"/>
+                <circle cx="12.3" cy="13.6" r="6.2"/>
+            </g>
+            <pattern id="bm-tile" width="76" height="58" patternUnits="userSpaceOnUse" patternTransform="rotate(-12)">
+                <use href="#bm-mini" x="4" y="4"/>
+                <use href="#bm-mini" x="42" y="33"/>
+            </pattern>
+        </defs>
+    </svg>
+
+    <div id="atm" class="scr-off">
+        <div class="bg"></div>
+        <svg class="pattern" aria-hidden="true"><rect width="100%" height="100%" fill="url(#bm-tile)"/></svg>
+
+        <header id="hdr">
+            <svg class="hdr-logo" aria-hidden="true"><use href="#bm-b" width="100%" height="100%"/></svg>
+            <div id="title"></div>
+            <div id="bal"></div>
+        </header>
+
+        <main id="view"></main>
+
+        <footer id="ftr"><div id="btns"></div></footer>
+
+        <div class="help" aria-hidden="true"><span class="spin"></span><span class="q">?</span></div>
+        <div class="vignette"></div>
+    </div>
+
+    <script src="atm.js"></script>
+</body>
+</html>

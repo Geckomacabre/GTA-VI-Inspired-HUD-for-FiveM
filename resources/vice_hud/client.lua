@@ -3203,6 +3203,8 @@ CreateThread(function()
 
     if savedOffset then applyOffset(savedOffset) end
 
+    local moneyHiddenForShop = false -- debounces the moneyHidden message below to one send per transition
+
     while true do
         Wait(Config.Tick)
 
@@ -3280,6 +3282,16 @@ CreateThread(function()
         if isDead ~= hudHiddenForDeath then
             hudHiddenForDeath = isDead
             ui('hudVisible', { show = not isDead })
+        end
+
+        -- The money (its rows and the "- $80" pop) off the screen while one of
+        -- illenium-appearance's stores is open - its full menu, a rack's
+        -- try-on, the barber / tattoo strip. It sets this state bag itself
+        -- (client/shopflag.lua): the same loose coupling as invOpen above.
+        local shopping = LocalPlayer.state.appearanceShop == true
+        if shopping ~= moneyHiddenForShop then
+            moneyHiddenForShop = shopping
+            ui('moneyHidden', { hidden = shopping })
         end
 
         local ok, err = pcall(function()
@@ -3477,7 +3489,9 @@ CreateThread(function()
             -- has to force a push of its own even when the balance itself
             -- hasn't moved, or the rows would keep showing whatever `show`
             -- state happened to be baked into the LAST balance change.
-            local wheel = wheelHeld()
+            -- Standing at an ATM (Renewed-Banking's BuckMe screen sets atmOpen)
+            -- is a reason to read both balances too, as the reference shows.
+            local wheel = wheelHeld() or LocalPlayer.state.atmOpen == true
             local key = tostring(cash) .. '|' .. tostring(bank) .. '|' .. tostring(wheel)
             if key ~= lastCash then
                 lastCash = key
