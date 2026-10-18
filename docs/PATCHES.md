@@ -609,6 +609,28 @@ rather than dropping the build output in blind.
 Colors are exposed as CSS custom properties in `gta6-theme.scss`, so you can
 retheme without touching component code.
 
+### Weapon art
+
+`patches/ox_inventory/web/images/WEAPON_*.png` (96 files) replace ox_inventory's
+own square, diagonal weapon thumbnails with the side-profile art from this
+HUD's single-player build (GTA6Hud's `scripts/Hud/Weapons`). Copy them over the
+files of the same name in your `ox_inventory/web/images/`. They use the
+names ox_inventory already uses, so nothing references them differently,
+and vice_hud's top-right weapon icon (which reads ox_inventory's images)
+shows the same art.
+
+They are scaled so the longer side is 320 px and are NOT padded to a square:
+the theme draws item art with `background-size: contain` (and the equipped
+readout at `$gta6-art-w auto`) inside a box that is wider than it is tall, so
+a rifle fills the box's width. A square canvas would have shrunk every long
+gun to fit the box's height.
+
+Weapons the single-player set has no art for (newer DLC guns such as the
+tactical rifle or the TEC pistol, and anything added by other resources) keep
+ox_inventory's own image. Restart ox_inventory after copying them, and a
+player who already loaded the inventory may need to reconnect: the images are
+loaded by fixed path, so the NUI cache can serve the old ones until then.
+
 ## dpclothing
 
 [dpClothing+](https://forum.cfx.re/t/5158019) by dullpear. Two exports
