@@ -51,12 +51,12 @@
             + (GLYPHS[name] || '') + '</svg>';
     }
 
-    // [[glyph, label, onclick]] into a row of prompts
+    // [[glyph, label, onclick]] into a row of prompts, each its word then its key ("SELECT (o)  CLOSE (o)")
     function prompts(target, list) {
         target.innerHTML = '';
         list.forEach(function (p) {
             var e = el('div', 'pr');
-            e.innerHTML = glyph(p[0]) + '<span></span>';
+            e.innerHTML = '<span></span>' + glyph(p[0]);
             e.querySelector('span').textContent = p[1];
             if (p[2]) e.addEventListener('click', p[2]);
             target.appendChild(e);
