@@ -33,6 +33,10 @@ MUTATIONS = [
     ('client/main.lua', "    TriggerServerEvent('vi_pausemenu:server:requestPlayers')\nend)", "end)"),
     ('client/main.lua', "if (Config.Title or '') ~= '' then return Config.Title end", ""),
     ('client/main.lua', "and name ~= serverName then", "then"),
+    ('client/main.lua', "        UnregisterPedheadshot(handle)\n        mugBusy = false", "        mugBusy = false"),
+    ('client/main.lua', "while mugCopied == nil and GetGameTimer() < deadline do Wait(0) end", ""),
+    ('client/main.lua', "    TakeMugshot()\n", ""),
+    ('client/main.lua', "if IsPedheadshotReady(handle) and IsPedheadshotValid(handle) then", "if IsPedheadshotReady(handle) then"),
 ]
 
 fengari = sys.argv[1] if len(sys.argv) > 1 else os.path.join(SRC, '..', 'vice_hud', 'node_modules', 'fengari')

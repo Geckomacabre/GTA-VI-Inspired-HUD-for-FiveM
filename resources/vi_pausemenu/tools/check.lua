@@ -52,6 +52,17 @@ eq(open.tiles[2][2].sub, 'Record a clip', 'editor tile line')
 eq(open.tiles[3][1].sub, '2 Online', 'players count')
 check(Disabled[200] ~= nil, 'ESC kept from the game while open')
 
+-- the character's face: a headshot of the player's ped, held only until the page has its own copy
+local mug = LastMessage('mugshot')
+check(mug and mug.txd == 'pedmugshot_01', 'face sent to the page')
+eq(Headshot.held, true, 'slot held until the page has copied the face')
+Run(300)
+eq(Headshot.held, true, 'still held while the page is copying')
+NuiCall('mugshot', { ok = true })
+Frames(2)
+eq(Headshot.held, false, 'slot let go once the page has the copy')
+eq(Headshot.unregistered, 1, 'let go once')
+
 -- a second ESC press while open does nothing on the Lua side (the page has the keys)
 local before = #Nui.messages
 Press(200)
@@ -318,6 +329,26 @@ eq(find(b.rows, 'label', 'Job').value, 'Unemployed', 'brief without qbx_core')
 TriggerEvent('onResourceStop', 'vi_pausemenu')
 eq(StateBag.pauseMenuOpen, false, 'flag cleared when the resource stops')
 eq(Nui.focus, false, 'focus off when the resource stops')
+
+-- the face, when things go wrong: a page that never answers, and a headshot the game refuses
+Run(6000)
+eq(Headshot.held, false, 'slot let go even when the page never answers')
+local before = Headshot.registered
+Run(400)
+Press(200)
+Frames(2)
+eq(Headshot.registered, before + 1, 'a new face each time the menu opens')
+Run(5200)
+eq(Headshot.held, false, 'let go after the wait for an answer')
+NuiCall('close')
+Headshot.valid = false
+Nui.messages = {}
+Run(400)
+Press(200)
+Frames(3)
+eq(LastMessage('mugshot'), nil, 'no face sent when the game refuses one')
+eq(Headshot.held, false, 'a refused headshot let go at once')
+eq(Headshot.registered, Headshot.unregistered, 'every headshot let go')
 
 eq(#Errors, 0, 'no thread errors')
 io.write(('%d passed, %d failed\n'):format(passes, fails))

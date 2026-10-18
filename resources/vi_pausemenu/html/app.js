@@ -257,8 +257,8 @@
         state.screen = name;
         var list = name !== 'home';
         root.classList.toggle('list', list);
-        $('kicker').textContent = state.title;
-        $('heading').textContent = list ? title : state.title;
+        $('title').textContent = state.title;
+        $('heading').textContent = list ? title : '';
         updatePrompts();
     }
 
@@ -557,6 +557,51 @@
         post('disconnect');
     }
 
+    /* -------------------------------------------------------------------------
+       The character's face, top right and on the map bar
+       ---------------------------------------------------------------------- */
+    // a pedheadshot is served from the game's own texture memory; the txd and its texture share the name
+    var faceUrl = typeof window.VIPM_FACE_URL === 'function' ? window.VIPM_FACE_URL : function (txd) {
+        return 'https://nui-img/' + txd + '/' + txd;
+    };
+    var face = null;        // this page's own copy of the picture (an object URL)
+
+    function setInitials(name) {
+        var letters = String(name || '').trim().split(/\s+/).map(function (w) { return w.charAt(0); }).join('');
+        letters = letters.length > 2 ? letters.charAt(0) + letters.charAt(letters.length - 1) : letters;
+        ['mug', 'map-mug'].forEach(function (id) {
+            $(id).querySelector('.initials').textContent = letters.toUpperCase();
+        });
+    }
+
+    function showFace(url) {
+        ['mug', 'map-mug'].forEach(function (id) {
+            var img = $(id).querySelector('img');
+            img.src = url;
+            img.hidden = false;
+            $(id).classList.add('has-face');
+        });
+    }
+
+    // Copied out of the game's texture into a blob this page owns, then the client is told it may let the headshot
+    // slot go: everything after reads the copy. A failure keeps whatever face (or initials) was there.
+    function copyFace(txd) {
+        if (!txd) { post('mugshot', { ok: false }); return; }
+        fetch(faceUrl(txd))
+            .then(function (r) {
+                if (!r.ok) throw new Error('nui-img ' + r.status);
+                return r.blob();
+            })
+            .then(function (blob) {
+                var old = face;
+                face = URL.createObjectURL(blob);
+                showFace(face);
+                if (old) URL.revokeObjectURL(old);
+                post('mugshot', { ok: true });
+            })
+            .catch(function () { post('mugshot', { ok: false }); });
+    }
+
     var toastTimer = null;
     function toast(text) {
         var t = $('toast');
@@ -678,6 +723,7 @@
             if (Array.isArray(d.categories) && d.categories.length) state.categories = d.categories;
             $('mode').textContent = d.mode || '';
             $('name').textContent = d.name || '';
+            setInitials(d.name);
             setFooter(d.footer);
             if (d.fresh) {
                 state.sel = { r: 0, c: 0 };
@@ -712,9 +758,9 @@
         // the server's name, when it arrives after the menu opened
         title: function (d) {
             state.title = d.title || '';
-            $('kicker').textContent = state.title;
-            if (state.screen === 'home') $('heading').textContent = state.title;
+            $('title').textContent = state.title;
         },
+        mugshot: function (d) { copyFace(d.txd); },
         hide: function () { show(false); },
         close: function () {
             show(false);
@@ -728,6 +774,7 @@
                 $('map-loc').textContent = d.location || '';
                 $('map-mode').textContent = d.mode || '';
                 $('map-name').textContent = d.name || '';
+                setInitials(d.name);
             }
         }
     };

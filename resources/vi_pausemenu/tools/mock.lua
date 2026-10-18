@@ -184,6 +184,24 @@ end
 Commands = {}
 function RegisterCommand(name, fn) Commands[name] = fn end
 
+-- the pedheadshot slot (one, as in the game: registering while it is held fails)
+Headshot = { registered = 0, unregistered = 0, held = false, ready = true, valid = true }
+function RegisterPedheadshotTransparent(ped)
+    assert(ped == 100, 'headshot of the player ped')
+    assert(not Headshot.held, 'headshot registered while the slot was still held')
+    Headshot.held = true
+    Headshot.registered = Headshot.registered + 1
+    return 5
+end
+function IsPedheadshotReady(h) return Headshot.ready end
+function IsPedheadshotValid(h) return Headshot.valid end
+function GetPedheadshotTxdString(h) return 'pedmugshot_01' end
+function UnregisterPedheadshot(h)
+    assert(h == 5)
+    Headshot.held = false
+    Headshot.unregistered = Headshot.unregistered + 1
+end
+
 -- server
 Convars = { sv_projectName = 'Upstate Mafia', sv_hostname = 'Upstate Mafia!' }
 function GetConvar(k, default) return Convars[k] or default end

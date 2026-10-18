@@ -329,6 +329,36 @@ local function Show(what, fresh)
     end
 end
 
+-- The character's face for the top right, as the character switcher (qbx_relog) and the honor panel show it: a
+-- transparent pedheadshot of the player's own ped. The game has ONE slot for those (citizenfx/fivem#2611), so it is
+-- borrowed, never held: the page copies the picture out of nui-img and says so, and the slot is let go at once.
+local mugBusy = false
+local mugCopied = nil       -- the page's answer: true copied, false failed, nil not yet
+
+RegisterNUICallback('mugshot', function(data, cb)
+    mugCopied = type(data) == 'table' and data.ok == true
+    cb(1)
+end)
+
+local function TakeMugshot()
+    if mugBusy then return end
+    mugBusy = true
+    CreateThread(function()
+        local handle = RegisterPedheadshotTransparent(PlayerPedId())
+        local deadline = GetGameTimer() + 5000
+        while not IsPedheadshotReady(handle) and GetGameTimer() < deadline do Wait(0) end
+        if IsPedheadshotReady(handle) and IsPedheadshotValid(handle) then
+            mugCopied = nil
+            SendNUIMessage({ type = 'mugshot', txd = GetPedheadshotTxdString(handle) })
+            deadline = GetGameTimer() + 5000
+            while mugCopied == nil and GetGameTimer() < deadline do Wait(0) end
+        end
+        -- whatever happened, before anything else: holding the slot breaks every other headshot in the game
+        UnregisterPedheadshot(handle)
+        mugBusy = false
+    end)
+end
+
 local function OpenMenu()
     if open then return end
     local ok, err = pcall(function()
@@ -346,6 +376,8 @@ local function OpenMenu()
     LocalPlayer.state:set('pauseMenuOpen', true, false)
     TriggerServerEvent('vi_pausemenu:server:requestPlayers')
     Show('home', true)
+    -- a new picture every time: the clothes, the hair, the mask may have changed since the last
+    TakeMugshot()
     PlaySoundFrontend(-1, 'SELECT', 'HUD_FRONTEND_DEFAULT_SOUNDSET', true)
 end
 
