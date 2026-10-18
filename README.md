@@ -258,6 +258,26 @@ included here.
   kits. See `resources/Lenonida_customs/README.md` and the install notes
   below before starting it.
 
+- **`illenium-appearance`**: The clothing stores, barber and tattoo parlour.
+  A copy of
+  [Geckomacabre/Leonida-Appearance](https://github.com/Geckomacabre/Leonida-Appearance)
+  (commit `af696db`): iLLeniumStudios' `illenium-appearance` in
+  [Haaasib's redesign](https://github.com/Haaasib/illenium-appearance), with
+  this server's additions. In a clothing store the racks are targets of
+  their own: browse one and the camera turns to your character wearing its
+  items, left/right through them, up/down through the colours, Enter to buy.
+  At a barber or a tattoo parlour a second option picks a hairstyle or a
+  tattoo from a strip of pictures, GTA VI barber style. Both are drawn on
+  `vice_hud`'s shop panel (without `vice_hud` the racks draw their own and
+  the barber and parlour open the full menu), and `vice_hud`'s money leaves the
+  screen while any store is open. The pictures of every item come from the
+  resource's `thumbs/` folder, made from the game's files by this server's
+  `cloth_thumbs` tool and **not included** (tens of thousands of files);
+  without them the menu uses the redesign's online pictures, then a
+  placeholder. Needs `oxmysql`, `ox_lib` and Qbox, QBCore or ESX; it creates
+  its tables on first start. See `resources/illenium-appearance/readme.md`,
+  including what in it is only this server's.
+
 - **`sk_streetkings`**: The racing resource — routes, time trials,
   multiplayer lobbies, leaderboards and `/racemaker`, plus the car meet,
   meet night, nitrous, manual gearbox, drift, stunt jumps, speed cameras
@@ -347,7 +367,8 @@ its own.
    `resources/qbx_relog`, `resources/vi_radio`,
    `resources/gk_basketball`, `resources/vi_crashcam`,
    `resources/vi_binoculars`, `resources/vi_wasted`,
-   `resources/Lenonida_customs`, `resources/streetkings_audio` and/or
+   `resources/Lenonida_customs`, `resources/illenium-appearance`,
+   `resources/streetkings_audio` and/or
    `resources/sk_streetkings` into your
    server's `resources/` folder. Keep the folder names as they are.
 2. Add them to `server.cfg`:
@@ -363,6 +384,7 @@ its own.
    ensure vi_binoculars
    ensure vi_wasted
    ensure Lenonida_customs
+   ensure illenium-appearance
    ensure streetkings_audio
    ensure sk_streetkings
    ```
@@ -403,6 +425,14 @@ its own.
    - `vi_crashcam`, `vi_binoculars` and `vi_wasted` have no dependency.
      Skip `vi_wasted` if you run fenix-police: it plays the same two
      screens itself.
+   - `illenium-appearance` needs **oxmysql**, **ox_lib** and a framework
+     (Qbox, QBCore or ESX). It replaces any `illenium-appearance` you already
+     run (same folder name, which other resources call its exports by). Two
+     things in it are this server's: `shared/blacklist_placeholders.lua`
+     numbers clothes for this server's clothing packs (empty it on yours),
+     and its management and radial menus look for `um_management` /
+     `um_radialmenu` (change them back to `qbx_*` in
+     `client/management/management.lua` and `client/radial/radial.lua`).
    - `sk_streetkings` needs **qbx_core**, **ox_lib**, **oxmysql**, and
      `sql/install.sql` from its folder run once. `streetkings_audio` is
      optional beside it.
@@ -592,6 +622,16 @@ keeps that licence and its own `LICENSE`.
 is built on [renzu_customs](https://github.com/renzuzu/renzu_customs) by
 [renzuzu](https://github.com/renzuzu), keeps its own `LICENSE`, and stays
 GPL-3.0.
+
+`resources/illenium-appearance` keeps its own `LICENSE` too: the base
+resource (snakewiz's fivem-appearance, continued by
+[iLLeniumStudios](https://github.com/iLLeniumStudios/illenium-appearance))
+is MIT. Its web UI is [Haaasib's redesign](https://github.com/Haaasib/illenium-appearance),
+which states no licence of its own; it is a free public release whose
+readme invites editing and rebuilding it, and it is credited here and in
+the resource's readme, but like `dpclothing` below, "free to use" is not a
+licence to redistribute. If you are its author and want it handled
+differently, open an issue.
 
 `resources/vice_hud/target` is under neither of those. It is the code of a
 modified fork of [osm-target](https://github.com/OsmFX-Mods/osm-target) by

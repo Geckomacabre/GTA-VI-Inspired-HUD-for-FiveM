@@ -1,0 +1,132 @@
+# Leonida-Appearance
+
+`illenium-appearance` as it runs on our server: iLLeniumStudios' clothing and player customization resource in
+Haaasib's redesign (below), with additions of our own: a rack try-on in the clothing stores, a GTA VI barber and
+tattoo parlour, pictures of every item in the menu, and vice_hud's money off the screen while you shop.
+
+## Rack try-on
+
+Inside the three vanilla clothing-store interiors, the racks themselves are targets. Look at a rack of shirts, jeans,
+shoes, hats, glasses, bags or ties and browse it: the camera turns to your character wearing an item of that rack's
+kind, with its name, price and colours on screen.
+
+| Key | What it does |
+|---|---|
+| **Left** / **Right** | the previous / next item |
+| **Up** / **Down** | its colours |
+| **Enter** | buy and wear it |
+| **Backspace** / **Esc** | leave (an item you did not buy goes back to what you wore) |
+
+- The full menu at the store's clerk is unchanged; the racks are an extra way in.
+- Where the racks are comes from the game's own interiors (`shared/racks.lua`, generated: 244 racks in 14 stores; a
+  store in a custom interior gets none). Prices, cameras and keys are `Config.Racks` in `shared/config.lua`; a spot
+  that is off in game can be fixed there (`extra` / `override`), and with `Config.Debug` on `/rackspot <category>`
+  prints an entry for where you are aiming.
+- The price is the server's (per category, plus `Config.TaxRate`), paid in cash, then from the bank.
+- **With `vice_hud`** the try-on is drawn by the HUD itself: its shop panel (`ShowShopItem`: store and category,
+  price, item, a swatch for each colour, "Not enough money"), its action prompts and its feed - and the only
+  money on the screen is the HUD's own wallet, which shows the new total when you buy. Without it (or with
+  `Config.Racks.hud = "own"`) the resource's own overlay draws the same thing, and shows your cash itself only
+  when no `vice_hud` is there to show it.
+- Not seen in game yet: the rack positions and the camera were worked out from the game's files.
+
+## Barber chair and tattoo parlour
+
+At a barber or a tattoo parlour the store's target has a second option, **Hairstyles** or **Tattoos**: one at a time
+on your character, picked from a strip of pictures the way GTA VI's barber does it. The camera frames the head (or the
+body zone), the strip shows six pictures with the one you are on outlined, "3 / 40" over it and the price and the name
+beside it.
+
+| Key | What it does |
+|---|---|
+| **Left** / **Right** | the previous / next hairstyle (or tattoo) |
+| **Up** / **Down** | a hairstyle's variants, or the next body zone |
+| **Enter** | buy what is on (a tattoo you already have: take it off) |
+| **Backspace** / **Esc** | leave (what you did not buy goes back) |
+
+- The strip is `vice_hud`'s shop panel in its strip mode; without `vice_hud` the option opens the store's full menu.
+- Prices, cameras, zones, keys and words are `Config.Parlour` in `shared/config.lua`. The server takes the money
+  (`server/parlour.lua`): its own price plus tax (a tattoo's own `cost` wins), only for a tattoo of
+  `shared/tattoos.lua`, only at a store of that kind.
+- Only tattoos the game has are offered: `shared/tattoo_facing.lua` lists them (generated with the pictures, below),
+  with the way the character turns to show each one to the camera.
+
+## Pictures
+
+The menu's grids, the rack try-on and the barber / tattoo strip show a picture of every item from the resource's
+`thumbs/` folder: clothes and props on the character, hairstyles on a clay head, tattoos on a clay body where the game
+puts them. They are made from the game's own files by our `cloth_thumbs` tool, about 50,000 of them for our
+server's clothing packs, so they are **not in this repository**. Without them the grid falls back to the redesign's
+online pictures (vanilla clothes only), then to a blank figure; the strip still works, with plain frames where the
+pictures would be.
+
+## Smaller changes
+
+- **vice_hud's money off the screen while you shop** (`client/shopflag.lua`): the full menu, a rack's try-on and the
+  barber / tattoo strip set `LocalPlayer.state.appearanceShop`, which vice_hud reads to hide its cash and bank rows.
+  `Config.HideHudMoneyInShops = false` turns it off.
+- **The stores are target zones** (`client/shops.lua`), with no clerk ped; with `Config.UseTarget = false` an `[E]`
+  prompt at the store's spot opens it instead.
+- **Barber and plastic surgeon are one shop**: hair, makeup, face blend and features in one menu.
+- **Gamepad navigation** for the menu (`client/controller.lua`, `Config.ControllerNavigation`).
+- **Health regen is left alone**: upstream set the regen multiplier to 0 every time the menu closed, which switched off
+  passive health regen for the rest of the session (and fought vice_hud's hunger / thirst).
+- **Rockstar's placeholder clothes are taken out of the lists** (`shared/blacklist_placeholders.lua`, generated by
+  `cloth_thumbs` for our server's clothing packs). On another server the numbers will not match: empty the file, or
+  generate it for your packs.
+- Things that are only our server's: the management and radial resources are looked up as `um_management` /
+  `um_radialmenu` (`client/management/management.lua`, `client/radial/radial.lua`; upstream's are `qbx_*`), the
+  add-on ped models in `shared/peds.lua`, the fire station's clothing room and outfits and the starting clothes in
+  `shared/config.lua`, and the colours in `shared/theme.lua`.
+
+The web UI is built: `web/dist` is what the game loads. To change it, edit `web/src` and run `npm install` and
+`npm run build` in `web/`.
+
+Keep the resource's folder named `illenium-appearance`: other resources call its exports by that name.
+
+Licence: the base resource (snakewiz's fivem-appearance, continued by iLLeniumStudios as illenium-appearance) is MIT,
+see `LICENSE`. Haaasib's redesign, which the web UI is, states no licence of its own; it is credited below.
+
+---
+
+# 🌟 NoPixel Inspired Clothing (`illenium-appearance`)
+
+Modern FiveM clothing & player customization menu inspired by **NoPixel**.  
+Redesign by **Haaasib**. Full credit to **iLLeniumStudios** for the base `illenium-appearance` script!
+
+---
+
+## 📸 Previews
+
+![Apparel](preview/apparel.png)
+![Tops](preview/tops.png)
+![Outfits](preview/outfit.png)
+![Hair](preview/hair.png)
+![Nose](preview/nose.png)
+![Face Blend](preview/face-blend.png)
+![Ped Models](preview/ped-models.png)
+![Tattoos](preview/tatto.png)
+
+---
+
+## ⚡ Quick Install & Customization
+
+1. Place `illenium-appearance` into your resources directory.
+2. Add to your `server.cfg`:
+```cfg
+ensure oxmysql
+ensure qbx_core # or qb-core / es_extended
+ensure illenium-appearance
+```
+3. Restart server. (Database tables are automatically created on startup).
+
+> 🎨 **UI Customization**: Full source code is included under the `/web` folder (React + TypeScript + TailwindCSS). Feel free to edit, rebuild (`npm run build`), and customize the UI however you like!
+
+---
+
+## 💬 Links & Support
+
+- 💬 **Discord Support**: [https://discord.gg/kj3bWdD7uK](https://discord.gg/kj3bWdD7uK)
+- 🛒 **Store**: [https://tebex.haaasib.dev/](https://tebex.haaasib.dev/)
+- 📦 **GitHub Repository**: [https://github.com/Haaasib/illenium-appearance](https://github.com/Haaasib/illenium-appearance)
+- 📦 **Base Script**: [iLLeniumStudios Base](https://github.com/iLLeniumStudios/illenium-appearance)

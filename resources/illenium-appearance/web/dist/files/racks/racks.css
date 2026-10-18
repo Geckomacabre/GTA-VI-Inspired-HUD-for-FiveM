@@ -1,0 +1,48 @@
+/* the rack try-on (racks.js; client/racks.lua): over the game while an item of a rack is on trial - the store and
+   the category top left, the cash top right (only when no HUD keeps the wallet), the item bottom left, the keys
+   bottom right. Display only: nothing here takes a click. On a server with vice_hud the HUD draws the try-on.
+   A plain file of public/ beside the React page (Vite copies it to dist/files/racks as it is). */
+#racks { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2147483000; pointer-events: none; color: #fff;
+  text-transform: uppercase; font-family: "Bahnschrift", "Arial Narrow", sans-serif; font-stretch: 78%;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 12px rgba(0, 0, 0, 0.45); line-height: 1.2; user-select: none; }
+#racks.racks-off, #racks .racks-off { display: none; }
+#racks-head { position: absolute; top: 5.5vh; left: 4vw; line-height: 1.08; }
+#racks-store { font-size: 28px; font-weight: 700; letter-spacing: 0.03em; color: rgba(226, 224, 236, 0.62); }
+#racks-store:not(:empty)::after { content: " /"; }
+#racks-title { font-size: 40px; font-weight: 700; letter-spacing: 0.03em; }
+#racks-cash { position: absolute; top: 5.5vh; right: 4vw; font-size: 34px; font-weight: 800;
+  font-variant-numeric: tabular-nums; }
+#racks-cash.racks-spent { animation: racks-spent 0.9s ease-out; }
+@keyframes racks-spent { 0% { color: #ff5a5a; transform: translateY(-4px); } 100% { color: #fff; transform: none; } }
+
+#racks-item { position: absolute; left: 4vw; bottom: 7vh; max-width: 46vw; }
+#racks-price { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
+#racks-name { font-size: 26px; font-weight: 800; letter-spacing: 0.02em; line-height: 1.15; }
+#racks-colour { font-size: 17px; font-weight: 600; letter-spacing: 0.06em; opacity: 0.85; margin-top: 2px; }
+#racks-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 12px; }
+#racks-swatches i { position: relative; display: flex; align-items: center; justify-content: center; width: 58px;
+  height: 58px; box-sizing: border-box; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.55);
+  background-color: rgba(0, 0, 0, 0.35); font-style: normal; font-size: 20px; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.85); }
+#racks-swatches i.racks-on { border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); color: #fff; }
+#racks-swatches img { position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; max-width: none;
+  object-fit: cover; background-color: rgba(0, 0, 0, 0.35); }
+#racks-status { font-size: 17px; font-weight: 700; letter-spacing: 0.08em; }
+#racks-status.racks-wearing { color: #8fe08a; }
+#racks-status.racks-poor { color: #ff8f8f; }
+
+#racks-keys { position: absolute; right: 4vw; bottom: 7vh; display: flex; flex-direction: row; flex-wrap: nowrap;
+  align-items: center; gap: 26px; white-space: nowrap; }
+#racks-keys div { display: flex; align-items: center; gap: 7px; font-size: 18px; font-weight: 700;
+  letter-spacing: 0.06em; }
+#racks-keys div.racks-dim { opacity: 0.45; }
+#racks-keys kbd { display: inline-block; min-width: 14px; padding: 3px 8px; border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92); color: #111; font: inherit; font-size: 13px; font-weight: 800;
+  text-align: center; text-shadow: none; line-height: 1.25; }
+#racks-keys span { margin-right: 4px; }
+
+#racks-toast { position: absolute; right: 4vw; top: 44vh; padding: 9px 16px; font-size: 20px; font-weight: 800;
+  letter-spacing: 0.06em; background: rgba(0, 0, 0, 0.55); border-left: 3px solid #8fe08a;
+  animation: racks-toast 0.25s ease-out; }
+#racks-toast.racks-failed { border-left-color: #ff5a5a; text-transform: none; font-size: 16px; max-width: 30vw; }
+@keyframes racks-toast { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
