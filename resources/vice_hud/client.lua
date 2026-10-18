@@ -1093,12 +1093,20 @@ RegisterNUICallback('uiReady', function(_, cb)
     cb({ ok = true })
 end)
 
-RegisterCommand('hudminimap', function()
-    minimapOnFoot = not minimapOnFoot
+-- The preference itself: kept, saved, and the map shown or hidden now if on foot. /hudminimap toggles it, and
+-- vi_pausemenu's Settings > Map in Vehicle Only sets it through SetMinimapOnFoot.
+local function setMinimapOnFoot(state)
+    minimapOnFoot = state == true
     SetResourceKvp(KVP_MINIMAP, minimapOnFoot and 'always' or 'hidden')
     if not IsPedInAnyVehicle(cache.ped or PlayerPedId(), false) then
         setRadar(minimapOnFoot or editorOpen)
     end
+end
+exports('GetMinimapOnFoot', function() return minimapOnFoot == true end)
+exports('SetMinimapOnFoot', function(state) setMinimapOnFoot(state) end)
+
+RegisterCommand('hudminimap', function()
+    setMinimapOnFoot(not minimapOnFoot)
     -- Print the live state as well as notifying. When someone says "I set it to
     -- hide and it doesn't", this is the line that separates "the preference did
     -- not take" from "the preference took and something else is overriding it".

@@ -1,0 +1,596 @@
+/* GTA VI's pause menu. Everything is placed in a 16:9 frame in the middle of the screen (an ultrawide gets the
+   frame in its middle, the shade across all of it), in units of that frame: cqw across, cqh down. Sizes were
+   measured on the reference screens at 1280x720, where 1cqh is 7.2px. */
+
+/* GTA Art Deco throughout, vice_hud's three real cuts (one @font-face each, so no weight is ever synthesised):
+   bold for titles, labels and values, medium for the lines under them, regular for typed text. */
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoRegular.ttf') format('truetype');
+    font-weight: 400;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoMedium.ttf') format('truetype');
+    font-weight: 500;
+    font-display: block;
+}
+@font-face {
+    font-family: 'GTAArtDeco';
+    src: url('fonts/GTAArtDecoBold.ttf') format('truetype');
+    font-weight: 700;
+    font-display: block;
+}
+
+:root {
+    --ink: #f4f0ea;
+    --dim: rgba(244, 240, 234, 0.6);
+    --dark: #141418;
+    --row: rgba(26, 26, 32, 0.74);
+    --row-hover: rgba(44, 44, 52, 0.82);
+    --head: 'GTAArtDeco', 'Segoe UI', sans-serif;
+    --text: 'GTAArtDeco', 'Segoe UI', sans-serif;
+}
+
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--text);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+}
+
+#root {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.16s ease, visibility 0s linear 0.16s;
+}
+#root.on {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.16s ease;
+}
+
+/* The game is blurred under it (TriggerScreenblurFadeIn); this darkens it, more at the top and bottom where the
+   writing is. */
+#shade {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(to bottom, rgba(6, 8, 14, 0.55) 0%, rgba(6, 8, 14, 0.2) 22%, rgba(6, 8, 14, 0.2) 74%, rgba(6, 8, 14, 0.62) 100%),
+        rgba(10, 12, 20, 0.42);
+}
+
+#frame {
+    position: relative;
+    width: min(100vw, 177.78vh);
+    height: min(100vh, 56.25vw);
+    container-type: size;
+}
+#frame > * { position: absolute; }
+
+/* -----------------------------------------------------------------------------
+   The top: the title (home) or the game's name over the screen's name (lists); the mode, the character and the logo
+   at the right.
+   -------------------------------------------------------------------------- */
+#head {
+    left: 5cqw;
+    top: 4.6cqh;
+}
+#kicker {
+    display: none;
+    font: 700 2cqh/1 var(--head);
+    letter-spacing: 0.04em;
+    color: var(--dim);
+    margin-bottom: 0.6cqh;
+}
+#heading {
+    font: 700 4.4cqh/1 var(--head);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+/* a long server name stops short of the character's name */
+#head { max-width: 58cqw; }
+#kicker, #heading { overflow: hidden; text-overflow: ellipsis; padding-bottom: 0.2cqh; }
+#root.list #head { left: 5.9cqw; top: 4.4cqh; }
+#root.list #kicker { display: block; }
+#root.list #heading { font-size: 5.6cqh; text-transform: uppercase; }
+
+#who {
+    right: calc(5cqw + 9.6cqh);
+    top: 4.5cqh;
+    text-align: right;
+}
+#mode {
+    font: 700 1.5cqh/1 var(--head);
+    letter-spacing: 0.14em;
+    color: var(--dim);
+    text-transform: uppercase;
+}
+#name {
+    font: 700 3.1cqh/1.05 var(--head);
+    margin-top: 0.3cqh;
+    white-space: nowrap;
+    max-width: 30cqw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#logo {
+    right: 5cqw;
+    top: 3.4cqh;
+    height: 6cqh;
+    filter: drop-shadow(0 0.2cqh 0.6cqh rgba(0, 0, 0, 0.45));
+}
+
+/* -----------------------------------------------------------------------------
+   Home: three rows of tiles, the top two big, then four, then four short ones
+   -------------------------------------------------------------------------- */
+#grid {
+    left: 5cqw;
+    right: 5cqw;
+    top: 15.5cqh;
+    height: 69.5cqh;
+    display: flex;
+    flex-direction: column;
+    gap: 1.67cqh;
+}
+#root.list #grid { display: none; }
+
+.row {
+    display: flex;
+    gap: 0.94cqw;
+    flex: 12 1 0;
+    min-height: 0;
+}
+.row.r1 { flex-grow: 34.4; }
+.row.r2 { flex-grow: 19.7; }
+.row.r3 { flex-grow: 12; }
+
+.tile {
+    position: relative;
+    flex: 1 1 0;
+    overflow: hidden;
+    border-radius: 0.55cqh;
+    background: #1b1c22;
+    cursor: pointer;
+}
+.tile img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: brightness(0.8) saturate(0.95);
+    transform: scale(1.001);
+    transition: transform 0.35s ease, filter 0.2s ease;
+}
+.tile::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.25) 38%, rgba(0, 0, 0, 0) 62%);
+    z-index: 1;
+}
+.row.r3 .tile::before {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.3) 60%, rgba(0, 0, 0, 0.1) 100%);
+}
+/* the chosen tile: a white edge, the picture a little brighter and closer */
+.tile::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 0.32cqh #fff;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    z-index: 3;
+}
+.tile.sel img { filter: none; transform: scale(1.035); }
+.tile.sel::after { opacity: 1; }
+
+/* the label at the bottom left and its line at the bottom right, in one row so they can never run into each other:
+   the line gives way (an ellipsis) when the tile is too narrow for both */
+.tile .cap {
+    position: absolute;
+    left: 1.5cqh;
+    right: 1.5cqh;
+    bottom: 1.3cqh;
+    z-index: 2;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.2cqh;
+    line-height: 1;
+    white-space: nowrap;
+    text-shadow: 0 0.15cqh 0.5cqh rgba(0, 0, 0, 0.55);
+}
+.tile .lbl {
+    flex: 0 0 auto;
+    font: 700 2.7cqh/1 var(--head);
+    letter-spacing: -0.005em;
+}
+.tile .sub {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font: 500 1.7cqh/1 var(--head);
+    color: rgba(255, 255, 255, 0.82);
+}
+.row.r1 .tile .cap { left: 2cqh; right: 2cqh; bottom: 1.8cqh; }
+.row.r1 .tile .lbl { font-size: 3.6cqh; }
+.row.r1 .tile .sub { font-size: 2.1cqh; }
+
+/* -----------------------------------------------------------------------------
+   The list screens
+   -------------------------------------------------------------------------- */
+#list,
+#preview { display: none; }
+#root.list #list,
+#root.list #preview { display: block; }
+
+#list {
+    left: 5.9cqw;
+    width: 28.3cqw;
+    top: 19.6cqh;
+    height: 64.5cqh;
+    overflow: hidden;
+}
+#rows { position: relative; }
+
+.lrow {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.4cqh;
+    height: 5.7cqh;
+    margin-bottom: 0.5cqh;
+    padding: 0 1.8cqh;
+    box-sizing: border-box;
+    border-radius: 0.35cqh;
+    background: var(--row);
+    font: 700 2.7cqh/1 var(--head);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    cursor: pointer;
+    overflow: hidden;
+}
+.lrow:hover { background: var(--row-hover); }
+.lrow.sel { background: var(--ink); color: var(--dark); }
+.lrow .l {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.lrow .v {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.9cqh;
+    max-width: 60%;
+    white-space: nowrap;
+}
+.lrow .vt { overflow: hidden; text-overflow: ellipsis; }
+.lrow .arr {
+    display: none;
+    width: 1.6cqh;
+    height: 1.6cqh;
+    cursor: pointer;
+}
+.lrow .arr path { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.lrow.sel.change .arr { display: block; }
+/* an action row (Key Bindings, Game Settings) opens something: a chevron where the value goes */
+.lrow.action .v::after {
+    content: '';
+    width: 0.9cqh;
+    height: 0.9cqh;
+    border-right: 0.32cqh solid currentColor;
+    border-top: 0.32cqh solid currentColor;
+    transform: rotate(45deg);
+    margin-right: 0.4cqh;
+    opacity: 0.8;
+}
+/* a stat's level along the bottom of its row */
+.lrow .bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 0.38cqh;
+    background: rgba(255, 255, 255, 0.12);
+}
+.lrow .bar b {
+    display: block;
+    height: 100%;
+    background: #f06a9e;
+}
+.lrow.sel .bar { background: rgba(0, 0, 0, 0.12); }
+
+/* the report's subject line, typed into its row */
+.lrow input {
+    flex: 0 1 62%;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: inherit;
+    font: 500 2.2cqh/1 var(--text);
+    text-transform: none;
+    text-align: right;
+    padding: 0;
+}
+.lrow input::placeholder { color: currentColor; opacity: 0.45; }
+
+.lrow.empty { background: transparent; color: var(--dim); cursor: default; }
+
+/* the picture and the line about the chosen row */
+#preview {
+    left: 37.6cqw;
+    width: 56.2cqw;
+    top: 19.6cqh;
+}
+#pic {
+    position: relative;
+    width: 100%;
+    height: 42.2cqh;
+    border-radius: 0.55cqh;
+    background: #1b1c22 center / cover no-repeat;
+    overflow: hidden;
+}
+#pic::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 0.1cqh rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+}
+#report-text {
+    display: none;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 2.4cqh 2.6cqh;
+    border: 0;
+    outline: 0;
+    resize: none;
+    background: rgba(20, 20, 26, 0.86);
+    color: var(--ink);
+    font: 400 2.4cqh/1.45 var(--text);
+}
+#report-text::placeholder { color: var(--dim); }
+#preview.typing #report-text { display: block; }
+
+#pv-title {
+    margin-top: 2.6cqh;
+    font: 700 3.4cqh/1 var(--head);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+#pv-bar {
+    display: none;
+    margin-top: 1.4cqh;
+    width: 46%;
+    height: 0.7cqh;
+    border-radius: 0.35cqh;
+    background: rgba(255, 255, 255, 0.16);
+    overflow: hidden;
+}
+#pv-bar b { display: block; height: 100%; background: #f06a9e; }
+#preview.has-bar #pv-bar { display: block; }
+#pv-desc {
+    margin-top: 1.2cqh;
+    max-width: 92%;
+    font: 500 2.3cqh/1.4 var(--text);
+    color: var(--dim);
+}
+
+/* -----------------------------------------------------------------------------
+   The bottom: the day and time and the money at the left, the keys at the right
+   -------------------------------------------------------------------------- */
+#stats {
+    left: 5cqw;
+    bottom: 4.2cqh;
+    display: flex;
+    gap: 3.6cqh;
+}
+#root.list #stats { left: 5.9cqw; }
+.stat .k {
+    font: 700 1.55cqh/1 var(--head);
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    text-transform: uppercase;
+}
+.stat .v {
+    margin-top: 0.5cqh;
+    font: 700 3.1cqh/1 var(--head);
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.prompts {
+    display: flex;
+    align-items: center;
+    gap: 2.8cqh;
+}
+#prompts {
+    right: 5cqw;
+    bottom: 4.5cqh;
+}
+.pr {
+    display: flex;
+    align-items: center;
+    gap: 0.9cqh;
+    font: 700 2.15cqh/1 var(--head);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.pr:hover { opacity: 0.8; }
+
+.glyph {
+    width: 3.1cqh;
+    height: 3.1cqh;
+    flex: 0 0 auto;
+    overflow: visible;
+    filter: drop-shadow(0 0.12cqh 0.2cqh rgba(0, 0, 0, 0.45));
+}
+.g-face { fill: var(--ink); }
+.g-ink { fill: none; stroke: #1f2126; stroke-width: 2.7; stroke-linecap: round; stroke-linejoin: round; }
+.g-ink.g-t { stroke-width: 1.9; }
+.g-solid { fill: #1f2126; }
+.g-text {
+    fill: #1f2126;
+    font-family: 'Bahnschrift', 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+}
+
+/* -----------------------------------------------------------------------------
+   Disconnect's question, and a line that comes and goes
+   -------------------------------------------------------------------------- */
+#confirm {
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(4, 5, 9, 0.6);
+    z-index: 10;
+}
+#confirm.on { display: flex; }
+#confirm .box {
+    min-width: 40cqh;
+    padding: 4cqh 5cqh 3.6cqh;
+    border-radius: 0.6cqh;
+    background: rgba(22, 22, 28, 0.94);
+    box-shadow: 0 1cqh 4cqh rgba(0, 0, 0, 0.5);
+    text-align: center;
+}
+.c-title {
+    font: 700 5cqh/1 var(--head);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+.c-text {
+    margin: 1.6cqh 0 3.4cqh;
+    font: 500 2.4cqh/1.4 var(--text);
+    color: var(--dim);
+}
+#confirm .prompts { justify-content: center; }
+
+#toast {
+    left: 50%;
+    bottom: 13cqh;
+    transform: translate(-50%, 1cqh);
+    padding: 1.3cqh 2.4cqh;
+    border-radius: 0.5cqh;
+    background: rgba(22, 22, 28, 0.92);
+    font: 500 2.2cqh/1 var(--text);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+    z-index: 11;
+}
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+/* -----------------------------------------------------------------------------
+   The map: the game's own, with GTA VI's dark blue bars over its top and bottom
+   -------------------------------------------------------------------------- */
+#map {
+    position: fixed;
+    inset: 0;
+    display: none;
+    pointer-events: none;
+}
+#map.on { display: block; }
+#map .bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+}
+#map .bar.top {
+    top: 0;
+    height: min(17vh, 9.56vw);
+    background: linear-gradient(to bottom, rgba(12, 28, 44, 0.94), rgba(14, 32, 50, 0.86));
+}
+#map .bar.bottom {
+    bottom: 0;
+    height: min(12vh, 6.75vw);
+    background: linear-gradient(to top, rgba(12, 28, 44, 0.95), rgba(14, 32, 50, 0.88));
+}
+.mframe {
+    position: relative;
+    width: min(100vw, 177.78vh);
+    height: 100%;
+    container-type: size;
+}
+.m-head {
+    position: absolute;
+    left: 5cqw;
+    top: 50%;
+    transform: translateY(-46%);
+}
+.m-title {
+    font: 700 31cqh/1 var(--head);
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+}
+.m-loc {
+    margin-top: 6cqh;
+    font: 700 14cqh/1 var(--head);
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.m-who {
+    position: absolute;
+    right: calc(5cqw + 55cqh);
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: right;
+}
+.m-mode {
+    font: 700 9cqh/1 var(--head);
+    letter-spacing: 0.14em;
+    color: var(--dim);
+    text-transform: uppercase;
+}
+.m-name {
+    margin-top: 2cqh;
+    font: 700 18cqh/1 var(--head);
+}
+.m-logo {
+    position: absolute;
+    right: 5cqw;
+    top: 50%;
+    height: 36cqh;
+    transform: translateY(-50%);
+}
+#map-prompts {
+    position: absolute;
+    right: 5cqw;
+    top: 50%;
+    transform: translateY(-50%);
+    gap: 22cqh;
+}
+#map .pr { font-size: 17cqh; gap: 7cqh; }
+#map .glyph { width: 25cqh; height: 25cqh; }

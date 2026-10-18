@@ -213,6 +213,8 @@ exports.vice_hud:ClearWantedTellOverrides(source)
 exports.vice_hud:SetHudVisible(visible)
 exports.vice_hud:SetHudOffsetX(pixels)
 exports.vice_hud:GetHudOffset(element)             -- returns x, y
+exports.vice_hud:GetMinimapOnFoot()                -- /hudminimap's choice: true = the map on foot too
+exports.vice_hud:SetMinimapOnFoot(state)           -- set it (saved, as /hudminimap does)
 
 exports.vice_hud:AddSkillXp(id, amount)
 exports.vice_hud:GetSkill(id)                      -- { id, xp, level, into, need, frac }
