@@ -50,6 +50,10 @@ CyberLeek's videos and GTA VI Extended Look.
 | BuckMe card, back | Pay a contact |
 | ![lb-phone BuckMe, BuckBot support chat](docs/screenshots/buckbot-help.png) | ![qbx_relog character switcher](docs/screenshots/character-switcher.png) |
 | BuckBot support chat | `qbx_relog`: hold-to-switch character strip |
+| ![vi_pausemenu home screen](resources/vi_pausemenu/docs/home.jpg) | ![vi_pausemenu settings](resources/vi_pausemenu/docs/settings.jpg) |
+| `vi_pausemenu`: the GTA VI pause menu | Its settings screen |
+| ![vi_pausemenu stats](resources/vi_pausemenu/docs/stats.jpg) | ![vi_pausemenu map bars](resources/vi_pausemenu/docs/map.jpg) |
+| Stats, from vice_hud's skills | The bars over the game's own map |
 
 > [!NOTE]
 > Screenshots of `gk_pausemenu` are pending — the ones that used to be here
@@ -149,6 +153,21 @@ included here.
   live blip scan instead of the native hand-off above) has been retired to
   [`resources/_retired/gk_pausemenu`](resources/_retired/gk_pausemenu) and
   is no longer maintained.
+
+- **`vi_pausemenu`**: The pause menu as GTA VI's: a grid of picture tiles
+  (Map, Brief, Stats, Rockstar Editor, Game, Settings, Players, Report,
+  Discord, Disconnect) over the live game, blurred by the game's own screen
+  blur, with the server's name at the top left, the character's name at the
+  top right and the day, time, cash and bank along the bottom, all in GTA Art
+  Deco. Settings, Brief, Stats, Players and Report are GTA VI's list-and-picture
+  screens. The map and the game's settings are the game's own screens, the map
+  with its header stripped and GTA VI's bars laid over it. Its settings read
+  and write the resources they belong to (`vi_crashcam`, `vi_radio`,
+  `vice_hud`'s minimap). Takes over ESC the same way `gk_pausemenu` does, so
+  run one of the two, not both. No hard dependency; see
+  [`resources/vi_pausemenu/README.md`](resources/vi_pausemenu/README.md). The
+  tile pictures are stills from Rockstar's GTA VI footage (the pictures above
+  are from its browser preview, over a still standing in for the game).
 
 - **`qbx_relog`**: Singleplayer-style character switching. `/relog` still
   works as before (confirmation, anti-combat-log wait, back to the
@@ -318,7 +337,7 @@ its own.
 ## Installing (drag-and-drop resources)
 
 1. Copy `resources/vice_hud`, `resources/um_gigs`,
-   `resources/qbx_vehiclekeys`, `resources/gk_pausemenu`,
+   `resources/qbx_vehiclekeys`, `resources/vi_pausemenu` (or `resources/gk_pausemenu`),
    `resources/qbx_relog`, `resources/vi_radio`,
    `resources/gk_basketball`, `resources/vi_crashcam`,
    `resources/vi_binoculars`, `resources/vi_wasted`,
@@ -330,7 +349,7 @@ its own.
    ensure vice_hud
    ensure um_gigs
    ensure qbx_vehiclekeys
-   ensure gk_pausemenu
+   ensure vi_pausemenu   # or gk_pausemenu: one pause menu, not both
    ensure qbx_relog
    ensure vi_radio
    ensure gk_basketball
@@ -363,6 +382,9 @@ its own.
      (without it the car is just painted white).
    - `qbx_vehiclekeys` needs **qbx_core**, **ox_target**, **ox_inventory**.
      Its Slim Jim ring only shows up while `vice_hud` is also running.
+   - `vi_pausemenu` has no hard dependency. With **qbx_core** it shows the
+     character's name, money and brief; with `vice_hud` its Stats tile and
+     minimap setting.
    - `gk_pausemenu` needs **ox_lib**.
    - `qbx_relog` needs **ox_lib** and **qbx_core**, and won't run at all
      without the `patches/qbx_core` hand-edit below applied first. See
