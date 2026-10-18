@@ -69,8 +69,27 @@
         return 1;
     };
 
+    // The face: in game a pedheadshot from nui-img; here a crop of Lucia from the Game tile's still (?face=0: none,
+    // to see the initials), handed to the page the same way, as a "txd" it fetches.
+    var faceData = null;
+    window.VIPM_FACE_URL = function () { return faceData; };
+    function sendFace() {
+        if (q.get('face') === '0') return;
+        var still = new Image();
+        still.onload = function () {
+            var c = document.createElement('canvas');
+            c.width = 220;
+            c.height = 248;
+            c.getContext('2d').drawImage(still, 452, 168, 206, 232, 0, 0, 220, 248);
+            faceData = c.toDataURL('image/png');
+            send({ type: 'mugshot', txd: 'preview' });
+        };
+        still.src = 'img/game.webp';
+    }
+
     function send(msg) { window.postMessage(msg, '*'); }
     window.addEventListener('load', function () {
+        sendFace();
         if (q.get('map')) {
             send({ type: 'map', show: true, location: 'Vespucci Beach', mode: 'ONLINE', name: 'Lucia Caminos' });
             return;

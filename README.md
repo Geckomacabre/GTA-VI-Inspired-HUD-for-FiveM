@@ -157,9 +157,9 @@ included here.
 - **`vi_pausemenu`**: The pause menu as GTA VI's: a grid of picture tiles
   (Map, Brief, Stats, Rockstar Editor, Game, Settings, Players, Report,
   Discord, Disconnect) over the live game, blurred by the game's own screen
-  blur, with the server's name at the top left, the character's name at the
-  top right and the day, time, cash and bank along the bottom, all in GTA Art
-  Deco. Settings, Brief, Stats, Players and Report are GTA VI's list-and-picture
+  blur, with the day, time, cash and bank at the top left, the character's
+  name and face (a live headshot, like `qbx_relog`'s cards) at the top right
+  and the server's name at the bottom left, all in GTA Art Deco. Settings, Brief, Stats, Players and Report are GTA VI's list-and-picture
   screens. The map and the game's settings are the game's own screens, the map
   with its header stripped and GTA VI's bars laid over it. Its settings read
   and write the resources they belong to (`vi_crashcam`, `vi_radio`,

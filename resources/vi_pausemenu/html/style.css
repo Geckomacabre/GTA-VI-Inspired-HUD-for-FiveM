@@ -81,34 +81,46 @@ html, body {
 #frame > * { position: absolute; }
 
 /* -----------------------------------------------------------------------------
-   The top: the title (home) or the game's name over the screen's name (lists); the mode, the character and the logo
-   at the right.
+   The top: the day and time and the money at the left (a list screen's name under them); the mode, the character's
+   name and the character's face at the right.
    -------------------------------------------------------------------------- */
-#head {
+#stats {
     left: 5cqw;
-    top: 4.6cqh;
+    top: 4.4cqh;
+    display: flex;
+    gap: 3.6cqh;
 }
-#kicker {
-    display: none;
-    font: 700 2cqh/1 var(--head);
-    letter-spacing: 0.04em;
+#root.list #stats { left: 5.9cqw; }
+.stat .k {
+    font: 700 1.55cqh/1 var(--head);
+    letter-spacing: 0.1em;
     color: var(--dim);
-    margin-bottom: 0.6cqh;
+    text-transform: uppercase;
 }
-#heading {
-    font: 700 4.4cqh/1 var(--head);
+.stat .v {
+    margin-top: 0.5cqh;
+    font: 700 3.1cqh/1 var(--head);
     letter-spacing: 0.01em;
     white-space: nowrap;
 }
-/* a long server name stops short of the character's name */
-#head { max-width: 58cqw; }
-#kicker, #heading { overflow: hidden; text-overflow: ellipsis; padding-bottom: 0.2cqh; }
-#root.list #head { left: 5.9cqw; top: 4.4cqh; }
-#root.list #kicker { display: block; }
-#root.list #heading { font-size: 5.6cqh; text-transform: uppercase; }
+
+#heading {
+    display: none;
+    left: 5.9cqw;
+    top: 11.2cqh;
+    max-width: 58cqw;
+    font: 700 5.6cqh/1 var(--head);
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-bottom: 0.2cqh;
+}
+#root.list #heading { display: block; }
 
 #who {
-    right: calc(5cqw + 9.6cqh);
+    right: calc(5cqw + 8.4cqh);
     top: 4.5cqh;
     text-align: right;
 }
@@ -126,11 +138,42 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-#logo {
+
+/* The character's face: a portrait card like the character switcher's, the pedheadshot cropped so the face sits in
+   the middle rather than the hairline; the initials until the picture comes, or if it never does. */
+.mug {
+    overflow: hidden;
+    border-radius: 0.6cqh;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(0, 0, 0, 0.14) 100%),
+        linear-gradient(155deg, #5c5662, #2a2730);
+    box-shadow: 0 0.25cqh 0.7cqh rgba(0, 0, 0, 0.46), inset 0 0 0 0.1cqh rgba(255, 255, 255, 0.22);
+}
+.mug img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 18%;
+}
+.mug img[hidden] { display: none; }
+.mug .initials {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: 500 2.4cqh/1 var(--head);
+    letter-spacing: 0.06em;
+    color: var(--dim);
+}
+.mug.has-face .initials { display: none; }
+#mug {
     right: 5cqw;
     top: 3.4cqh;
-    height: 6cqh;
-    filter: drop-shadow(0 0.2cqh 0.6cqh rgba(0, 0, 0, 0.45));
+    width: 6.6cqh;
+    height: 7.4cqh;
 }
 
 /* -----------------------------------------------------------------------------
@@ -402,27 +445,20 @@ html, body {
 }
 
 /* -----------------------------------------------------------------------------
-   The bottom: the day and time and the money at the left, the keys at the right
+   The bottom: the server's name at the left (a long one stops short of the keys), the keys at the right
    -------------------------------------------------------------------------- */
-#stats {
+#title {
     left: 5cqw;
     bottom: 4.2cqh;
-    display: flex;
-    gap: 3.6cqh;
-}
-#root.list #stats { left: 5.9cqw; }
-.stat .k {
-    font: 700 1.55cqh/1 var(--head);
-    letter-spacing: 0.1em;
-    color: var(--dim);
-    text-transform: uppercase;
-}
-.stat .v {
-    margin-top: 0.5cqh;
-    font: 700 3.1cqh/1 var(--head);
+    max-width: 58cqw;
+    font: 700 4cqh/1 var(--head);
     letter-spacing: 0.01em;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-bottom: 0.2cqh;
 }
+#root.list #title { left: 5.9cqw; }
 
 .prompts {
     display: flex;
@@ -563,7 +599,7 @@ html, body {
 }
 .m-who {
     position: absolute;
-    right: calc(5cqw + 55cqh);
+    right: calc(5cqw + 47cqh);
     top: 50%;
     transform: translateY(-50%);
     text-align: right;
@@ -578,13 +614,15 @@ html, body {
     margin-top: 2cqh;
     font: 700 18cqh/1 var(--head);
 }
-.m-logo {
+#map-mug {
     position: absolute;
     right: 5cqw;
     top: 50%;
-    height: 36cqh;
+    width: 39cqh;
+    height: 44cqh;
     transform: translateY(-50%);
 }
+#map-mug .initials { font-size: 14cqh; }
 #map-prompts {
     position: absolute;
     right: 5cqw;

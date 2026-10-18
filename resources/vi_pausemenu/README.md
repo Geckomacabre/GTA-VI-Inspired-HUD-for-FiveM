@@ -1,8 +1,9 @@
 # vi_pausemenu
 
 The pause menu as GTA VI's. ESC, P or a pad's Start opens a grid of picture tiles over the blurred game, the way
-GTA VI's own pause menu looks: the server's name at the top left, the mode and the character's name and the VI logo
-at the top right, the day and time, the cash and the bank at the bottom left, the keys at the bottom right.
+GTA VI's own pause menu looks: the day and time, the cash and the bank at the top left; the mode, the character's name
+and the character's face at the top right; the server's name at the bottom left and the keys, each word then its key,
+at the bottom right.
 
 ![The home screen](docs/home.jpg)
 
@@ -29,6 +30,14 @@ about the chosen row on the right.
 
 (Pictured in the browser preview, `tools/serve.py`, over a blurred still standing in for the game; the map picture
 shows where the bars sit, with a still where the game's own map goes.)
+
+## The character's face
+
+A transparent pedheadshot of the player's own ped, taken each time the menu opens, on a portrait card like the
+character switcher's (`qbx_relog`) and the honor panel's; the same face is on the map's top bar. The game has one slot
+for these pictures, so the slot is borrowed, never held: the page copies the picture out of `nui-img` and the slot is
+let go at once (after five seconds at most, whatever happens). The character's initials show until the picture comes,
+or if the game refuses one.
 
 ## Install
 
@@ -82,7 +91,7 @@ A UI that disables control 200 while it is up (the ATM, the phone's games, the c
 ## Pictures and type
 
 In game the menu sits over the live game, blurred by the game's own screen blur; nothing is drawn behind it but a
-dark tint. The tile and setting pictures (`html/img`) are stills from Rockstar's GTA VI footage; the logo is GTA VI's. The type is
+dark tint. The tile and setting pictures (`html/img`) are stills from Rockstar's GTA VI footage. The type is
 GTA Art Deco throughout, the same three cuts vice_hud ships (`html/fonts`): bold for titles, labels and values, medium
 for the lines under them, regular for typed text.
 
@@ -90,9 +99,9 @@ for the lines under them, regular for typed text.
 
 - `node tools/run.js` — the client and server on a small FiveM (`tools/mock.lua`, `tools/check.lua`): opening and
   closing, the reopen cooldown, the tiles, every settings row against its export, the brief, stats and players, the
-  map and settings hand-offs, the editor, reports (rate limit, webhook), disconnect, classic mode. Uses vice_hud's
+  map and settings hand-offs, the face's headshot slot, the editor, reports (rate limit, webhook), disconnect, classic mode. Uses vice_hud's
   fengari (`npm i jsdom fengari` in `vice_hud`, as its README says).
-- `python tools/mutate.py` — breaks the code in 25 ways; each must make the checks fail.
+- `python tools/mutate.py` — breaks the code in 29 ways; each must make the checks fail.
 - `python tools/serve.py` — the page in a browser with `tools/stub.js` standing in for the client
   (`?screen=settings|brief|stats|players|report`, `?map=1`).
 - `python tools/shots.py` — the pictures in `docs/`, from `serve.py`'s page (Python Playwright).

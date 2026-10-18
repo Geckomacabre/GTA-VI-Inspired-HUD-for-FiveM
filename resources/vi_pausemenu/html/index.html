@@ -10,15 +10,18 @@
     <div id="root">
         <div id="shade"></div>
         <div id="frame">
-            <div id="head">
-                <div id="kicker"></div>
-                <div id="heading"></div>
+            <div id="stats">
+                <div class="stat"><div class="k" id="st-day"></div><div class="v" id="st-time"></div></div>
+                <div class="stat"><div class="k">Cash</div><div class="v" id="st-cash"></div></div>
+                <div class="stat"><div class="k">Bank</div><div class="v" id="st-bank"></div></div>
             </div>
+            <div id="heading"></div>
             <div id="who">
                 <div id="mode"></div>
                 <div id="name"></div>
             </div>
-            <img id="logo" src="img/vi_logo.png" alt="">
+            <!-- the character's face, as the character switcher and the honor panel show it; initials until it comes -->
+            <div id="mug" class="mug"><span class="initials"></span><img alt="" hidden></div>
 
             <!-- home: the tiles -->
             <div id="grid"></div>
@@ -32,11 +35,7 @@
                 <div id="pv-desc"></div>
             </div>
 
-            <div id="stats">
-                <div class="stat"><div class="k" id="st-day"></div><div class="v" id="st-time"></div></div>
-                <div class="stat"><div class="k">Cash</div><div class="v" id="st-cash"></div></div>
-                <div class="stat"><div class="k">Bank</div><div class="v" id="st-bank"></div></div>
-            </div>
+            <div id="title"></div>
             <div id="prompts" class="prompts"></div>
 
             <div id="confirm">
@@ -62,7 +61,7 @@
                     <div class="m-mode" id="map-mode"></div>
                     <div class="m-name" id="map-name"></div>
                 </div>
-                <img class="m-logo" src="img/vi_logo.png" alt="">
+                <div id="map-mug" class="mug"><span class="initials"></span><img alt="" hidden></div>
             </div>
         </div>
         <div class="bar bottom">
