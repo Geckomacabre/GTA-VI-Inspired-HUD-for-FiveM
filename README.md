@@ -111,6 +111,15 @@ included here.
   [KnoWay](https://github.com/Geckomacabre/KnoWay-Autonomous-Vehicles), for
   the same paint and livery as the KnoWays in traffic.
 
+- **`peekhole`**: Peekhole, GTA VI's subscription-content app (it was
+  LonelyMans), as an `lb-phone` App Store app. Creators set a subscription
+  price, post photos and videos with optional unlock prices, and go live;
+  fans pay from their bank account, and the creator keeps 80%. Players can
+  sign in with their Trendy, InstaPic or Birdy account. Coming from
+  LonelyMans, it keeps the same database tables, so nothing is lost; see its
+  own `README.md`. Depends on `qb-core` (or `qbx_core`'s bridge), `oxmysql`,
+  `lb-phone`.
+
 - **Honor** (part of `vice_hud` now, in `vice_hud/honor/`; it was the
   separate `qbx_honor` resource, and `vice_hud` still answers to that
   name): An RDR2-style persistent honor stat, purpose-built to
@@ -365,7 +374,7 @@ its own.
 
 ## Installing (drag-and-drop resources)
 
-1. Copy `resources/vice_hud`, `resources/um_gigs`,
+1. Copy `resources/vice_hud`, `resources/um_gigs`, `resources/peekhole`,
    `resources/qbx_vehiclekeys`, `resources/vi_pausemenu` (or `resources/gk_pausemenu`),
    `resources/qbx_relog`, `resources/vi_radio`,
    `resources/gk_basketball`, `resources/vi_crashcam`,
@@ -378,6 +387,7 @@ its own.
    ```
    ensure vice_hud
    ensure um_gigs
+   ensure peekhole
    ensure qbx_vehiclekeys
    ensure vi_pausemenu   # or gk_pausemenu: one pause menu, not both
    ensure qbx_relog
@@ -391,6 +401,9 @@ its own.
    ensure streetkings_audio
    ensure sk_streetkings
    ```
+   On start, `vice_hud` checks this repository's releases and says in the
+   server console whether a newer one is out, with its link
+   (`Config.UpdateCheck = false` to skip it).
    `vice_hud` goes first because it stands in for `ox_target` (and for
    `osm-target` and `qbx_honor`), which several of the others wait for.
    If you ran `osm-target`, `ox_target`, `qb-target`, `qtarget` or
@@ -411,6 +424,8 @@ its own.
      Optional: [KnoWay](https://github.com/Geckomacabre/KnoWay-Autonomous-Vehicles),
      installed as a folder named `knoway`, for the AI pickup's KnoWay livery
      (without it the car is just painted white).
+   - `peekhole` needs **qb-core** (`qbx_core`'s bridge is enough),
+     **oxmysql**, **lb-phone**. Replaces `lonelymans`: run one, not both.
    - `qbx_vehiclekeys` needs **qbx_core**, **ox_target**, **ox_inventory**.
      Its Slim Jim ring only shows up while `vice_hud` is also running.
    - `vi_pausemenu` has no hard dependency. With **qbx_core** it shows the

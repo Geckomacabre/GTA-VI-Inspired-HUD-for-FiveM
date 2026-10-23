@@ -2926,10 +2926,17 @@ local function getWantedTells(wanted)
         return {}
     end
 
+    local ped = cache.ped or PlayerPedId()
+
+    -- Wanted inside a building: it has CCTV, so the police have you on
+    -- camera. Latched like any other sighting, until the stars are gone.
+    if Config.WantedIndoorCameras ~= false and GetInteriorFromEntity(ped) ~= 0 then
+        tellSightings.camera.indoors = true
+    end
+
     local out = {}
     if tellOverrides.camera or next(tellSightings.camera) then out[#out + 1] = 'camera' end
 
-    local ped = cache.ped or PlayerPedId()
     local _, wep = GetCurrentPedWeapon(ped, true)
     if wep and wep ~= `WEAPON_UNARMED` then out[#out + 1] = 'weapon' end
 
@@ -3650,7 +3657,13 @@ local function defaultPoliceTune()
         -- 'edges'  four strips, tracking bearing
         -- 'radius' one lamp pair that tracks the exact bearing around the screen's perimeter
         -- 'custom' one lamp pair pinned exactly where you put it, ignoring bearing entirely
-        mode         = 'edges',
+        --          (the GTA VI row has no pinned form, so it tracks the bearing as in radius)
+        mode         = 'radius',
+        -- 'round'  GTA VI's row of lights rising from the edge (sprite frames)
+        -- 'wide'   the classic soft lamps the sliders below shape
+        shape        = 'round',
+        size         = 100,   -- GTA VI row size, % (60-140)
+        arrow        = true,  -- GTA VI's police arrow round the middle of the screen
         maxOpacity   = Config.PoliceLights.maxOpacity,
         flashMs      = Config.PoliceLights.flashMs,
         white        = Config.PoliceLights.white ~= false,
@@ -3715,6 +3728,13 @@ local function pushPoliceUi(active, extra)
         softness = PoliceTune.softness,
         sweepAmt = PoliceTune.sweepAmt,
         sweepMs  = PoliceTune.sweepMs,
+        shape      = PoliceTune.shape or 'round',
+        size       = PoliceTune.size or 100,
+        arrowOn    = PoliceTune.arrow ~= false,
+        maxOpacity = PoliceTune.maxOpacity,
+        nearSize     = Config.PoliceLights.nearSize or 19.0,
+        farSize      = Config.PoliceLights.farSize or 8.0,
+        roundOpacity = Config.PoliceLights.roundOpacity or 1.0,
     }
     if type(extra) == 'table' then
         for k, v in pairs(extra) do payload[k] = v end
@@ -3723,7 +3743,10 @@ local function pushPoliceUi(active, extra)
 end
 
 local function clearPoliceUi()
-    pushPoliceUi(false, { edges = { top = 0.0, right = 0.0, bottom = 0.0, left = 0.0 }, strength = 0.0 })
+    pushPoliceUi(false, {
+        edges = { top = 0.0, right = 0.0, bottom = 0.0, left = 0.0 }, strength = 0.0,
+        arrow = { seen = false },
+    })
 end
 
 local function edgeWeights(rel, out)
@@ -3749,10 +3772,15 @@ local function perimeterPoint(relDeg)
     return 50.0 + dx * t * 50.0, 50.0 + dy * t * 50.0
 end
 
+local ignoredSirenModels = {}
+for _, name in ipairs(Config.PoliceLights.ignoreModels or {}) do
+    ignoredSirenModels[joaat(name)] = true
+end
+
 --- Shared detection math: walks active police sirens in range and calls
---- `fn(rel, strength)` for each one that's actually lighting something up.
---- Both scan modes below are just different ways of combining these calls —
---- the range, falloff and "which vehicles count" logic only lives here once.
+--- `fn(rel, strength, dist)` for each one that's actually lighting something
+--- up. The scan below combines these calls for every mode and shape — the
+--- range, falloff and "which vehicles count" logic only lives here once.
 local function forEachSiren(fn)
     local cfg = Config.PoliceLights
     local ped = cache.ped or PlayerPedId()
@@ -3766,7 +3794,7 @@ local function forEachSiren(fn)
     local fullDist = math.min(PoliceTune.fullDistance or cfg.fullDistance, maxDist - 1)
 
     for _, vehicle in ipairs(GetGamePool('CVehicle')) do
-        if cfg.classes[GetVehicleClass(vehicle)] then
+        if cfg.classes[GetVehicleClass(vehicle)] and not ignoredSirenModels[GetEntityModel(vehicle)] then
             if (not cfg.requireSiren) or IsVehicleSirenOn(vehicle) then
                 local vx, vy = table.unpack(GetEntityCoords(vehicle))
                 local dist = #(vector2(px, py) - vector2(vx, vy))
@@ -3780,45 +3808,106 @@ local function forEachSiren(fn)
                         t = 1.0 - ((dist - fullDist) / (maxDist - fullDist))
                     end
                     local strength = math.max(0.0, math.min(1.0, t)) * PoliceTune.maxOpacity
-                    if strength > 0.0 then fn(rel, strength) end
+                    if strength > 0.0 then fn(rel, strength, dist) end
                 end
             end
         end
     end
 end
 
---- Edges mode: strongest siren per edge wins; a single glow per edge reads
---- more clearly than summing several.
-local function scanPoliceLightsEdges()
-    local edges = { top = 0.0, right = 0.0, bottom = 0.0, left = 0.0 }
+--- One pass over the sirens, combined every way the modes need:
+---   edges     strongest siren per edge wins; a single glow per edge reads
+---             more clearly than summing several.
+---   strongest only the single strongest siren positions radius mode's lamp
+---             and the arrow — averaging bearings from two different sirens
+---             would put the light somewhere neither of them actually is.
+---   nearest   sizes the GTA VI row, so you can tell how close they are.
+local function scanPolice()
+    local s = {
+        edges = { top = 0.0, right = 0.0, bottom = 0.0, left = 0.0 },
+        strength = 0.0, rel = 0.0, dist = 0.0, nearest = math.huge, found = false,
+    }
     local weights = { top = 0.0, right = 0.0, bottom = 0.0, left = 0.0 }
-    local found = false
 
-    forEachSiren(function(rel, strength)
-        found = true
+    forEachSiren(function(rel, strength, dist)
+        s.found = true
+        if strength > s.strength or (strength == s.strength and dist < s.dist) then
+            s.strength, s.rel, s.dist = strength, rel, dist
+        end
+        if dist < s.nearest then s.nearest = dist end
         edgeWeights(rel, weights)
         for edge, w in pairs(weights) do
             local v = strength * w
-            if v > edges[edge] then edges[edge] = v end
+            if v > s.edges[edge] then s.edges[edge] = v end
         end
     end)
 
-    return edges, found
+    return s
 end
 
---- Radius mode: only the single strongest siren gets to position the lamp —
---- averaging bearings from two different sirens would put the light
---- somewhere neither of them actually is.
-local function scanPoliceLightsRadius()
-    local bestStrength, bestRel, found = 0.0, 0.0, false
+local function clamp01(v)
+    return v < 0.0 and 0.0 or (v > 1.0 and 1.0 or v)
+end
 
-    forEachSiren(function(rel, strength)
-        if strength > bestStrength then
-            bestStrength, bestRel, found = strength, rel, true
+--- Cop on foot within `range` of the player. The arrow goes once the police
+--- are beside you, and a cop who got out of the car is the police as much as
+--- the car is. Ped types 6 (cop) and 27 (swat).
+local function nearestCopOnFoot(range)
+    local ped = cache.ped or PlayerPedId()
+    local pos = GetEntityCoords(ped)
+    local best = math.huge
+    for _, other in ipairs(GetGamePool('CPed')) do
+        if other ~= ped and not IsEntityDead(other) then
+            local t = GetPedType(other)
+            if t == 6 or t == 27 then
+                local d = #(GetEntityCoords(other) - pos)
+                if d < range and d < best then best = d end
+            end
         end
-    end)
+    end
+    return best
+end
 
-    return bestRel, bestStrength, found
+-- Held between scans so the arrow does not flicker on and off when the
+-- police hover right at arrowGone: it goes inside arrowGone and only comes
+-- back once they are 2 m further out.
+local arrowBeside = false
+
+--- What the GTA VI row and the arrow need from a scan, on top of the
+--- classic lamps' payload: the strongest siren's bearing, how big the row is
+--- (`near`, 0 = farSize .. 1 = nearSize), and how full and whether the arrow
+--- shows. The NUI smooths all of it between scans.
+local function viPoliceExtra(s)
+    local cfg = Config.PoliceLights
+    local maxDist = PoliceTune.maxDistance or cfg.maxDistance
+    local extra = { rel = s.rel }
+    if not s.found then
+        extra.arrow = { seen = false }
+        return extra
+    end
+
+    local tall, short = cfg.tallDistance or 5.0, cfg.shortDistance or 60.0
+    short = math.max(short, tall + 1.0)
+    extra.near = clamp01((short - s.nearest) / (short - tall))
+
+    local gone = cfg.arrowGone or 8.0
+    local full = math.max(gone, cfg.arrowFull or 15.0)
+    local closest = s.dist
+    if PoliceTune.arrow ~= false then
+        closest = math.min(closest, nearestCopOnFoot(gone + 2.0))
+    end
+    if closest < gone then
+        arrowBeside = true
+    elseif closest > gone + 2.0 then
+        arrowBeside = false
+    end
+    extra.arrow = {
+        seen = true,
+        rel = s.rel,
+        fill = clamp01((maxDist - s.dist) / math.max(1.0, maxDist - full)),
+        beside = arrowBeside,
+    }
+    return extra
 end
 
 CreateThread(function()
@@ -3830,44 +3919,49 @@ CreateThread(function()
         -- flicker the panel between "your tuned preview" and "nothing nearby".
         if Config.PoliceLights.enable and not policeEditorOpen then
             local ok, err = pcall(function()
+                -- The pause menu draws under the NUI, so the lights would
+                -- flash over it; they fade out instead, as in single player.
+                local s = IsPauseMenuActive() and { found = false } or scanPolice()
+                if not s.found then
+                    if lastKey ~= 'none' then
+                        lastKey = 'none'
+                        arrowBeside = false
+                        clearPoliceUi()
+                    end
+                    return
+                end
+
+                local extra = viPoliceExtra(s)
                 if PoliceTune.mode == 'radius' or PoliceTune.mode == 'custom' then
                     -- Custom mode still uses the real scan for WHETHER a siren
                     -- is in range and HOW BRIGHT it should be — only the
                     -- position is pinned instead of tracking the bearing.
-                    local rel, strength, found = scanPoliceLightsRadius()
-                    local key = found and ('%.1f|%.2f'):format(rel, strength) or 'none'
-                    if key ~= lastKey then
-                        lastKey = key
-                        if found then
-                            local rx, ry, bx, by, wx, wy
-                            if PoliceTune.mode == 'custom' then
-                                rx, ry = PoliceTune.customRx, PoliceTune.customRy
-                                bx, by = PoliceTune.customBx, PoliceTune.customBy
-                                wx, wy = PoliceTune.customWx, PoliceTune.customWy
-                            else
-                                local half = PoliceTune.spread or 24
-                                rx, ry = perimeterPoint(rel - half)
-                                bx, by = perimeterPoint(rel + half)
-                                wx, wy = perimeterPoint(rel)
-                            end
-                            pushPoliceUi(true, {
-                                strength = strength, rx = rx, ry = ry, bx = bx, by = by, wx = wx, wy = wy,
-                            })
-                        else
-                            clearPoliceUi()
-                        end
+                    local rx, ry, bx, by, wx, wy
+                    if PoliceTune.mode == 'custom' then
+                        rx, ry = PoliceTune.customRx, PoliceTune.customRy
+                        bx, by = PoliceTune.customBx, PoliceTune.customBy
+                        wx, wy = PoliceTune.customWx, PoliceTune.customWy
+                    else
+                        local half = PoliceTune.spread or 24
+                        rx, ry = perimeterPoint(s.rel - half)
+                        bx, by = perimeterPoint(s.rel + half)
+                        wx, wy = perimeterPoint(s.rel)
                     end
+                    extra.strength = s.strength
+                    extra.rx, extra.ry, extra.bx, extra.by, extra.wx, extra.wy = rx, ry, bx, by, wx, wy
                 else
-                    local edges, found = scanPoliceLightsEdges()
+                    extra.edges = s.edges
+                end
 
-                    -- Only message the NUI when something actually changed,
-                    -- rounded so tiny distance jitter doesn't spam every scan.
-                    local key = ('%.2f|%.2f|%.2f|%.2f'):format(
-                        edges.top, edges.right, edges.bottom, edges.left)
-                    if key ~= lastKey then
-                        lastKey = key
-                        pushPoliceUi(found, { edges = edges })
-                    end
+                -- Only message the NUI when something actually changed,
+                -- rounded so tiny distance jitter doesn't spam every scan.
+                local e, a = s.edges, extra.arrow
+                local key = ('%.0f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%s'):format(
+                    s.rel, s.strength, e.top, e.right, e.bottom, e.left,
+                    extra.near or 0, a.fill or 0, tostring(a.beside))
+                if key ~= lastKey then
+                    lastKey = key
+                    pushPoliceUi(true, extra)
                 end
             end)
             if not ok then print('^1[vice_hud]^7 police light scan error: ' .. tostring(err)) end
@@ -3881,24 +3975,24 @@ end)
 --- spin on its own either; drag "Preview angle" to check a different corner.
 local previewRel = -135.0  -- south-west, so the corner-merging is visible immediately
 local function pushEditorPreview()
+    -- The GTA VI row at full size, and the arrow half filled so both of its
+    -- colours show while you tune.
+    local vi = { rel = previewRel, near = 1.0, arrow = { seen = true, rel = previewRel, fill = 0.5, beside = false } }
     if PoliceTune.mode == 'custom' then
-        pushPoliceUi(true, {
-            strength = PoliceTune.maxOpacity,
-            rx = PoliceTune.customRx, ry = PoliceTune.customRy,
-            bx = PoliceTune.customBx, by = PoliceTune.customBy,
-            wx = PoliceTune.customWx, wy = PoliceTune.customWy,
-        })
+        vi.strength = PoliceTune.maxOpacity
+        vi.rx, vi.ry = PoliceTune.customRx, PoliceTune.customRy
+        vi.bx, vi.by = PoliceTune.customBx, PoliceTune.customBy
+        vi.wx, vi.wy = PoliceTune.customWx, PoliceTune.customWy
     elseif PoliceTune.mode == 'radius' then
         local half = PoliceTune.spread or 24
-        local rx, ry = perimeterPoint(previewRel - half)
-        local bx, by = perimeterPoint(previewRel + half)
-        local wx, wy = perimeterPoint(previewRel)
-        pushPoliceUi(true, {
-            strength = PoliceTune.maxOpacity, rx = rx, ry = ry, bx = bx, by = by, wx = wx, wy = wy,
-        })
+        vi.strength = PoliceTune.maxOpacity
+        vi.rx, vi.ry = perimeterPoint(previewRel - half)
+        vi.bx, vi.by = perimeterPoint(previewRel + half)
+        vi.wx, vi.wy = perimeterPoint(previewRel)
     else
-        pushPoliceUi(true, { edges = { top = 0.0, right = PoliceTune.maxOpacity, bottom = 0.0, left = PoliceTune.maxOpacity } })
+        vi.edges = { top = 0.0, right = PoliceTune.maxOpacity, bottom = 0.0, left = PoliceTune.maxOpacity }
     end
+    pushPoliceUi(true, vi)
 end
 
 --- Closing the editor has to undo the preview and release focus, not just

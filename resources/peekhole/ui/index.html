@@ -1,0 +1,210 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Peekhole</title>
+
+    <link rel="stylesheet" href="colors.css" />
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Local icon set. This was a Font Awesome CDN link; in NUI that meant
+         every icon vanished with no internet or a blocked CDN, and added a
+         network round trip to opening the app. Only 16 icons were in use. -->
+    <link rel="stylesheet" href="icons.css" />
+</head>
+<body>
+
+<!--
+    #phone-wrapper is display:none — it is only used by dev tooling.
+    lb-phone loads this page inside an iframe that IS the phone screen,
+    so the app content goes directly in <body>, not inside any wrapper.
+-->
+<div id="phone-wrapper"></div>
+
+<!-- .app#content lives directly in <body>, always visible -->
+<div class="app" id="content">
+
+    <!-- ── Login screen (shown until account is confirmed) ─────── -->
+    <div id="login-screen">
+        <div class="login-hero">
+            <div class="login-logo">Peekhole</div>
+            <div class="login-tagline">The platform for exclusive content</div>
+        </div>
+
+        <div class="login-body">
+            <div class="login-section-lbl">Sign in with</div>
+            <div id="social-login-btns">
+                <!-- filled dynamically from server config -->
+            </div>
+
+            <div class="login-or"><span>or</span></div>
+
+            <button class="login-create-btn" id="btn-show-register">
+                <i class="fas fa-user-plus"></i> Create Account
+            </button>
+
+            <div id="login-error" class="login-error" style="display:none;"></div>
+        </div>
+
+        <!-- Register form (toggled) -->
+        <div id="register-form" style="display:none;">
+            <div class="login-hero" style="padding:24px 20px 16px;">
+                <div class="login-logo" style="font-size:22px;">Create Account</div>
+            </div>
+            <div class="login-body">
+                <label class="lbl">Choose a username</label>
+                <input type="text" class="inp" id="inp-reg-username"
+                       placeholder="e.g. john_doe" maxlength="30"
+                       style="margin-bottom:6px;" />
+                <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+                    Letters, numbers, _ and . only. Min 3 characters.
+                </div>
+                <button class="btn btn-blue btn-full" id="btn-submit-register">Create Account</button>
+                <button class="btn btn-ghost btn-full" id="btn-back-to-login" style="margin-top:8px;">Back</button>
+                <div id="register-error" class="login-error" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Main app shell (hidden until login confirmed) ──────── -->
+    <div id="app-shell" style="display:none;">
+
+        <!-- Top nav -->
+        <div class="topnav">
+            <div class="topnav-logo">Peekhole</div>
+            <div class="topnav-right" id="nav-char-name"></div>
+        </div>
+
+        <!-- Tab bar -->
+        <div class="tabs">
+            <button class="tab active" data-tab="feed">
+                <i class="fas fa-home"></i><span>Home</span>
+            </button>
+            <button class="tab" data-tab="discover">
+                <i class="fas fa-search"></i><span>Discover</span>
+            </button>
+            <button class="tab" data-tab="studio">
+                <i class="fas fa-user"></i><span>My Page</span>
+            </button>
+        </div>
+
+        <!-- Scrollable content area -->
+        <div id="content-area">
+
+            <!-- FEED -->
+            <div id="tab-feed" class="tab-panel active">
+                <div id="feed-list"><div class="spinner"></div></div>
+            </div>
+
+            <!-- DISCOVER -->
+            <div id="tab-discover" class="tab-panel">
+                <div id="discover-list"><div class="spinner"></div></div>
+            </div>
+
+            <!-- CREATOR PROFILE (sub-view) -->
+            <div id="tab-creator" class="tab-panel" style="display:none;">
+                <div class="back-bar">
+                    <button id="btn-back-creator" class="back-btn">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </button>
+                    <span id="creator-nav-name"></span>
+                </div>
+                <div id="creator-detail"></div>
+            </div>
+
+            <!-- STUDIO -->
+            <div id="tab-studio" class="tab-panel">
+                <div id="studio-content"><div class="spinner"></div></div>
+            </div>
+
+        </div><!-- /#content-area -->
+    </div><!-- /#app-shell -->
+
+    <!-- ── Create / Edit Profile Sheet ──────────────────────────── -->
+    <div class="modal-back" id="modal-profile" style="display:none;">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <h2 class="sheet-title" id="profile-sheet-title">Create My Page</h2>
+
+            <label class="lbl">Display Name</label>
+            <input type="text" class="inp" id="inp-dname" placeholder="Your creator name" maxlength="50" />
+
+            <label class="lbl">Bio</label>
+            <textarea class="inp" id="inp-bio" rows="3" placeholder="Tell your fans about yourself…"></textarea>
+
+            <label class="lbl">Subscription Price ($) — 0 = Free</label>
+            <input type="number" class="inp" id="inp-subprice" placeholder="0" min="0" />
+
+            <label class="lbl">Profile Picture</label>
+            <div class="media-pick" id="pick-pfp">
+                <i class="fas fa-image"></i> Tap to pick profile photo
+            </div>
+            <input type="hidden" id="val-pfp" />
+
+            <label class="lbl">Banner</label>
+            <div class="media-pick" id="pick-banner">
+                <i class="fas fa-mountain"></i> Tap to pick banner image
+            </div>
+            <input type="hidden" id="val-banner" />
+
+            <div class="btn-row">
+                <button class="btn btn-ghost" id="btn-cancel-profile">Cancel</button>
+                <button class="btn btn-blue" id="btn-save-profile">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── New Post Sheet ──────────────────────────────────────────── -->
+    <div class="modal-back" id="modal-post" style="display:none;">
+        <div class="sheet">
+            <div class="sheet-handle"></div>
+            <h2 class="sheet-title">New Post</h2>
+
+            <div class="media-pick large" id="pick-post-media">
+                <i class="fas fa-camera" style="font-size:24px;"></i>
+                <span>Tap to pick photo or video</span>
+            </div>
+            <input type="hidden" id="val-post-url" />
+            <input type="hidden" id="val-post-type" value="image" />
+
+            <label class="lbl">Caption</label>
+            <textarea class="inp" id="inp-caption" rows="3" placeholder="Write a caption…"></textarea>
+
+            <label class="lbl">Extra Unlock Price ($) — 0 = Free for subscribers</label>
+            <input type="number" class="inp" id="inp-post-price" placeholder="0" min="0" />
+
+            <div class="btn-row">
+                <button class="btn btn-ghost" id="btn-cancel-post">Cancel</button>
+                <button class="btn btn-blue" id="btn-submit-post">Post</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Toast ──────────────────────────────────────────────────── -->
+    <div id="toast"></div>
+
+</div><!-- /.app#content -->
+
+<script>
+    window.fetchNui = function (event, data) {
+        return fetch('https://' + location.host + '/' + event, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+            body: JSON.stringify(data || {})
+        }).then(function (r) { return r.json(); }).catch(function () { return {}; });
+    };
+
+    window.addEventListener('message', function (e) {
+        if (e.data === 'componentsLoaded') {
+            // Only runs inside the lb-phone iframe — keeps the full-screen NUI hidden
+            document.body.style.visibility = 'visible';
+            var s = document.createElement('script');
+            s.src = 'script.js';
+            document.body.appendChild(s);
+        }
+    });
+</script>
+
+</body>
+</html>

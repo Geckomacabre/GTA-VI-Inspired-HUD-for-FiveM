@@ -38,7 +38,6 @@ server/
   framework/         Server-side framework adapters
   db.lua             Database schema initialization and revision persistence
   config_store.lua   Configuration validation, persistence, and client broadcasting
-  version.lua        Release update checker
   main.lua           Command registration and network event dispatching
 
 designs/           Installed modular design packs (one directory per design)

@@ -1,5 +1,10 @@
 Config = {}
 
+-- On start (and once a day after), check GitHub for a newer release of the
+-- GTA VI HUD set and say so in the server console. Nothing is downloaded or
+-- changed; it only prints. false skips the check.
+Config.UpdateCheck = true
+
 -- How long the vehicle make/model panel stays up after getting in, in ms.
 -- The reference footage never shows it persisting for a whole drive — it
 -- announces the vehicle and then clears.
@@ -920,6 +925,11 @@ Config.Reputation = {
 -- Paints a soft red/blue pulse on the screen edge nearest an active siren, so
 -- you can feel which direction the police are coming from without looking at
 -- the minimap.
+-- Wanted inside a building lights the camera tell (the building has CCTV),
+-- and it stays lit until the stars are gone. false leaves the camera tell to
+-- resources that report it (exports.vice_hud:ReportWantedTellSighting).
+Config.WantedIndoorCameras = true
+
 Config.PoliceLights = {
     enable      = true,
 
@@ -962,6 +972,31 @@ Config.PoliceLights = {
 
     -- Require the siren to actually be ON, not merely a police vehicle.
     requireSiren = true,
+
+    -- Emergency-class models that are not the police. Their sirens never light
+    -- the screen or the arrow (same three the single-player HUD skips).
+    ignoreModels = { 'ambulance', 'firetruk', 'lguard' },
+
+    -- GTA VI lights (the default shape; /hudpolice edit can switch back to
+    -- the classic lamps). A row of blue and red lights glowing up from the
+    -- screen edge, played from frames of the GTA VI trailer's police chase.
+    -- The row is nearSize tall when the nearest siren is within tallDistance
+    -- metres and shrinks to farSize from shortDistance out. Sizes are in the
+    -- single-player HUD's units (19 = the trailer's own size); the editor's
+    -- Size slider scales the whole row on top of this.
+    nearSize      = 19.0,
+    farSize       = 8.0,
+    tallDistance  = 5.0,
+    shortDistance = 60.0,
+    roundOpacity  = 1.0,
+
+    -- GTA VI's police arrow: a thin curved line on a ring round the middle of
+    -- the screen, pointing at the strongest siren. White while the car is far,
+    -- fills blue from its point as it closes in (all blue by arrowFull metres),
+    -- and goes once the police are beside you -- the car, or a cop on foot --
+    -- inside arrowGone metres.
+    arrowFull = 15.0,
+    arrowGone = 8.0,
 }
 
 -- =============================================================================

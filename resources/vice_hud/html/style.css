@@ -713,7 +713,7 @@ html, body {
     /* Matched to the plate red baked into the cropped reference PNGs
        (weapon/person/people/vehicle, see TELL_IMG in app.js) so their
        transparent edges blend with no fringing. Was #c0393f. */
-    background: #8d161c;
+    background: #682425;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1598,31 +1598,48 @@ html, body {
 /* -----------------------------------------------------------------------------
    Wanted notification (middle-left)
    -------------------------------------------------------------------------- */
+/* GTA VI's box, rebuilt from a GTA VI frame (the single-player HUD 2.6.2's
+   measurements, at 1080p: 430x110, 1px = var(--w) / 19.2). A dark tint that
+   fades towards the right, a faint top edge, light spaced-out capitals, and a
+   dark red star and tell discs. */
 #wanted {
     position: absolute;
     left: 1.5cqw;
     top: 26.7cqh;
-    width: calc(23 * var(--w));
-    background: var(--plate-soft);
-    border-radius: calc((var(--r-md)) * var(--rad-wanted, 1));
-    box-shadow: var(--shadow-sm), var(--hairline);
-    padding: 1.5cqh calc(1.1 * var(--w)) 1.35cqh;
-    display: flex;
-    flex-direction: column;
-    gap: 1.1cqh;
+    width: calc(22.396 * var(--w));
+    height: calc(5.729 * var(--w));
+    box-sizing: border-box;
+    background: linear-gradient(90deg, rgba(22, 20, 24, 0.88), rgba(40, 34, 44, 0.45));
+    border-radius: calc((0.156 * var(--w)) * var(--rad-wanted, 1));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    padding: calc(0.4 * var(--w)) calc(3 * var(--w)) 0 calc(0.859 * var(--w));
 }
-#wanted-line { display: flex; align-items: flex-start; gap: calc(0.7 * var(--w)); }
 #wanted-copy {
-    flex: 1;
-    font-size: calc((calc(1.05 * var(--w))) * var(--fs-wanted, 1));
-    font-weight: var(--fw-wanted, 400);
-    color: var(--text);
-    line-height: 1.45;
-    letter-spacing: var(--ls-wanted, 0.004em);
-    text-shadow: var(--ink-shadow);
+    display: block;
+    font-size: calc((0.833 * var(--w)) * var(--fs-wanted, 1));
+    font-weight: var(--fw-wanted, 380);
+    color: rgb(215, 205, 210);
+    line-height: 1.9375;
+    letter-spacing: var(--ls-wanted, 0.065em);
+    text-transform: uppercase;
+    white-space: nowrap;
 }
-#wanted .star { width: calc((calc(1.2 * var(--w))) * var(--ic-wanted, 1)); height: calc((calc(1.2 * var(--w))) * var(--ic-wanted, 1)); flex-shrink: 0; }
-#wanted-tells { display: flex; gap: calc(0.55 * var(--w)); }
+#wanted .star {
+    position: absolute;
+    left: calc(19.635 * var(--w));
+    top: calc(0.625 * var(--w));
+    width: calc((1.458 * var(--w)) * var(--ic-wanted, 1));
+    height: calc((1.458 * var(--w)) * var(--ic-wanted, 1));
+}
+/* One dark red in every search state, outlined near-black, as in GTA VI. */
+#wanted .star path { fill: rgb(110, 36, 33); stroke: rgb(8, 2, 4); stroke-width: 5.7; opacity: 1; }
+#wanted-tells {
+    position: absolute;
+    left: calc(1.042 * var(--w));
+    top: calc(3.854 * var(--w));
+    display: flex;
+    gap: calc(0.469 * var(--w));
+}
 
 /* -----------------------------------------------------------------------------
    Honor toast — transient, fires only on an honor change
@@ -2223,6 +2240,13 @@ html, body {
     pointer-events: none;
     z-index: 2;
     display: none;
+}
+/* The vignette breathes on its own layer: with the pulse on #cine-fx itself
+   the bars swelled and drifted with it. They stay put, as in single player. */
+#cine-fx::before {
+    content: '';
+    position: absolute;
+    inset: 0;
     background:
         radial-gradient(ellipse 150% 135% at 50% 50%,
             transparent 40%,
@@ -2231,16 +2255,16 @@ html, body {
     box-shadow: inset 0 0 14vh rgba(0, 0, 0, calc(0.5 * var(--cine-strength, 1)));
 }
 #cine-fx.active { display: block; }
-#cine-fx.active.pulse { animation: cineFxPulse 2600ms ease-in-out infinite; }
+#cine-fx.active.pulse::before { animation: cineFxPulse 2600ms ease-in-out infinite; }
 @keyframes cineFxPulse {
-    0%, 100% { transform: scale(1); filter: brightness(1); }
-    50%      { transform: scale(1.04); filter: brightness(1.18); }
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.04); }
 }
-.cine-bar { position: absolute; left: -5%; right: -5%; height: var(--cine-bars, 3.2vh); background: #000; }
+.cine-bar { position: absolute; left: 0; right: 0; height: var(--cine-bars, 3.2vh); background: #000; }
 .cine-top { top: 0; }
 .cine-bottom { bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
-    #cine-fx.active.pulse { animation: none; }
+    #cine-fx.active.pulse::before { animation: none; }
 }
 
 /* Targeting's own page, hosted as a frame over the HUD (see index.html). It is
@@ -2653,6 +2677,18 @@ html, body {
 .polr-b { --polc: rgba(64, 118, 255, 0.92); }
 .polr-w { --polc: rgba(255, 250, 240, var(--pol-white-a, 0.70)); }
 #police-radius.no-white .polr-w { display: none; }
+
+/* GTA VI police lights + arrow. A full-bleed canvas app.js draws on only
+   while the row or the arrow is showing (see "GTA VI police lights" there);
+   the classic lamps above sit at opacity 0 while it is in use. */
+#police-vi {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
 
 @media (prefers-reduced-motion: reduce) {
     .polr-r, .polr-b, .polr-w { animation: none; }
@@ -4943,12 +4979,12 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 /* Which of the two rendering modes (four edges, or one lamp tracking the
    exact bearing) the sliders below are shaping. Both modes share every
    slider, so this is the only control that needs its own row. */
-#pol-ed-modes {
+#pol-ed-modes, #pol-ed-shapes {
     display: flex;
     gap: calc(0.4 * var(--w));
     margin-top: 0.6cqh;
 }
-.pol-mode-btn {
+.pol-mode-btn, .pol-shape-btn {
     font: inherit;
     font-size: calc(0.84 * var(--w));
     font-weight: 500;
@@ -4959,8 +4995,8 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.045);
 }
-.pol-mode-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.09); }
-.pol-mode-btn.active {
+.pol-mode-btn:hover, .pol-shape-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.09); }
+.pol-mode-btn.active, .pol-shape-btn.active {
     color: var(--text);
     background: linear-gradient(180deg, rgba(95, 216, 200, 0.34), rgba(95, 216, 200, 0.17));
     border-color: rgba(95, 216, 200, 0.4);

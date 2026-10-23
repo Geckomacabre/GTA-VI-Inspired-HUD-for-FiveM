@@ -501,6 +501,13 @@
         <span class="polr-r"></span><span class="polr-b"></span><span class="polr-w"></span>
     </div>
 
+    <!-- GTA VI police lights + arrow -----------------------------------------
+         The default shape: a row of lights rising from the screen edge, played
+         from frames of the GTA VI trailer (icons/police/row.png), and the arrow
+         round the middle of the screen that points at the siren. Drawn on a
+         canvas by app.js, only while either is on screen. -->
+    <canvas id="police-vi" aria-hidden="true"></canvas>
+
     <!-- Skill level-up -------------------------------------------------------
          Transient, like the honor indicator: it fires on a change and clears
          itself. The panel below is the place to go and LOOK at your skills;
@@ -850,8 +857,22 @@
                 <button type="button" class="pol-mode-btn" data-mode="radius">Radius</button>
                 <button type="button" class="pol-mode-btn" data-mode="custom">Custom</button>
             </div>
+            <div id="pol-ed-shapes">
+                <button type="button" class="pol-shape-btn" data-shape="round">GTA VI</button>
+                <button type="button" class="pol-shape-btn" data-shape="wide">Classic</button>
+            </div>
         </div>
         <div id="pol-ed-body">
+            <div class="pol-ed-group">GTA VI lights</div>
+            <div class="pol-ed-row pol-ed-round-only" data-k="size">
+                <label>Size</label>
+                <input type="range" min="60" max="140" step="5">
+                <span class="pol-ed-val"></span>
+            </div>
+            <label id="pol-ed-arrow-row">
+                <input type="checkbox" id="pol-ed-arrow"> Police arrow
+            </label>
+
             <div class="pol-ed-group">Brightness &amp; flash</div>
             <div class="pol-ed-row" data-k="maxOpacity">
                 <label>Brightness</label>
