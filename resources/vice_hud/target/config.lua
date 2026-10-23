@@ -15,11 +15,6 @@ Config.Framework = 'auto'
 -- Diagnostic overlay: toggle in-world debug visuals and resolver logs.
 Config.TargetDebug = false
 
--- Version check: check GitHub for newer release notices on startup.
--- Off in the merged resource: the check compares the manifest version with
--- osm-target's own GitHub releases, and the manifest is vice_hud's now.
-Config.VersionCheck = false
-
 -- Admin permission: ACE permission required for admin panel access.
 Config.AcePermission = 'osm_target.admin'
 

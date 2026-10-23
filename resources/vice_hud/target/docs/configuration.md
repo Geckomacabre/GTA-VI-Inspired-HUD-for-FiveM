@@ -14,7 +14,6 @@ Config = {}
 Config.Locale = 'en'
 Config.Framework = 'auto' -- 'auto' | 'qbox' | 'qbcore' | 'esx' | 'ox' | 'standalone'
 Config.Debug = false
-Config.VersionCheck = true
 Config.AcePermission = 'osm_target.admin'
 
 Config.Commands = {

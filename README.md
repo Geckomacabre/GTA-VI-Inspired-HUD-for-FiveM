@@ -401,6 +401,9 @@ its own.
    ensure streetkings_audio
    ensure sk_streetkings
    ```
+   On start, `vice_hud` checks this repository's releases and says in the
+   server console whether a newer one is out, with its link
+   (`Config.UpdateCheck = false` to skip it).
    `vice_hud` goes first because it stands in for `ox_target` (and for
    `osm-target` and `qbx_honor`), which several of the others wait for.
    If you ran `osm-target`, `ox_target`, `qb-target`, `qtarget` or

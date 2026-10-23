@@ -1,5 +1,10 @@
 Config = {}
 
+-- On start (and once a day after), check GitHub for a newer release of the
+-- GTA VI HUD set and say so in the server console. Nothing is downloaded or
+-- changed; it only prints. false skips the check.
+Config.UpdateCheck = true
+
 -- How long the vehicle make/model panel stays up after getting in, in ms.
 -- The reference footage never shows it persisting for a whole drive — it
 -- announces the vehicle and then clears.

@@ -6,6 +6,13 @@ name 'vice_hud'
 description 'GTA6-style HUD for Qbox: status bars, minimap slot (zone + vehicle), turn-by-turn navigation, wanted stars, weapon/ammo, money, honor, skills, action prompts, an NUI interact menu, directional police glow and exhaustion effects. Requires ox_lib; qbx_core optional.'
 version '2.2.0'
 
+-- The GTA VI HUD set's release (the GitHub tag) this copy is, and where those
+-- are published. server_update.lua compares them with GitHub's latest release
+-- on start and says in the console when there is a newer one. Bump `release`
+-- to the new tag whenever one is cut.
+release '1.8.0'
+repository 'https://github.com/Geckomacabre/GTA-VI-Inspired-HUD-for-FiveM'
+
 shared_scripts {
     '@ox_lib/init.lua',
     'config.lua',
@@ -100,6 +107,8 @@ server_scripts {
     'server_gym.lua',
     -- Server-wide popup theme (/themepublish). Independent of the layout above.
     'server_theme.lua',
+    -- Tells the console when GitHub has a newer release of the HUD set.
+    'server_update.lua',
 
     'target/server/framework/init.lua',
     'target/server/framework/esx.lua',
@@ -109,7 +118,6 @@ server_scripts {
     'target/server/framework/standalone.lua',
     'target/server/db.lua',
     'target/server/config_store.lua',
-    'target/server/version.lua',
     'target/server/main.lua',
     'honor/server/main.lua',
     'honor/server/debug.lua',
