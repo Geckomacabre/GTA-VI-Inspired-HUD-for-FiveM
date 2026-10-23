@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 780" font-family="Arial,Helvetica,sans-serif">
+  <rect width="390" height="780" fill="#f3f4f6"/>
+
+  <!-- Top nav -->
+  <rect width="390" height="52" fill="#00AFF0"/>
+  <text x="14" y="34" font-size="20" font-weight="900" font-style="italic" fill="white">Peekhole</text>
+  <text x="300" y="34" font-size="11" fill="rgba(255,255,255,0.85)">Michael D.</text>
+
+  <!-- Tab bar -->
+  <rect y="52" width="390" height="42" fill="white"/>
+  <rect y="52" width="390" height="1" fill="#e0e0e0"/>
+  <text x="65" y="72" font-size="11" fill="#6b7280" text-anchor="middle">⌂</text>
+  <text x="65" y="88" font-size="9" fill="#6b7280" text-anchor="middle">Home</text>
+  <text x="195" y="72" font-size="11" fill="#6b7280" text-anchor="middle">⌕</text>
+  <text x="195" y="88" font-size="9" fill="#6b7280" text-anchor="middle">Discover</text>
+  <text x="325" y="72" font-size="11" fill="#00AFF0" text-anchor="middle">♟</text>
+  <text x="325" y="88" font-size="9" fill="#00AFF0" text-anchor="middle">My Page</text>
+  <rect x="260" y="91" width="130" height="3" fill="#00AFF0" rx="1"/>
+  <rect y="93" width="390" height="1" fill="#e0e0e0"/>
+
+  <!-- Studio header -->
+  <rect y="94" width="390" height="70" fill="white" stroke="#e0e0e0" stroke-width="0"/>
+  <rect y="163" width="390" height="1" fill="#e0e0e0"/>
+  <circle cx="56" cy="130" r="24" fill="#00AFF0" stroke="#00AFF0" stroke-width="2"/>
+  <text x="56" y="135" font-size="16" text-anchor="middle" fill="white">MD</text>
+  <text x="90" y="122" font-size="14" font-weight="700" fill="#1a1a1a">MikeDawson</text>
+  <text x="90" y="138" font-size="11" fill="#6b7280">$1,000/mo · 47 fans</text>
+  <rect x="316" y="118" width="58" height="24" rx="12" fill="white" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="345" y="134" font-size="11" fill="#1a1a1a" text-anchor="middle">Edit</text>
+
+  <!-- Stats row -->
+  <rect y="164" width="390" height="86" fill="#e6f7fd"/>
+  <rect x="12" y="176" width="112" height="62" rx="10" fill="white" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="68" y="204" font-size="18" font-weight="700" fill="#00AFF0" text-anchor="middle">12</text>
+  <text x="68" y="220" font-size="10" fill="#6b7280" text-anchor="middle">Posts</text>
+  <rect x="139" y="176" width="112" height="62" rx="10" fill="white" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="195" y="204" font-size="18" font-weight="700" fill="#00AFF0" text-anchor="middle">47</text>
+  <text x="195" y="220" font-size="10" fill="#6b7280" text-anchor="middle">Fans</text>
+  <rect x="266" y="176" width="112" height="62" rx="10" fill="white" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="322" y="204" font-size="18" font-weight="700" fill="#00AFF0" text-anchor="middle">$48k</text>
+  <text x="322" y="220" font-size="10" fill="#6b7280" text-anchor="middle">Earned</text>
+
+  <!-- New Post button -->
+  <rect x="12" y="262" width="366" height="40" rx="10" fill="#00AFF0"/>
+  <text x="195" y="287" font-size="13" font-weight="700" fill="white" text-anchor="middle">+ New Post</text>
+
+  <!-- My Posts label -->
+  <rect y="314" width="390" height="30" fill="white"/>
+  <text x="14" y="333" font-size="11" font-weight="700" fill="#6b7280" letter-spacing="0.6">MY POSTS</text>
+  <rect y="343" width="390" height="1" fill="#e0e0e0"/>
+
+  <!-- Post grid -->
+  <!-- Row 1 -->
+  <rect x="0"   y="344" width="129" height="129" fill="#334155"/>
+  <text x="64"  y="416" font-size="30" text-anchor="middle">🌃</text>
+  <rect x="1"   y="344" width="128" height="128" fill="none"/>
+
+  <rect x="131" y="344" width="129" height="129" fill="#7c3aed"/>
+  <text x="195" y="416" font-size="30" text-anchor="middle">💜</text>
+  <rect x="292" y="460" width="50" height="16" rx="3" fill="rgba(0,0,0,0.65)"/>
+  <text x="317" y="472" font-size="9" font-weight="700" fill="white" text-anchor="middle">$500</text>
+
+  <rect x="262" y="344" width="128" height="129" fill="#0c5486"/>
+  <text x="326" y="416" font-size="30" text-anchor="middle">🌊</text>
+
+  <!-- Row 2 -->
+  <rect x="0"   y="475" width="129" height="129" fill="#d97706"/>
+  <text x="64"  y="547" font-size="30" text-anchor="middle">🌅</text>
+
+  <rect x="131" y="475" width="129" height="129" fill="#1e1b4b"/>
+  <text x="195" y="547" font-size="30" text-anchor="middle">⭐</text>
+  <rect x="161" y="591" width="70" height="16" rx="3" fill="rgba(0,0,0,0.65)"/>
+  <text x="196" y="603" font-size="9" font-weight="700" fill="white" text-anchor="middle">$2,000</text>
+
+  <rect x="262" y="475" width="128" height="129" fill="#166534"/>
+  <text x="326" y="547" font-size="30" text-anchor="middle">🌿</text>
+
+  <!-- Row 3 partial -->
+  <rect x="0"   y="606" width="129" height="124" fill="#881337"/>
+  <text x="64"  y="676" font-size="30" text-anchor="middle">🔥</text>
+  <rect x="131" y="606" width="129" height="124" fill="#374151"/>
+  <text x="195" y="676" font-size="30" text-anchor="middle">🎵</text>
+  <rect x="262" y="606" width="128" height="124" fill="#1c1917"/>
+  <text x="326" y="676" font-size="30" text-anchor="middle">📸</text>
+  <rect x="292" y="700" width="50" height="16" rx="3" fill="rgba(0,0,0,0.65)"/>
+  <text x="317" y="712" font-size="9" font-weight="700" fill="white" text-anchor="middle">$250</text>
+
+  <!-- Label -->
+  <rect y="730" width="390" height="50" fill="white" opacity="0.9"/>
+  <text x="195" y="761" font-size="13" font-weight="700" fill="#00AFF0" text-anchor="middle">My Studio — Manage posts &amp; track earnings</text>
+</svg>
