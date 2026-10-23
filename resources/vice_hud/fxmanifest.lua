@@ -168,6 +168,9 @@ files {
     -- straight out of the reference screenshots -- another subfolder, same
     -- non-recursing caveat as above.
     'html/icons/tells/*.png',
+    -- GTA VI police lights: the trailer's 90 light-row pictures and the
+    -- arrow's 64 points, each packed into one sheet (app.js polVi).
+    'html/icons/police/*.png',
     -- Targeting's own page: the admin panel and preferences (a frame inside
     -- html/index.html) and the in-world DUI surfaces.
     'target/html/index.html',

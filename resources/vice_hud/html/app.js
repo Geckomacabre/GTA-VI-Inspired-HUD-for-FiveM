@@ -481,25 +481,20 @@
         });
     }
 
-    /* The notification says a different thing per state, because each one
-       means something different to the player (see renderStars' comment).
-       The box's own star mirrors the corner row so the two never disagree. */
-    var WANTED_COPY = {
-        contact:   'The cops are searching for you<br>and they have your description',
-        searching: 'The police are searching the area<br>for a suspect',
-        hollow:    'A crime has been reported<br>police are looking into it',
-        red:       'You\'ve lost them, but stay sharp<br>you\'re still in the search area'
-    };
+    /* GTA VI's wanted box says one thing -- "The cops are searching for you
+       / and they have your description" (it's in index.html) -- and only
+       while that is true: you are wanted AND the police have at least one
+       tell on you. The other three messages this box used to cycle through
+       were never in GTA VI. The box's own star keeps the corner row's class,
+       but style.css paints it GTA VI's dark red in every state. */
 
-    // The box used to stay up for as long as `active` (wanted > 0), which in
-    // practice meant it sat on screen for the whole chase. It is a
-    // notification -- something just changed -- not a standing readout, so it
-    // now pops up only on an actual change to the level or its state and
-    // hides itself after WANTED_HOLD_MS, the same "event, not furniture"
-    // treatment already applied to honor/reputation and to the health row.
-    var WANTED_HOLD_MS = 6000;
+    // A notification, not a standing readout: it pops up when a NEW tell
+    // lights or the stars go up, holds WANTED_HOLD_MS, and goes. A tell going
+    // out, the stars dropping or the search state changing is not news.
+    var WANTED_HOLD_MS = 7200;
     var wantedHideTimer = null;
-    var lastWantedKey = null;
+    var wantedLastStars = 0;
+    var wantedLastTells = {};
 
     function onWanted(d) {
         var stars = d.stars || 0;
@@ -507,29 +502,34 @@
         var state = d.state || null;
         renderStars($('stars'), stars, stars > 0 ? maxStars : 0, state);
 
-        var copy = $('wanted-copy');
-        if (copy) copy.innerHTML = WANTED_COPY[state] || WANTED_COPY.hollow;
         // Same class renderStars uses, so it matches the corner row exactly.
         var wstar = $('wanted-star');
         if (wstar) wstar.setAttribute('class', 'star' + (state ? ' ' + state : ''));
 
-        // The three "tells" (outfit / voice / vehicle) track independently of the
-        // notification box — the reference shows them top-right under the stars
-        // as well as inside the box.
+        // The tells track independently of the notification box -- the
+        // reference shows them top-right under the stars as well as inside
+        // the box.
         var tells = d.tells || [];
         show($('tells'), stars > 0 && tells.length > 0);
         renderTells($('tells'), tells);
         renderTells($('wanted-tells'), tells);
 
-        var key = stars + '|' + (state || '');
-        if (!d.active || stars <= 0) {
-            lastWantedKey = key;
+        var wanted = !!d.active && stars > 0;
+        var fresh = wanted && stars > wantedLastStars;
+        var seen = {};
+        tells.forEach(function (t) {
+            seen[t] = true;
+            if (wanted && !wantedLastTells[t]) fresh = true;
+        });
+        wantedLastStars = wanted ? stars : 0;
+        wantedLastTells = wanted ? seen : {};
+
+        if (!wanted || tells.length === 0) {
             if (wantedHideTimer) { clearTimeout(wantedHideTimer); wantedHideTimer = null; }
             setVisible('wanted', $('wanted'), false);
             return;
         }
-        if (key === lastWantedKey) return; // unchanged -- leave it exactly as it was
-        lastWantedKey = key;
+        if (!fresh) return; // nothing new -- leave it exactly as it was
 
         setVisible('wanted', $('wanted'), true);
         if (wantedHideTimer) clearTimeout(wantedHideTimer);
@@ -2980,6 +2980,9 @@
         // `edges` field, so every edge's opacity naturally falls to 0 here —
         // no explicit mode check needed to keep the two visuals from
         // overlapping.
+        // The GTA VI shape draws on its own canvas (polVi below), so the
+        // classic lamps stay at 0 rather than doubling up under it.
+        var classic = d.shape === 'wide';
         var edges = d.edges || {};
         var box = $('police');
         if (box) box.classList.toggle('no-white', d.white === false);
@@ -2987,7 +2990,7 @@
             var name = POL_EDGES[i];
             var el = document.querySelector('.pol-' + name);
             if (!el) continue;
-            var v = d.active === false ? 0 : (edges[name] || 0);
+            var v = d.active === false || !classic ? 0 : (edges[name] || 0);
             el.style.opacity = String(Math.max(0, Math.min(1, v)));
         }
 
@@ -2999,9 +3002,296 @@
             POL_RADIUS_VARS.forEach(function (k) {
                 if (d[k] != null) radiusBox.style.setProperty('--pol-' + k, d[k] + '%');
             });
-            var rv = d.active === false ? 0 : (d.strength || 0);
+            var rv = d.active === false || !classic ? 0 : (d.strength || 0);
             radiusBox.style.opacity = String(Math.max(0, Math.min(1, rv)));
         }
+
+        polViUpdate(d);
+    }
+
+    /* --- GTA VI police lights + arrow ---------------------------------------
+       Ported from the single-player HUD 2.6.2 (ViExtras PoliceLights). Lua
+       pushes targets a few times a second; everything that moves -- the
+       trailer frames, the 420ms fades, the bearing and size easing, the arrow
+       -- runs here on one canvas, and only while something is showing.
+
+       All drawing is in the single-player HUD's units: 1080 tall, as wide as
+       the aspect ratio makes it, then scaled to the window. */
+
+    // Which of row.png's 90 pictures shows on each frame of the trailer's
+    // 30fps loop; -1 is a frame with the lights off.
+    var POL_PICTURE = [
+        0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+        10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 26, 27, 28,
+        28, 29, 30, 30, 31, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+        46, 47, 48, 49, 50, 51, 52, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
+        65, 66, 67, 68, 69, 69, 70, 71, 72, 73, 74, 75, 76, 77, 77, 78, 79, 80, 81, 82,
+        83, 83, 84, 85, 86, 87, 88, 89
+    ];
+    var POL_ROW_W = 140, POL_ROW_H = 52, POL_ROW_COLS = 10;   // icons/police/row.png
+    var POL_TIP = 24, POL_TIP_COLS = 8;                      // icons/police/tips.png, 64 directions
+    // Same order and angles as client.lua's EDGE_ANGLE: top, right, bottom, left.
+    var POL_EDGE_ANGLE = [0, -90, 180, 90];
+    var POL_ARROW_WHITE = [240, 240, 240, 230];
+    var POL_ARROW_BLUE = [62, 98, 222, 242];
+
+    var polVi = {
+        shape: 'round', mode: 'radius', size: 1, arrowOn: true,
+        maxOpacity: 0.55, nearSize: 19, farSize: 8, roundOpacity: 1,
+        from: [0, 0, 0, 0], to: [0, 0, 0, 0], since: [0, 0, 0, 0],
+        rel: 0, relTarget: 0, relSet: false,
+        near: 0, nearTarget: 0, nearSet: false,
+        arrowSeen: false, arrowBeside: false, arrowRel: 0, arrowRelTarget: 0,
+        arrowFill: 0, arrowFillTarget: 0, arrowA: 0,
+        clock0: 0, running: false, last: 0, ctx: null, row: null, tips: null, tint: {}
+    };
+
+    function polClamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+    function polNormalise(a) { a = (a + 180) % 360; if (a < 0) a += 360; return a - 180; }
+
+    // CSS-style cubic-bezier easing, solved the same way the single-player
+    // HUD does it, so the fades land on the same curve.
+    function polBezier(x1, y1, x2, y2, x) {
+        if (x <= 0) return 0;
+        if (x >= 1) return 1;
+        function cubic(p1, p2, t) { var u = 1 - t; return 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t; }
+        var lo = 0, hi = 1, t = x;
+        for (var i = 0; i < 24; i++) {
+            t = (lo + hi) * 0.5;
+            if (cubic(x1, x2, t) < x) lo = t; else hi = t;
+        }
+        return cubic(y1, y2, t);
+    }
+
+    function polNow() { return typeof performance !== 'undefined' ? performance.now() : Date.now(); }
+
+    function polOpacity(i, now) {
+        var x = polClamp01((now - polVi.since[i]) / 420);
+        return polVi.from[i] + (polVi.to[i] - polVi.from[i]) * polBezier(0.4, 0, 0.2, 1, x);
+    }
+
+    function polViUpdate(d) {
+        var s = polVi, now = polNow();
+        if (d.shape) s.shape = d.shape;
+        if (d.mode) s.mode = d.mode;
+        if (d.size != null) s.size = Math.max(0.4, Math.min(2, d.size / 100));
+        if (d.arrowOn != null) s.arrowOn = !!d.arrowOn;
+        if (d.maxOpacity) s.maxOpacity = d.maxOpacity;
+        if (d.nearSize) s.nearSize = d.nearSize;
+        if (d.farSize) s.farSize = d.farSize;
+        if (d.roundOpacity != null) s.roundOpacity = polClamp01(d.roundOpacity);
+
+        var on = d.active !== false && s.shape !== 'wide';
+        var targets = [0, 0, 0, 0];
+        var strongest = 0;
+        if (on && d.edges) {
+            var e = d.edges;
+            targets = [e.top || 0, e.right || 0, e.bottom || 0, e.left || 0];
+            strongest = Math.max.apply(null, targets);
+        } else if (on && d.strength) {
+            targets = [d.strength, 0, 0, 0];
+            strongest = d.strength;
+        }
+
+        if (strongest > 0 && d.rel != null) {
+            s.relTarget = d.rel;
+            if (!s.relSet || polOpacity(0, now) < 0.01) s.rel = d.rel;
+            s.relSet = true;
+        }
+        if (strongest > 0 && d.near != null) {
+            var dark = true;
+            for (var k = 0; k < 4; k++) if (polOpacity(k, now) >= 0.01) dark = false;
+            if (!s.nearSet || dark) s.near = d.near;
+            s.nearTarget = d.near;
+            s.nearSet = true;
+        }
+
+        var a = d.arrow || {};
+        s.arrowSeen = d.active !== false && !!a.seen;
+        if (s.arrowSeen) {
+            s.arrowRelTarget = a.rel || 0;
+            s.arrowFillTarget = polClamp01(a.fill || 0);
+            s.arrowBeside = !!a.beside;
+        }
+
+        for (var i = 0; i < 4; i++) {
+            var v = Math.round(targets[i] * 100) / 100;
+            if (Math.abs(v - s.to[i]) < 0.005) continue;
+            s.from[i] = polOpacity(i, now);
+            s.to[i] = v;
+            s.since[i] = now;
+        }
+
+        if (!s.running && (s.arrowSeen || s.to.some(function (o) { return o > 0; }))) polViStart();
+    }
+
+    function polViStart() {
+        var canvas = $('police-vi');
+        if (!canvas || !canvas.getContext) return;
+        var s = polVi;
+        if (!s.ctx) {
+            s.ctx = canvas.getContext('2d');
+            if (!s.ctx) return;
+            s.row = new Image(); s.row.src = 'icons/police/row.png';
+            s.tips = new Image(); s.tips.src = 'icons/police/tips.png';
+            s.clock0 = polNow();
+        }
+        s.running = true;
+        s.last = polNow();
+        raf(polViFrame);
+    }
+
+    // Top/bottom/left/right of the screen's rectangle at bearing `rel`, so a
+    // car to the south-west lands in the bottom-left corner.
+    function polPerimeter(rel, W) {
+        var r = rel * Math.PI / 180, dx = -Math.sin(r), dy = -Math.cos(r);
+        var t = 1 / Math.max(Math.abs(dx), Math.abs(dy), 0.0001);
+        return [(50 + dx * t * 50) / 100 * W, (50 + dy * t * 50) / 100 * 1080];
+    }
+
+    // Which edge that point is on, as the inward normal.
+    function polNormal(rel) {
+        var r = rel * Math.PI / 180, dx = -Math.sin(r), dy = -Math.cos(r);
+        if (Math.abs(dx) >= Math.abs(dy)) return [dx < 0 ? 1 : -1, 0];
+        return [0, dy < 0 ? 1 : -1];
+    }
+
+    // A white sprite drawn in a colour: tinted once into a small canvas and
+    // kept, keyed by colour, since the arrow only ever uses a handful.
+    function polTinted(img, sx, sy, sw, sh, rgb, key) {
+        var c = polVi.tint[key];
+        if (c) return c;
+        c = document.createElement('canvas');
+        c.width = sw; c.height = sh;
+        var g = c.getContext('2d');
+        g.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        g.globalCompositeOperation = 'source-in';
+        g.fillStyle = 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+        g.fillRect(0, 0, sw, sh);
+        polVi.tint[key] = c;
+        return c;
+    }
+
+    function polLerpColor(t) {
+        var a = POL_ARROW_WHITE, b = POL_ARROW_BLUE, out = [];
+        for (var i = 0; i < 4; i++) out.push(Math.round(a[i] + (b[i] - a[i]) * t));
+        return out;
+    }
+
+    function polRow(ctx, p, n, scale, o, f) {
+        var pic = POL_PICTURE[f];
+        if (pic < 0) return;
+        // The trailer's own flicker: a hair brighter or dimmer frame to frame.
+        var grain = ((1749218071 >>> f) & 1) === 0 ? 0.996 : 1.004;
+        var alpha = polClamp01(o / Math.max(0.01, polVi.maxOpacity) * polVi.roundOpacity * grain);
+        if (alpha <= 0.003 || !polVi.row.complete || !polVi.row.naturalWidth) return;
+        var along = 560 * scale, tall = 208 * scale, inset = 72 * scale;
+        // row.png is the bottom edge's picture; the others are it turned.
+        var angle = n[0] !== 0 ? (n[0] > 0 ? 90 : -90) : (n[1] < 0 ? 0 : 180);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(p[0] + n[0] * inset, p[1] + n[1] * inset);
+        ctx.rotate(angle * Math.PI / 180);
+        ctx.drawImage(polVi.row,
+            (pic % POL_ROW_COLS) * POL_ROW_W, Math.floor(pic / POL_ROW_COLS) * POL_ROW_H, POL_ROW_W, POL_ROW_H,
+            -along / 2, -tall / 2, along, tall);
+        ctx.restore();
+    }
+
+    function polDrawRound(ctx, now, dt, W) {
+        var s = polVi, any = false;
+        var scale = (s.farSize + (s.nearSize - s.farSize) * s.near) / 19 * s.size;
+        var frame = Math.floor((now - s.clock0) * 30 / 1000) % POL_PICTURE.length;
+        if (s.mode === 'radius' || s.mode === 'custom') {
+            var o = polOpacity(0, now);
+            if (o < 0.003) return s.to[0] > 0;
+            s.rel += polNormalise(s.relTarget - s.rel) * Math.min(1, dt * 8);
+            polRow(ctx, polPerimeter(s.rel, W), polNormal(s.rel), scale, o, frame);
+            return true;
+        }
+        for (var i = 0; i < 4; i++) {
+            var oi = polOpacity(i, now);
+            if (s.to[i] > 0) any = true;
+            if (oi < 0.003) continue;
+            any = true;
+            polRow(ctx, polPerimeter(POL_EDGE_ANGLE[i], W), polNormal(POL_EDGE_ANGLE[i]), scale, oi,
+                (frame + i * POL_PICTURE.length / 4) % POL_PICTURE.length);
+        }
+        return any;
+    }
+
+    function polDrawArrow(ctx, dt, W) {
+        var s = polVi;
+        var show = s.arrowSeen && !s.arrowBeside;
+        if (show && s.arrowA <= 0) { s.arrowRel = s.arrowRelTarget; s.arrowFill = s.arrowFillTarget; }
+        s.arrowA = polClamp01(s.arrowA + (show ? dt * 1000 / 420 : -dt / 0.3));
+        if (s.arrowA <= 0.003) return show;
+        s.arrowRel += polNormalise(s.arrowRelTarget - s.arrowRel) * Math.min(1, dt * 8);
+        s.arrowFill += (s.arrowFillTarget - s.arrowFill) * Math.min(1, dt * 4);
+
+        // In radius mode the arrow follows the row's own smoothed bearing so
+        // the two never disagree about where the car is.
+        var rel = (s.mode !== 'edges' && s.relSet && s.shape !== 'wide') ? s.rel : s.arrowRel;
+        var r = rel * Math.PI / 180, dx = -Math.sin(r), dy = -Math.cos(r);
+        // A 190-unit arc whose middle sits 427.68 out from the screen's centre.
+        var cx = W / 2 + 237.68 * dx, cy = 540 + 237.68 * dy;
+        var alpha = polBezier(0.25, 0.1, 0.25, 1, s.arrowA);
+        var fill = polClamp01(s.arrowFill);
+        var half = 26 / 95, base = Math.atan2(dy, dx), steps = 86, step = 1 / steps;
+
+        // The line: tapered dots, blue spreading out from the point as the
+        // police close in.
+        for (var i = 0; i <= steps; i++) {
+            var u = i * step, e = Math.abs(2 * u - 1);
+            var thick = 3.2 * Math.pow(polClamp01((1 - e) / 0.25), 0.7);
+            if (thick < 0.6) continue;
+            var ang = base + (u - 0.5) * 2 * half;
+            var c = polLerpColor(polClamp01((fill - e) / (2 * step) + 0.5));
+            ctx.globalAlpha = c[3] / 255 * alpha;
+            ctx.fillStyle = 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+            ctx.beginPath();
+            ctx.arc(cx + 190 * Math.cos(ang), cy + 190 * Math.sin(ang), thick / 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // The point, one of 64 pictures facing the car.
+        if (s.tips.complete && s.tips.naturalWidth) {
+            var idx = ((Math.round(Math.atan2(dx, -dy) / (Math.PI * 2) * 64) % 64) + 64) % 64;
+            var tc = polLerpColor(polClamp01(fill / 0.05));
+            var img = polTinted(s.tips, (idx % POL_TIP_COLS) * POL_TIP, Math.floor(idx / POL_TIP_COLS) * POL_TIP,
+                POL_TIP, POL_TIP, tc, 'tip' + idx + ':' + tc.join(','));
+            ctx.globalAlpha = tc[3] / 255 * alpha;
+            ctx.drawImage(img, cx + 191 * dx - POL_TIP / 2, cy + 191 * dy - POL_TIP / 2, POL_TIP, POL_TIP);
+        }
+        ctx.globalAlpha = 1;
+        return true;
+    }
+
+    function polViFrame() {
+        var s = polVi, canvas = $('police-vi'), ctx = s.ctx;
+        if (!canvas || !ctx) { s.running = false; return; }
+        var now = polNow();
+        var dt = Math.min(0.1, Math.max(0, (now - s.last) / 1000));
+        s.last = now;
+
+        var w = window.innerWidth || 1920, h = window.innerHeight || 1080;
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        var k = h / 1080, W = 1080 * w / h;
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+
+        s.near += (s.nearTarget - s.near) * Math.min(1, dt * 4);
+        var busy = false;
+        if (s.shape !== 'wide') busy = polDrawRound(ctx, now, dt, W) || busy;
+        if (s.arrowOn) busy = polDrawArrow(ctx, dt, W) || busy;
+
+        if (busy) { raf(polViFrame); return; }
+        // Nothing left on screen and nothing on its way: stop until the next
+        // siren rather than clearing an empty canvas 60 times a second.
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        s.running = false;
     }
 
     /* --- police light editor (/hudpolice edit) ----------------------------- */
@@ -3016,6 +3306,7 @@
         if (k === 'maxOpacity' || k === 'whiteA') return Math.round(v * 100) + '%';
         if (k === 'maxDistance' || k === 'fullDistance') return Math.round(v) + 'm';
         if (k === 'previewAngle') return Math.round(v) + '°';
+        if (k === 'size') return Math.round(v) + '%';
         if (POL_ED_PCT[k]) return Math.round(v) + '%';
         var dec = POL_ED_DEC[k] != null ? POL_ED_DEC[k] : 0;
         return v.toFixed(dec);
@@ -3038,6 +3329,18 @@
         });
     }
 
+    // The size slider only shapes the GTA VI row; the lamp sliders only the
+    // classic lamps -- but those stay visible, since the white flash and
+    // brightness rows shape both.
+    function setPoliceEditorShape(shape) {
+        document.querySelectorAll('.pol-shape-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-shape') === shape);
+        });
+        document.querySelectorAll('.pol-ed-round-only').forEach(function (el) {
+            el.style.display = shape === 'wide' ? 'none' : '';
+        });
+    }
+
     function onPoliceEditor(d) {
         var panel = $('police-editor');
         if (!panel) return;
@@ -3055,6 +3358,9 @@
         });
         var white = $('pol-ed-white');
         if (white) white.checked = values.white !== false;
+        var arrow = $('pol-ed-arrow');
+        if (arrow) arrow.checked = values.arrow !== false;
+        setPoliceEditorShape(values.shape === 'wide' ? 'wide' : 'round');
         setPoliceEditorMode(values.mode === 'radius' || values.mode === 'custom' ? values.mode : 'edges');
     }
 
@@ -3076,6 +3382,17 @@
         var whiteBox = $('pol-ed-white');
         if (whiteBox) whiteBox.addEventListener('change', function () {
             post('policeTune', { key: 'white', value: whiteBox.checked });
+        });
+        var arrowBox = $('pol-ed-arrow');
+        if (arrowBox) arrowBox.addEventListener('change', function () {
+            post('policeTune', { key: 'arrow', value: arrowBox.checked });
+        });
+        document.querySelectorAll('.pol-shape-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var shape = btn.getAttribute('data-shape');
+                setPoliceEditorShape(shape);
+                post('policeTune', { key: 'shape', value: shape });
+            });
         });
         document.querySelectorAll('.pol-mode-btn').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -4429,10 +4746,11 @@
             // huge, bogus loss and fires a money-pop for it.
             lastCashSeen = null;
             lastBankSeen = null;
-            // Same reasoning for the wanted box: the preview's 3-star
-            // 'contact' state must not silently suppress the next real
-            // wanted push if it happens to land on the same key.
-            lastWantedKey = null;
+            // Same reasoning for the wanted box: the preview's sample stars
+            // and tells must not count as already seen, or the next real
+            // wanted push would look like nothing new and never pop.
+            wantedLastStars = 0;
+            wantedLastTells = {};
         }
     }
 

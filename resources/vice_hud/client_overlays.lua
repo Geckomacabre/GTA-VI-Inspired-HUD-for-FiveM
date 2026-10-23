@@ -43,6 +43,7 @@ end
 if Config.Crosshair.enable then
     local crossActive, crossMode = false, 'foot'
     local crossWasShooting = false
+    local SNIPER_GROUP = `GROUP_SNIPER`
 
     CreateThread(function()
         while true do
@@ -50,7 +51,14 @@ if Config.Crosshair.enable then
             local ped = cache.ped or PlayerPedId()
             local playerId = PlayerId()
             local armedGun = IsPedArmed(ped, 2)
-            local aiming = armedGun and (IsPlayerFreeAiming(playerId) or IsPedShooting(ped))
+            -- A sniper rifle's scope IS the game's reticle, so hiding it for
+            -- our crosshair left nothing to aim through. Those keep the game's.
+            local sniper = armedGun and GetWeapontypeGroup(GetSelectedPedWeapon(ped)) == SNIPER_GROUP
+            -- Targetting covers Assisted Aim / Traditional lock-on, which is
+            -- never "free aiming": without it the crosshair only came up on
+            -- the first shot.
+            local aiming = armedGun and not sniper
+                and (IsPlayerFreeAiming(playerId) or IsPlayerTargettingAnything(playerId) or IsPedShooting(ped))
             local mode = IsPedInAnyVehicle(ped, false) and 'vehicle' or 'foot'
 
             if aiming then

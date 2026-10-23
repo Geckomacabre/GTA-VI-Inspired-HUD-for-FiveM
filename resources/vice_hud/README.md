@@ -106,10 +106,10 @@ on entering                          for the rest of the drive
 | **Status bars** | Health, armour, stamina. Auto-hide at full, with an anti-flicker hold |
 | **Minimap** | Rounded corner mask with 14 baked radii, positioned and resized from the editor |
 | **Turn-by-turn** | A nav bar above the map while a waypoint is set, from the game's *own* GPS route — so it never disagrees with the line on the minimap. Appears near a junction and gets out of the way otherwise |
-| **Wanted** | Star row, plus the "cops are searching for you" notice and its tells |
+| **Wanted** | Star row, plus GTA VI's "cops are searching for you" box and its tells (it pops up when a new tell lights or the stars go up; wanted indoors lights the camera tell) |
 | **Money** | Cash and bank, in GTA's own Pricedown |
 | **Honor** | A standing panel and a separate centre-screen change indicator |
-| **Police glow** | Directional edge lighting driven by real siren bearing and distance. Three modes, with a live editor |
+| **Police lights** | GTA VI's police lights: a row of blue and red lights glowing up from the screen edge toward the siren, bigger the closer the police are, and GTA VI's curved police arrow pointing at the car. The classic edge glow is still one click away in `/hudpolice edit` |
 | **Exhaustion** | A vignette that breathes in as stamina empties |
 | **Skills** | Eight skills that write straight into the character's stats, so levelling changes how the game plays |
 | **Prompts** | `ShowActionPrompt` for other resources, auto-cleaned if the caller crashes |
