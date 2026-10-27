@@ -71,8 +71,15 @@ RegisterNetEvent('qbx_vehiclekeys:server:smashedWindow', function(netId)
     pcall(function() exports.qbx_honor:ApplyHook(src, 'window_smash') end)
 end)
 
+local breakableTools = {
+    lockpick = true,
+    advancedlockpick = true,
+    -- Slim Jim's own dedicated tools (client/slimjim.lua), not the two above.
+    slimjim = true,
+    slimjim_pro = true,
+}
 RegisterNetEvent('qb-vehiclekeys:server:breakLockpick', function(itemName)
-    if not (itemName == 'lockpick' or itemName == 'advancedlockpick') then return end
+    if not breakableTools[itemName] then return end
     exports.ox_inventory:RemoveItem(source, itemName, 1)
 end)
 
@@ -104,6 +111,34 @@ RegisterNetEvent('qbx_vehiclekeys:server:slimJimmed', function(netId)
     -- Reuses window_smash's own hook rather than a dedicated slim_jim entry,
     -- see the reasoning in config/client.lua's slimJim block: both are
     -- the same act, illegally entering someone else's vehicle.
+    pcall(function() exports.qbx_honor:ApplyHook(src, 'window_smash') end)
+end)
+
+---A player cloned a locked vehicle's key (client/keyclone.lua) and won
+---vice_hud's key clone check: the doors open and the key is theirs, so no
+---hotwire. The same checks as slimJimmed above, plus the cloner itself,
+---since this one hands out keys.
+RegisterNetEvent('qbx_vehiclekeys:server:keyCloned', function(netId)
+    local src = source
+    if type(netId) ~= 'number' then return end
+
+    local vehicle = NetworkGetEntityFromNetworkId(netId)
+    if not vehicle or vehicle == 0 or not DoesEntityExist(vehicle) then return end
+
+    local vehicleConfig = GetVehicleConfig(vehicle)
+    if vehicleConfig.noLock or vehicleConfig.shared or vehicleConfig.lockpickImmune then return end
+
+    local ped = GetPlayerPed(src)
+    if not ped or ped == 0 then return end
+    if #(GetEntityCoords(ped) - GetEntityCoords(vehicle)) > 10.0 then return end
+
+    local ok, count = pcall(function() return exports.ox_inventory:Search(src, 'count', 'key_cloner') end)
+    if not ok or (count or 0) < 1 then return end
+
+    setLockState(vehicle, 'unlock')
+    GiveKeys(src, vehicle)
+
+    -- The same act as a slim jim or a smashed window: someone else's car.
     pcall(function() exports.qbx_honor:ApplyHook(src, 'window_smash') end)
 end)
 

@@ -4,7 +4,8 @@
 
 local session = nil -- everything about the menu that is open right now
 local opening = false
-local revving = false
+local revving = false -- the rev key or button is held
+local revBusy = false -- the engine is revving or settling
 local objective = nil -- { text, slot } from a mission script, see SetMenuObjective
 
 local Labels = {
@@ -900,6 +901,7 @@ local function closeMenu(restore)
 		end
 		SetVehicleLights(vehicle, 0)
 		FreezeEntityPosition(vehicle, false)
+		if revBusy then SetVehicleHandbrake(vehicle, false) end -- closed mid-rev
 	end
 	session = nil
 	camera = nil
@@ -1041,21 +1043,63 @@ RegisterNUICallback('Orbit', function(data, cb)
 	cb(1)
 end)
 
+-- REV
+-- The game's own "rev engine" driving action, the one its car meets and race line-ups use:
+-- throttle with the vehicle held, so it revs on the spot. A frozen vehicle does not run its
+-- engine, so the freeze comes off while it revs and goes back on once the engine has settled.
+
+local RevAction, WaitAction = 31, 1 -- TEMPACT_REV_ENGINE, TEMPACT_WAIT
+local RevChunk, RevTap = 2500, 600 -- ms: how long one action lasts, the shortest rev a tap gives
+
+local function revEngine()
+	local vehicle, ped = session.vehicle, PlayerPedId()
+	local home = GetEntityCoords(vehicle)
+	local function open()
+		return session ~= nil and session.vehicle == vehicle and DoesEntityExist(vehicle)
+	end
+	FreezeEntityPosition(vehicle, false)
+	SetVehicleHandbrake(vehicle, true)
+	if not GetIsVehicleEngineRunning(vehicle) then SetVehicleEngineOn(vehicle, true, true, false) end
+	local held, started, renew, settle = true, GetGameTimer(), 0, nil
+	while open() and #(GetEntityCoords(vehicle) - home) < 0.3 do -- it must never drive off
+		local now = GetGameTimer()
+		if revving and not held then started = now end
+		held = revving
+		if held or now - started < RevTap then
+			settle = nil
+			if now >= renew then
+				TaskVehicleTempAction(ped, vehicle, RevAction, RevChunk)
+				renew = now + RevChunk - 200
+			end
+		elseif not settle then
+			settle, renew = now, 0
+			TaskVehicleTempAction(ped, vehicle, WaitAction, 100) -- foot off the throttle
+		elseif now - settle > 2000 or (now - settle > 300 and GetVehicleCurrentRpm(vehicle) < 0.3) then
+			break
+		end
+		Wait(0)
+	end
+	if DoesEntityExist(vehicle) then
+		if not settle then TaskVehicleTempAction(ped, vehicle, WaitAction, 100) end
+		SetVehicleHandbrake(vehicle, false)
+		if open() then
+			FreezeEntityPosition(vehicle, true)
+			if #(GetEntityCoords(vehicle) - home) >= 0.3 then
+				SetEntityCoordsNoOffset(vehicle, home.x, home.y, home.z, false, false, false)
+			end
+		end
+	end
+end
+
 RegisterNUICallback('Rev', function(data, cb)
 	cb(1)
 	if not session then return end
-	if not data.on then
-		revving = false
-	elseif not revving then
-		revving = true
+	revving = data.on == true
+	if revving and not revBusy and GetPedInVehicleSeat(session.vehicle, -1) == PlayerPedId() then
+		revBusy = true
 		CreateThread(function()
-			local vehicle = session.vehicle
-			local rpm = 0.2
-			while revving and session do
-				rpm = math.min(rpm + 0.03, 1.0)
-				SetVehicleCurrentRpm(vehicle, rpm)
-				Wait(0)
-			end
+			revEngine()
+			revBusy = false
 		end)
 	end
 end)

@@ -119,31 +119,28 @@
     font-display: block;
 }
 
-/* Nobody has identified what GTA6 actually sets its scrollable item-select
-   lists (the fridge, presumably others) in. Previously stood in with a
-   commercial font (Belle Sans Extra Condensed Bold) that turned out to have
-   no redistributable tier -- swapped for Plus Jakarta Sans (variable font,
-   SIL OFL -- see fonts/PlusJakartaSans-OFL.txt), same face osm-target uses
-   for its own UI text, at its heaviest weight for a condensed-ish look at a
-   glance. Used with a black outline (see .item-select-outline below),
-   because that is what the reference actually draws: white fill, a hard
-   black stroke round it, no drop shadow doing the separation instead. */
+/* Belle Sans Extra Condensed Bold. Not the reference's real face -- nobody has
+   identified what GTA6 actually sets its scrollable item-select lists (the
+   fridge, presumably others) in -- but the closest condensed-grotesque match
+   found so far, standing in until a better one turns up. Used with a black
+   outline (see .item-select-outline below), because that is what the
+   reference actually draws: white fill, a hard black stroke round it, no
+   drop shadow doing the separation instead. */
 @font-face {
-    font-family: 'PlusJakartaSans';
-    src: url('fonts/PlusJakartaSans-Variable.ttf') format('truetype-variations');
-    font-weight: 200 800;
+    font-family: 'BelleSansCondensed';
+    src: url('fonts/BelleSansExtraCondensedBold.otf') format('opentype');
+    font-weight: 700;
     font-style: normal;
     font-display: block;
 }
 
 /* The black-outline text treatment itself, kept separate from the @font-face
-   above so any element can opt in once the fridge-style list this was
-   measured against exists. paint-order swaps stroke-then-fill, or the 2px
-   stroke would sit on TOP of the fill and eat into the glyph instead of
-   ringing it. */
+   so any element can opt in once the fridge-style list this was measured
+   against exists. paint-order swaps stroke-then-fill, or the 2px stroke would
+   sit on TOP of the fill and eat into the glyph instead of ringing it. */
 .item-select-outline {
-    font-family: 'PlusJakartaSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-weight: 800;
+    font-family: 'BelleSansCondensed', 'HelveticaNeueHUD', 'Helvetica Neue', sans-serif;
+    font-weight: 700;
     color: #f2f2ef;
     -webkit-text-stroke: 0.045em #0a0a0a;
     paint-order: stroke fill;
@@ -1916,6 +1913,64 @@ html, body {
 }
 .feed-line { display: flex; align-items: center; gap: 1cqh; white-space: nowrap; }
 .feed-line img { height: 1.75cqh; width: auto; display: block; filter: drop-shadow(0 0 0.15cqh rgba(0, 0, 0, 0.8)); }
+/* A count of something going on, "2 scored" in GTA VI's basketball. Measured
+   there at 1440p: capitals 25 px, the hoop after it 35 px tall, 24 px apart. */
+.feed-line.counter { font-size: 2.4cqh; gap: 1.67cqh; }
+.feed-line.counter img { height: 2.43cqh; }
+
+/* A button in the help box's line ('aim with (RMB) and hold (LMB)'): the
+   prompts' glyph, brought down to the text and sat on its middle. */
+#help-text .help-glyph {
+    --g-h: 2.6cqh;
+    display: inline-block;
+    vertical-align: -0.62cqh;
+    margin: 0 0.15cqh;
+}
+
+/* The gain card, "Focus +2%". Measured off GTA VI's basketball at 1440p
+   (cqh is 14.4px there): 520 x 115 px, 50 px in from the right and 45 up
+   from the bottom, a 92 px ring 12 px thick round the eye with 11 px either
+   side of it, the name in bold over the gain, both about 30 px. The plate is
+   the help box's. */
+#statgain {
+    position: absolute;
+    right: 3.47cqh;
+    bottom: 3.13cqh;
+    width: 36.1cqh;
+    height: 8cqh;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 1.05cqh;
+    padding: 0 0.76cqh;
+    background: rgba(38, 34, 46, 0.82);
+    border-radius: 1cqh;
+    box-shadow: inset 0 0 0 0.09cqh rgba(255, 255, 255, 0.08);
+    font-family: 'ViceText', 'Segoe UI', Roboto, Arial, sans-serif;
+    color: #ececf0;
+    pointer-events: none;
+}
+#statgain-ring { flex: 0 0 auto; width: 6.4cqh; height: 6.4cqh; }
+#statgain-ring svg { display: block; width: 100%; height: 100%; }
+#statgain .sg-track,
+#statgain .sg-arc { fill: none; stroke-width: 13; }
+#statgain .sg-track { stroke: rgba(167, 135, 255, 0.34); }
+#statgain .sg-fill { stroke: rgba(167, 135, 255, 0.8); }
+#statgain .sg-gain { stroke: #f4f2f8; }
+#statgain .sg-eye { fill: #a787ff; }
+#statgain .sg-pupil { fill: rgb(38, 34, 46); }
+#statgain-copy { display: flex; flex-direction: column; gap: 0.5cqh; min-width: 0; }
+#statgain-label { font-size: 2cqh; font-weight: 700; line-height: 1.1; }
+#statgain-text { font-size: 2cqh; font-weight: 400; line-height: 1.1; }
+
+@keyframes statGainIn {
+    from { opacity: 0; transform: translateY(0.8cqh); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+#statgain.slot-in { animation: statGainIn 220ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+    #statgain.slot-in { animation: none; }
+}
 
 /* Title cards. Three shapes in the reference:
      stack     "NINE MONTHS AGO." -- very large capitals 96px tall, one word a
@@ -4570,6 +4625,80 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
 #race-count.hidden { display: none !important; }
 
 /* -----------------------------------------------------------------------------
+   Race marker
+   -----------------------------------------------------------------------------
+   The icon over the next checkpoint's pillar. Measured on the dirt-bike race at
+   1080p (the pillar and smoke are world-space, client_overlays.lua):
+
+     dot        14 px across, accent with a darker rim
+     distance   white "453 ft" with a dark edge, 9 px capitals, its top 17 px
+                under the dot; the pillar starts 5 px under it
+     finish     a 25 x 26 px accent tile with rounded corners, a dark edge and
+                a 4 x 3 chequer in its middle 60 x 46 %; the distance 10 px
+                under it
+
+   The element's bottom centre is the top of the pillar, so it is pulled up
+   and left by its own size. Accent from the same variables as the race
+   plate's bar and the nav tile, so a teal character's marker is teal.
+   -------------------------------------------------------------------------- */
+#race-marker {
+    position: absolute;
+    left: 50cqw;
+    top: 50cqh;
+    transform: translate(-50%, -100%);
+    padding-bottom: 0.45cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.6cqh;
+    pointer-events: none;
+    --rm-accent: var(--nav-accent, var(--nav-accent-gender-default, #fc74a4));
+}
+#race-marker.hidden { display: none !important; }
+#race-marker-icon {
+    width: 1.38cqh;
+    height: 1.38cqh;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: var(--rm-accent);
+    border: 0.16cqh solid rgba(48, 10, 28, 0.55);
+}
+#race-marker.finish { gap: 0.95cqh; }
+#race-marker.finish #race-marker-icon {
+    position: relative;
+    width: 2.32cqh;
+    height: 2.41cqh;
+    border-radius: 0.42cqh;
+    border: 0.17cqh solid rgba(40, 10, 24, 0.85);
+}
+/* The chequer: four squares across, three down, dark on the accent, inset
+   from the tile's edge as in the reference. */
+#race-marker.finish #race-marker-icon::after {
+    content: '';
+    position: absolute;
+    left: 20%;
+    right: 20%;
+    top: 27%;
+    bottom: 27%;
+    background-image: conic-gradient(
+        rgba(46, 14, 30, 0.82) 0 25%, transparent 0 50%,
+        rgba(46, 14, 30, 0.82) 0 75%, transparent 0);
+    background-size: 50% 66.67%;
+}
+#race-marker-dist {
+    font-family: 'Bahnschrift', 'DIN Condensed', 'Oswald', 'Arial Narrow', sans-serif;
+    font-weight: 500;
+    font-size: 1.3cqh;
+    letter-spacing: 0.03em;
+    line-height: 1;
+    white-space: nowrap;
+    color: #f4f1f4;
+    text-shadow:
+        -0.08cqh -0.08cqh 0 #2a2a3a, 0.08cqh -0.08cqh 0 #2a2a3a,
+        -0.08cqh 0.08cqh 0 #2a2a3a, 0.08cqh 0.08cqh 0 #2a2a3a, 0 0 0.25cqh rgba(20, 20, 32, 0.6);
+}
+
+/* -----------------------------------------------------------------------------
    Interact menu  (Phase 1 of the ox_target-replacement project)
    -----------------------------------------------------------------------------
    Just a list. No targeting geometry, no raycast highlight -- that engine is
@@ -4851,6 +4980,51 @@ input.ed-pval::selection { background: rgba(95, 216, 200, 0.42); color: #fff; }
     text-shadow: 0 0.1cqh 0.3cqh rgba(0, 0, 0, 0.8);
 }
 #lockpick.lp-alarm #lp-alarm-banner { opacity: 1; }
+
+/* The key clone check (client_overlays.lua, the single-player HUD's CLONE
+   KEY) on the same ring, as the approved key cloning mock draws it: the
+   window in the band's pink with a soft glow, a white dot with a dark edge
+   and a white glow, a third of the band filled per hit (#lp-fill, over the
+   window), the track red for a moment on a miss, green with "Key cloned"
+   when it's done. None of it shows outside lp-clone, and no chevron there:
+   nothing is dragged. */
+#lp-window, #lp-dot, #lp-done-banner { display: none; }
+#lockpick.lp-clone #lp-window,
+#lockpick.lp-clone #lp-dot { display: inline; }
+#lockpick.lp-clone #lp-done-banner { display: block; }
+#lockpick.lp-clone #lp-chevron { display: none; }
+#lockpick.lp-win #lp-window, #lockpick.lp-win #lp-dot,
+#lockpick.lp-alarm #lp-window, #lockpick.lp-alarm #lp-dot { display: none; }
+#lp-window {
+    stroke: rgba(252, 116, 164, 0.85);
+    stroke-width: 8;
+    filter: drop-shadow(0 0 0.37cqh rgba(252, 116, 164, 0.6));
+}
+#lp-dot {
+    fill: #ffffff;
+    stroke: rgba(0, 0, 0, 0.55);
+    stroke-width: 1.2;
+    filter: drop-shadow(0 0 0.28cqh rgba(255, 255, 255, 0.7));
+}
+#lockpick.lp-miss #lp-track { stroke: rgba(217, 88, 92, 0.85); }
+#lp-done-banner {
+    position: absolute;
+    top: calc(50% - 3.635 * var(--w));
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #6ec06e;
+    font-weight: 800;
+    font-size: calc(0.288 * var(--w));
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 150ms ease;
+    text-shadow: 0 0.1cqh 0.3cqh rgba(0, 0, 0, 0.8);
+}
+#lockpick.lp-clone.lp-win #lp-done-banner { opacity: 1; }
+.lp-pad-ink { display: block; }
+.lp-pad-ink .g-ink { fill: none; stroke: #111111; stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* Centre: a plain flex box occupying the whole ring, same trick .pip-ring's
    own centre label uses, so #lp-glyph only ever has to express its OWN

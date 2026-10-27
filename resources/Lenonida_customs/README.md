@@ -116,6 +116,8 @@ Who pays:
 
 The menu has no money display of its own, your HUD is expected to draw it. While the menu is open `LocalPlayer.state['customs:menuOpen']` is `true` and the local event `customs:menu` fires with `true`, then `false` on close. The game's own HUD and radar are hidden while it is open.
 
+The menu disables the game's controls while it is open, but a resource that reads the controller directly (`IsDisabledControlPressed`, as a radio wheel on D-pad Left might) still sees every press the menu uses. Have it check `customs:menuOpen` and stand down while it is `true`.
+
 Nitrous state is in `LocalPlayer.state['customs:nitrous']` (not replicated) and is also sent as the local event `customs:nitrous`:
 
 ```lua

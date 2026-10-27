@@ -26,6 +26,18 @@
         <ul class="roster" id="roster"></ul>
     </div>
 
+    <!-- The 'rings' shot: a white ring and a dot in the middle of the screen,
+         and the yellow ring when a basket is under it. Sizes are in units of
+         the white ring's radius; app.js sets that from Config.Shot.rings. -->
+    <div id="reticle" class="hidden">
+        <svg viewBox="-1.1 -1.1 2.2 2.2" aria-hidden="true">
+            <circle id="ring-yellow" cx="0" cy="0" r="0.4"></circle>
+            <circle id="ring-white" cx="0" cy="0" r="1"></circle>
+            <circle id="ring-dot" cx="0" cy="0" r="0.067"></circle>
+        </svg>
+    </div>
+
     <script src="app.js"></script>
+    <script src="sfx.js"></script>
 </body>
 </html>

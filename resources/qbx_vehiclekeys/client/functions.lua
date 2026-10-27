@@ -1,5 +1,123 @@
 local config = require 'config.client'
 
+-- ---------------------------------------------------------------------------
+-- Break-in animations
+-- ---------------------------------------------------------------------------
+-- Every anim entry in config.anims resolves model -> class -> default, and any
+-- of those three may be EITHER one { dict, clip } table or a LIST of them. A
+-- list is picked from at random per attempt, which is the whole reason this
+-- helper exists: the same forced entry playing identically every single time
+-- reads as one canned move rather than someone working a door.
+--
+-- A clip that is not in its dict makes TaskPlayAnim silently do nothing (that
+-- is exactly how smashWindow ended up with no animation for a while, see the
+-- note on it in config/client.lua), and a dict that does not exist on this
+-- build behaves the same way. Neither reports an error, so the dict is checked
+-- here and an entry that fails is dropped instead of played into the void.
+
+---Is this dict/clip pair real on this build?
+---
+---Both halves have to be checked and neither reports an error on its own.
+---DoesAnimDictExist covers the dict. For the clip there is no direct native, so
+---this uses GetAnimDuration, which returns 0 for a name that is not in the
+---dict: that is the only way to tell a real clip from a plausible-looking
+---typo, and a typo is indistinguishable from a working anim at runtime because
+---TaskPlayAnim just quietly does nothing.
+---@param dict string
+---@param clip string
+---@return boolean
+local function getAnimIsReal(dict, clip)
+    if type(dict) ~= 'string' or dict == '' then return false end
+    if type(clip) ~= 'string' or clip == '' then return false end
+    if not DoesAnimDictExist(dict) then return false end
+
+    -- GetAnimDuration reads clip metadata, so the dict has to be in memory.
+    if not HasAnimDictLoaded(dict) then
+        RequestAnimDict(dict)
+
+        local timeout = GetGameTimer() + 5000
+        while not HasAnimDictLoaded(dict) and GetGameTimer() < timeout do
+            Wait(0)
+        end
+
+        if not HasAnimDictLoaded(dict) then return false end
+    end
+
+    return GetAnimDuration(dict, clip) > 0.0
+end
+
+---Drops variants that are not real, in place.
+---@param entry table one { dict, clip } or a list of them
+---@param label string for the console summary
+---@return table? entry, or nil when nothing in it survived
+local function pruneAnimEntry(entry, label)
+    if type(entry) ~= 'table' then return end
+
+    if entry.dict then
+        if getAnimIsReal(entry.dict, entry.clip) then return entry end
+        print(('^3[qbx_vehiclekeys]^7 %s: "%s / %s" is not a real anim on this build, dropped')
+            :format(label, tostring(entry.dict), tostring(entry.clip)))
+        return
+    end
+
+    local kept = {}
+    for i = 1, #entry do
+        local variant = entry[i]
+        if type(variant) == 'table' and getAnimIsReal(variant.dict, variant.clip) then
+            kept[#kept + 1] = variant
+        elseif type(variant) == 'table' then
+            print(('^3[qbx_vehiclekeys]^7 %s: "%s / %s" is not a real anim on this build, dropped')
+                :format(label, tostring(variant.dict), tostring(variant.clip)))
+        end
+    end
+
+    return #kept > 0 and kept or nil
+end
+
+-- Validated ONCE at startup rather than per attempt, so the resolver below is a
+-- plain table lookup with no streaming work or blocking wait in the middle of
+-- someone breaking into a car. It also means the console says plainly which
+-- clips are real on this build, which is the only practical way to find out:
+-- there is no offline list, and a wrong clip name looks exactly like a working
+-- one right up until nothing plays.
+CreateThread(function()
+    if not config.anims then return end
+
+    for name, anims in pairs(config.anims) do
+        if type(anims) == 'table' then
+            for _, bucket in ipairs({ 'default', 'class', 'model' }) do
+                local value = anims[bucket]
+                if bucket == 'default' then
+                    anims.default = pruneAnimEntry(value, name .. '.default')
+                elseif type(value) == 'table' then
+                    for key, entry in pairs(value) do
+                        value[key] = pruneAnimEntry(entry, ('%s.%s[%s]'):format(name, bucket, tostring(key)))
+                    end
+                end
+            end
+        end
+    end
+end)
+
+---Resolves one anim entry for a vehicle, picking at random when that entry is
+---a list of variants. Everything here has already been validated at startup.
+---@param anims { default: table, class: table, model: table }?
+---@param vehicle number
+---@return { dict: string, clip: string }? nil when nothing usable is configured
+function ResolveVehicleAnim(anims, vehicle)
+    if not anims then return end
+
+    local entry = anims.model and anims.model[GetEntityModel(vehicle)]
+        or anims.class and anims.class[GetVehicleClass(vehicle)]
+        or anims.default
+    if type(entry) ~= 'table' then return end
+
+    if entry.dict then return entry end
+    if #entry == 0 then return end
+
+    return entry[math.random(#entry)]
+end
+
 ---Grants keys for job shared vehicles
 ---@param vehicle number The entity number of the vehicle.
 ---@return boolean? `true` if the vehicle is shared for a player's job, `nil` otherwise.
@@ -44,6 +162,15 @@ exports('HasKeys', HasKeys)
 function GetIsVehicleAccessible(vehicle)
     return HasKeys(vehicle) or AreKeysJobShared(vehicle)
 end
+
+-- Exported (not just HasKeys above) so ox_target/client/defaults.lua's own
+-- door-toggle options can gate on the SAME "do I actually have access"
+-- check slimjim.lua's getIsPickable already uses, rather than door-toggle
+-- only ever looking at the vehicle's raw lock status. HasKeys alone would
+-- miss job-shared access (AreKeysJobShared, not exported -- job-share rules
+-- read this resource's own config.client, no reason for another resource
+-- to duplicate that), which this combines the same way getIsPickable does.
+exports('GetIsVehicleAccessible', GetIsVehicleAccessible)
 
 local alertSend = false --Variable strictly related to sendPoliceAlertAttempt, not used elsewhere
 function SendPoliceAlertAttempt(crime, vehicle)
@@ -196,10 +323,10 @@ function LockpickDoor(isAdvancedLockedpick, maxDistance, customChallenge)
     islockpickingProcessLocked = true -- one call per player at a time
 
     CreateThread(function()
-        local anim = config.anims.lockpick.model[GetEntityModel(vehicle)]
-            or config.anims.lockpick.class[GetVehicleClass(vehicle)]
-            or config.anims.lockpick.default
-        lib.playAnim(cache.ped, anim.dict, anim.clip, 3.0, 3.0, -1, 16, 0, false, false, false) -- lock opening animation
+        local anim = ResolveVehicleAnim(config.anims.lockpick, vehicle)
+        if anim then
+            lib.playAnim(cache.ped, anim.dict, anim.clip, 3.0, 3.0, -1, 16, 0, false, false, false) -- lock opening animation
+        end
         local isSuccess = customChallenge or lib.skillCheck(skillCheckConfig.difficulty, skillCheckConfig.inputs)
 
         if getIsVehicleInRange(vehicle, maxDistance) then -- the action will be aborted if the opened vehicle is too far.
@@ -251,10 +378,10 @@ function Hotwire(vehicle, isAdvancedLockedpick, customChallenge)
     isHotwiringProcessLocked = true -- one call per player at a time
 
     CreateThread(function()
-        local anim = config.anims.hotwire.model[GetEntityModel(vehicle)]
-        or config.anims.hotwire.class[GetVehicleClass(vehicle)]
-        or config.anims.hotwire.default
-        lib.playAnim(cache.ped, anim.dict, anim.clip, 3.0, 3.0, -1, 16, 0, false, false, false) -- lock opening animation
+        local anim = ResolveVehicleAnim(config.anims.hotwire, vehicle)
+        if anim then
+            lib.playAnim(cache.ped, anim.dict, anim.clip, 3.0, 3.0, -1, 16, 0, false, false, false) -- hotwire animation
+        end
         local isSuccess = customChallenge or lib.skillCheck(skillCheckConfig.difficulty, skillCheckConfig.inputs)
 
         hotwireCallback(vehicle, isAdvancedLockedpick, isSuccess)

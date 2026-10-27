@@ -1199,6 +1199,25 @@
         box.style.top = (d.y * 100) + 'cqh';
     }
 
+    /* --- race marker -----------------------------------------------------
+       The next checkpoint's icon over its pillar (client_overlays.lua's race
+       marker section draws the pillar and works out where its top lands on
+       screen). d: { show, kind: 'checkpoint'|'finish', x, y (0..1 of the
+       screen), text: '453 ft' }. show:false with no position is the marker
+       going away or the point being behind the camera; either way nothing is
+       drawn until a position comes back. */
+    function onRaceMarker(d) {
+        var box = $('race-marker');
+        if (!box) return;
+        if (d && d.kind) box.classList.toggle('finish', d.kind === 'finish');
+        if (!d || !d.show || d.x == null || d.y == null) { show(box, false); return; }
+        box.style.left = (d.x * 100) + 'cqw';
+        box.style.top = (d.y * 100) + 'cqh';
+        var dist = $('race-marker-dist');
+        if (dist && d.text != null && dist.textContent !== String(d.text)) dist.textContent = String(d.text);
+        show(box, true);
+    }
+
     /* --- lockpick check -------------------------------------------------
        Analog direction-fill ring. Lua owns the input reading and the
        direction/completion decision entirely (see exports.vice_hud:
@@ -1271,7 +1290,7 @@
         if (!box) return;
         if (!d || !d.show) { show(box, false); return; }
 
-        box.classList.remove('lp-win', 'lp-alarm');
+        box.classList.remove('lp-win', 'lp-alarm', 'lp-clone', 'lp-miss');
         var fill = $('lp-fill');
         if (fill) fill.setAttribute('d', '');
         var glyphBox = $('lp-glyph');
@@ -1332,6 +1351,83 @@
         box.classList.add('lp-alarm');
         clearTimeout(lockpickResultTimer);
         lockpickResultTimer = setTimeout(function () { show(box, false); }, 450);
+    }
+
+    /* --- key clone check -------------------------------------------------
+       The same ring in its lp-clone mode, for client_overlays.lua's key
+       clone check (the single-player HUD's CLONE KEY): the pink window, the
+       white dot sweeping the bottom half, a third of the band filled for
+       each hit, green and "Key cloned" when it's done, the lockpick's own
+       alarm when it isn't. Lua decides everything; this draws it. */
+    var keyCloneTimer = null;
+    var keyCloneMissTimer = null;
+
+    function onKeyClone(d) {
+        var box = $('lockpick');
+        if (!box) return;
+        clearTimeout(lockpickResultTimer);
+        clearTimeout(keyCloneTimer);
+        box.classList.remove('lp-win', 'lp-alarm', 'lp-miss');
+        if (!d || !d.show) { box.classList.remove('lp-clone'); show(box, false); return; }
+
+        box.classList.add('lp-clone');
+        ['lp-fill', 'lp-window'].forEach(function (id) { var el = $(id); if (el) el.setAttribute('d', ''); });
+        var glyphBox = $('lp-glyph');
+        if (glyphBox) glyphBox.style.setProperty('--lp-dx', 0);
+        // A pad's face button is drawn as its own mark (Xbox X, PlayStation
+        // square) in dark ink on the white disc; anything else is the key's text.
+        var face = d.device === 'pad' && G_FACE[padStyle === 'ps' ? 'ps' : 'xbox'][d.glyph];
+        if (face) {
+            var text = $('lp-glyph-text');
+            if (text) text.innerHTML = '<svg class="lp-pad-ink" viewBox="0 0 36 36" width="22" height="22" aria-hidden="true">' + face + '</svg>';
+        } else {
+            setLockpickGlyph(d.glyph || 'E');
+        }
+        show(box, true);
+    }
+
+    function onKeyCloneProgress(d) {
+        if (!d) return;
+        var w = d.window || 24 / 1.8;
+        var t = Math.max(w / 2, Math.min(100 - w / 2, d.target != null ? d.target : 50));
+        var win = $('lp-window');
+        if (win) win.setAttribute('d', lpArcPath(t - w / 2, t + w / 2));
+        var dot = $('lp-dot');
+        if (dot) {
+            var p = lpArcPoint(Math.max(0, Math.min(100, d.pos || 0)));
+            dot.setAttribute('cx', p.x.toFixed(3));
+            dot.setAttribute('cy', p.y.toFixed(3));
+        }
+        var hits = Math.max(0, Math.min(3, d.hits || 0));
+        var fill = $('lp-fill');
+        if (fill) fill.setAttribute('d', hits > 0 ? lpArcPath(0, hits * 100 / 3) : '');
+    }
+
+    // A miss: the track goes red for a quarter of a second.
+    function onKeyCloneMiss() {
+        var box = $('lockpick');
+        if (!box) return;
+        box.classList.add('lp-miss');
+        clearTimeout(keyCloneMissTimer);
+        keyCloneMissTimer = setTimeout(function () { box.classList.remove('lp-miss'); }, 250);
+    }
+
+    function onKeyCloneResult(d) {
+        var box = $('lockpick');
+        if (!box) return;
+        var won = !!(d && d.success);
+        if (won) {
+            box.classList.add('lp-win');
+            var fill = $('lp-fill');
+            if (fill) fill.setAttribute('d', lpArcPath(0, 100));
+        } else {
+            box.classList.add('lp-alarm');
+        }
+        clearTimeout(keyCloneTimer);
+        keyCloneTimer = setTimeout(function () {
+            box.classList.remove('lp-clone', 'lp-win', 'lp-alarm', 'lp-miss');
+            show(box, false);
+        }, won ? 700 : 900);
     }
 
     /* --- minimap slot geometry ------------------------------------------- */
@@ -1533,6 +1629,36 @@
 
         if (skillUpTimer) clearTimeout(skillUpTimer);
         skillUpTimer = setTimeout(function () { show(el, false); }, 4200);
+    }
+
+    /* The gain card: "Focus +2%" bottom right, for a skill that goes up a
+       little at a time in front of the player (client_skills.lua, award's
+       `card`). The ring is the skill's standing, 0 at twelve o'clock and
+       round clockwise: what there was before in the skill's colour, what this
+       just added in white. A gain too small to see is drawn as a sliver, the
+       way the reference's +2% is. */
+    var statGainTimer = null;
+
+    function onStatGain(d) {
+        var el = $('statgain');
+        if (!el || !d || !d.label) return;
+        var clamp = function (v) { return Math.max(0, Math.min(1, Number(v) || 0)); };
+        var from = clamp(d.from), to = Math.max(from, clamp(d.to));
+        var gain = Math.max(to - from, 0.015);
+
+        $('statgain-label').textContent = d.label;
+        $('statgain-text').textContent = d.text || '';
+        $('statgain-fill').setAttribute('stroke-dasharray', (from * 100).toFixed(2) + ' 100');
+        $('statgain-gain').setAttribute('stroke-dasharray', (gain * 100).toFixed(2) + ' 100');
+        $('statgain-gain').setAttribute('stroke-dashoffset', (-from * 100).toFixed(2));
+
+        el.classList.remove('slot-in');
+        show(el, true);
+        void el.offsetWidth;
+        el.classList.add('slot-in');
+
+        if (statGainTimer) clearTimeout(statGainTimer);
+        statGainTimer = setTimeout(function () { show(el, false); }, 4000);
     }
 
     function onSkills(d) {
@@ -2091,33 +2217,46 @@
            -- and keeps its own clock either way. */
         var asleep = function (id) { return !running && id !== 'pip-tracker'; };
 
+        /* A bicycle has no tank and no engine, a train no tank: client.lua
+           says so (noFuel / noEngine, from the vehicle class), and those pips
+           are not seats on that vehicle -- a grey fuel pump on a BMX was a
+           reading of nothing. Nothing new is drawn; the pips that do not
+           apply are simply left out. */
+        var hasFuel = d.noFuel !== true;
+        var hasEngine = d.noEngine !== true;
+
         /* The name plate is an announcement: here is the car, here is the
            state it is in. Everything it has -- lit if the car is running. */
         if (expanded) {
-            show($('pip-fuel'), true);
-            show($('pip-engine'), true);
+            show($('pip-fuel'), hasFuel);
+            show($('pip-engine'), hasEngine);
             show($('pip-tracker'), hasTrack);
             show($('pip-nitrous'), hasNitro);
             ['pip-fuel', 'pip-engine', 'pip-nitrous'].forEach(function (id) {
                 if (asleep(id)) $(id).classList.add('quiet');
             });
-            show($('veh-foot'), true);
+            show($('veh-foot'), hasFuel || hasEngine || hasTrack || hasNitro);
             return true;
         }
 
-        /* Collapsed. Engine and fuel are always seats in the row; the tracker
-           and nitrous are in it only while there is something to track or a
-           kit on the car. The row is up while ANY of the pips in it has moved
-           recently, and each pip is lit or quiet on its own clock. */
-        var row = [['pip-fuel', ageFuel], ['pip-engine', ageEng]];
+        /* Collapsed. Engine and fuel are always seats in the row (when the
+           vehicle has them); the tracker and nitrous are in it only while
+           there is something to track or a kit on the car. The row is up
+           while ANY of the pips in it has moved recently, and each pip is lit
+           or quiet on its own clock. */
+        var row = [];
+        if (hasFuel) row.push(['pip-fuel', ageFuel]);
+        if (hasEngine) row.push(['pip-engine', ageEng]);
         if (hasTrack) row.push(['pip-tracker', ageTrack]);
         if (hasNitro) row.push(['pip-nitrous', ageNitro]);
 
-        var freshest = Math.min.apply(null, row.map(function (p) { return p[1]; }));
+        var freshest = row.length
+            ? Math.min.apply(null, row.map(function (p) { return p[1]; }))
+            : Infinity;
         var rowUp = freshest < PIP_LIT_MS + PIP_DIM_MS;
 
-        show($('pip-fuel'), rowUp);
-        show($('pip-engine'), rowUp);
+        show($('pip-fuel'), rowUp && hasFuel);
+        show($('pip-engine'), rowUp && hasEngine);
         show($('pip-tracker'), rowUp && hasTrack);
         show($('pip-nitrous'), rowUp && hasNitro);
         if (rowUp) {
@@ -2711,6 +2850,15 @@
         if (!el) return;
         if (!d || d.show === false || !d.text) { takeDown('helpText', el); return; }
         richText(el, d.text);
+        // [[1]], [[2]]: the buttons client_overlays.lua resolved from opts.keys,
+        // in the line where the text names them ('aim with [[1]] and hold [[2]]').
+        if (d.glyphs && d.glyphs.length) {
+            el.innerHTML = el.innerHTML.replace(/\[\[(\d+)\]\]/g, '<span class="help-glyph" data-key="$1"></span>');
+            el.querySelectorAll('.help-glyph').forEach(function (span) {
+                var g = d.glyphs[Number(span.getAttribute('data-key')) - 1];
+                if (g) setGlyph(span, g.glyph, g.device, 'glyph help-glyph');
+            });
+        }
         // The reference puts the wanted tells under a line about the police.
         if (d.tells && d.tells.length) {
             var row = document.createElement('div');
@@ -2728,6 +2876,14 @@
         if (!box || !d || !d.text) return;
         var line = document.createElement('div');
         line.className = 'feed-line';
+        // A count ("2 scored"): a size up, and in place of the last one.
+        if (d.counter) {
+            line.classList.add('counter');
+            line.setAttribute('data-counter', d.counter);
+            Array.prototype.forEach.call(box.querySelectorAll('.feed-line.counter'), function (old) {
+                if (old.getAttribute('data-counter') === d.counter) box.removeChild(old);
+            });
+        }
         var text = document.createElement('span');
         richText(text, d.text);
         line.appendChild(text);
@@ -3074,7 +3230,7 @@
         var s = polVi, now = polNow();
         if (d.shape) s.shape = d.shape;
         if (d.mode) s.mode = d.mode;
-        if (d.size != null) s.size = Math.max(0.4, Math.min(2, d.size / 100));
+        if (d.size != null) s.size = d.size <= 0 ? 0 : Math.max(0.4, Math.min(2, d.size / 100));
         if (d.arrowOn != null) s.arrowOn = !!d.arrowOn;
         if (d.maxOpacity) s.maxOpacity = d.maxOpacity;
         if (d.nearSize) s.nearSize = d.nearSize;
@@ -3283,7 +3439,8 @@
 
         s.near += (s.nearTarget - s.near) * Math.min(1, dt * 4);
         var busy = false;
-        if (s.shape !== 'wide') busy = polDrawRound(ctx, now, dt, W) || busy;
+        // Size 0 is the GTA VI row switched off; the arrow below is separate.
+        if (s.shape !== 'wide' && s.size > 0) busy = polDrawRound(ctx, now, dt, W) || busy;
         if (s.arrowOn) busy = polDrawArrow(ctx, dt, W) || busy;
 
         if (busy) { raf(polViFrame); return; }
@@ -3306,7 +3463,7 @@
         if (k === 'maxOpacity' || k === 'whiteA') return Math.round(v * 100) + '%';
         if (k === 'maxDistance' || k === 'fullDistance') return Math.round(v) + 'm';
         if (k === 'previewAngle') return Math.round(v) + '°';
-        if (k === 'size') return Math.round(v) + '%';
+        if (k === 'size') return v <= 0 ? 'Off' : Math.round(v) + '%';
         if (POL_ED_PCT[k]) return Math.round(v) + '%';
         var dec = POL_ED_DEC[k] != null ? POL_ED_DEC[k] : 0;
         return v.toFixed(dec);
@@ -3372,6 +3529,8 @@
             if (!input) return;
             input.addEventListener('input', function () {
                 var v = +input.value;
+                // The row is either off (0) or 60-140%: nothing in between.
+                if (k === 'size' && v > 0 && v < 60) { v = v < 30 ? 0 : 60; input.value = String(v); }
                 if (out) out.textContent = polEdFormat(k, v);
                 // previewAngle is a testing aid, not a saved setting — it has
                 // its own endpoint so it never ends up written to the KVP.
@@ -5128,6 +5287,7 @@
         lapHud: onLapHud,
         raceCard: onRaceCard,
         raceCountdown: onRaceCountdown,
+        raceMarker: onRaceMarker,
         interact: onInteract,
         worldActions: onWorldActions,
         worldActionsPos: onWorldActionsPos,
@@ -5135,6 +5295,10 @@
         lockpickProgress: onLockpickProgress,
         lockpickResult: onLockpickResult,
         lockpickAlarm: onLockpickAlarm,
+        keyClone: onKeyClone,
+        keyCloneProgress: onKeyCloneProgress,
+        keyCloneMiss: onKeyCloneMiss,
+        keyCloneResult: onKeyCloneResult,
         mapRect: onMapRect,
         mapDebug: onMapDebug,
         zone: onZone,
@@ -5165,6 +5329,7 @@
         policeEditor: onPoliceEditor,
         skills: onSkills,
         skillUp: onSkillUp,
+        statGain: onStatGain,
         exhaustion: onExhaustion,
         hudOffset: onOffset,
         layout: onLayout,

@@ -258,6 +258,7 @@ RegisterNetEvent('sk_streetkings:racing:mp:go', function(lobbyId)
             cpPerLap    = (def.scheme == 'circuit') and (#def.checkpoints + 1) or #def.checkpoints,
         }
         SKCheckpoints.show(raceState.checkpoints, 1, #raceState.checkpoints == 1, raceState.meta)
+        SKRaceObjective(def, true)
         SKPushLapHud({
             lap = 1, laps = raceState.laps,
             cp = 0, cpTotal = raceState.cpPerLap,
@@ -271,8 +272,30 @@ RegisterNetEvent('sk_streetkings:racing:mp:go', function(lobbyId)
     end)
 end)
 
+-- Where this player stands in the field, from the server's last standings broadcast (sorted, one
+-- row per racer). Returns position, racers, or nil before the first broadcast.
+local function myPlace()
+    if not standings then return nil end
+    for i = 1, #standings do
+        if standings[i].src == myServerId then return i, #standings end
+    end
+    return nil
+end
+
 RegisterNetEvent('sk_streetkings:racing:mp:standings', function(snapshot)
+    local before = myPlace()
     standings = snapshot
+    -- The position plate moves the moment someone passes, as it does in the reference, not only
+    -- at this player's next checkpoint. The clock is left alone: no elapsedMs, so it keeps running.
+    local position, racers = myPlace()
+    if raceState and raceState.index <= #raceState.checkpoints and position and position ~= before then
+        local lap, cpInLap = SKLapProgress(math.max(1, raceState.index - 1), raceState.cpPerLap, raceState.laps)
+        SKPushLapHud({
+            lap = lap, laps = raceState.laps,
+            cp = raceState.index > 1 and cpInLap or 0, cpTotal = raceState.cpPerLap,
+            position = position, racers = racers, running = true,
+        })
+    end
 end)
 
 RegisterNetEvent('sk_streetkings:racing:mp:youFinished', function(elapsedMs)
@@ -360,6 +383,7 @@ CreateThread(function()
                 -- raceState.index BEFORE incrementing it.
                 local lap, cpInLap = SKLapProgress(raceState.index, raceState.cpPerLap, raceState.laps)
                 local finished = raceState.index >= #raceState.checkpoints
+                if not finished then SKCheckpoints.passed() end
 
                 raceState.index = raceState.index + 1
                 if raceState.index > #raceState.checkpoints then
@@ -371,15 +395,7 @@ CreateThread(function()
                 -- Freezes on this player's own finish; endRaceCleanup (via
                 -- the eventual mp:results broadcast once everyone's done, or
                 -- a forfeit) is what actually hides the panel.
-                -- Where this player stands in the field, from the server's
-                -- last standings broadcast (sorted, one row per racer).
-                local position, racers
-                if standings then
-                    racers = #standings
-                    for i = 1, racers do
-                        if standings[i].src == myServerId then position = i break end
-                    end
-                end
+                local position, racers = myPlace()
                 SKPushLapHud({
                     lap = lap, laps = raceState.laps,
                     cp = cpInLap, cpTotal = raceState.cpPerLap,
@@ -395,11 +411,13 @@ CreateThread(function()
     end
 end)
 
--- Live standings HUD (idles when there's nothing to show)
+-- Live standings list (idles when there's nothing to show). Only without vice_hud: with it, the
+-- race block's position plate ("3 / 14") is where the reference shows your place, and it has no
+-- list of names on screen.
 CreateThread(function()
     while true do
         local sleep = 500
-        if standings and #standings > 0 then
+        if standings and #standings > 0 and GetResourceState('vice_hud') ~= 'started' then
             sleep = 0
             local rowH   = 0.032
             local panelH = rowH * (#standings + 1) + 0.01

@@ -1977,7 +1977,13 @@ local currentWater = false
 
 local function checkZone(ped)
     local label = GetLabelText(GetNameOfZone(GetEntityCoords(ped)))
-    local water = IsPedSwimming(ped)
+    -- Out on the water counts too, not just swimming: a boat or a jet ski on
+    -- the open sea used to show the land bar (the single-player GTA6Hud
+    -- picks its water plate the same way). Class 14 is boats; anything else
+    -- has to be properly afloat, not just splashed through a puddle.
+    local v = cache.vehicle
+    local water = IsPedSwimming(ped) or (v and v ~= 0 and (GetVehicleClass(v) == 14
+        or (IsEntityInWater(v) and GetEntitySubmergedLevel(v) > 0.4))) or false
     -- Swimming state has to be re-sent on its own, not just on a zone-label
     -- change -- walking into the ocean usually doesn't cross a zone boundary,
     -- so gating this on `label == currentZone` left the bar stuck on land
@@ -2237,11 +2243,18 @@ local function resolveVehicle(vehicle)
     end
 
     veh.make, veh.model = make, modelName
+    -- 13 = cycles (no tank, no engine), 21 = trains (no tank). The panel
+    -- leaves those pips out rather than drawing a reading of nothing.
+    veh.cls = GetVehicleClass(vehicle)
 end
 
 local function fuelLevel(vehicle)
-    -- LegacyFuel keeps the tank in the "_FUEL_LEVEL" decorator; fall back to the
-    -- native so the pip still means something if that resource isn't present.
+    -- ox_fuel (Qbox's default) replicates the tank as the `fuel` state bag,
+    -- which is the authoritative value for every seat; the native can lag
+    -- for a passenger. LegacyFuel keeps it in the "_FUEL_LEVEL" decorator.
+    -- Fall back to the native so the pip still means something without either.
+    local bag = Entity(vehicle).state.fuel
+    if type(bag) == 'number' then return math.floor(bag) end
     if DecorExistOn(vehicle, '_FUEL_LEVEL') then
         return math.floor(DecorGetFloat(vehicle, '_FUEL_LEVEL') or 0)
     end
@@ -2685,11 +2698,17 @@ end
 ---               lost (fenix-police stopped searching), but the wanted level
 ---               hasn't dropped yet: "basically shaken them, still in the
 ---               search zone" per the reference.
---- Without fenix-police there is no search-radius/contact-history model to
---- read at all, so this degrades to the two states copsCanSeeMe() can
---- actually tell apart: 'contact' or 'hollow'. Never 'searching' or 'red',
---- inventing a distinction the fallback has no data for would be worse than
---- not drawing it.
+--- Without fenix-police there is no search-radius model to read, but the game
+--- has its own: once the police lose sight of you the stars grey out
+--- (ARE_PLAYER_STARS_GREYED_OUT) until you evade or they find you again --
+--- the vanilla "searching". So the fallback is 'contact' while a cop has line
+--- of sight, 'searching' while the game itself has the stars greyed after a
+--- contact, 'contact' again if it is not greyed (the game still has you, our
+--- 90 m LOS probe just cannot see who), and 'hollow' until anyone has seen
+--- you. Never 'red': the game has no "stopped searching but still wanted"
+--- state for it to come from. (Earlier this returned only contact/hollow on
+--- the belief there was no data for 'searching'; the single-player GTA6Hud
+--- reads exactly this native for its own lost-sight state.)
 local everContactedThisWanted = false
 
 local function wantedState(ped, wanted)
@@ -2716,7 +2735,13 @@ local function wantedState(ped, wanted)
 
     if copsCanSeeMe(ped) then
         everContactedThisWanted = true
+        -- What they saw, for the tells (client_awareness.lua).
+        if ViceWantedMemory then ViceWantedMemory.note(ped) end
         return 'contact'
+    end
+
+    if everContactedThisWanted then
+        return ArePlayerStarsGreyedOut(PlayerId()) and 'searching' or 'contact'
     end
 
     return 'hollow'
@@ -2788,6 +2813,17 @@ local NAV_ACCENT_HEX = {
     teal = { accent = '#47aba7', ink = '#0b1a19' },
     pink = { accent = '#fc74a4', ink = '#280d14' },
 }
+
+--- The character's accent, for things drawn outside this page that should
+--- match the route and the race plate's bar: the race marker (client_overlays.lua)
+--- and a race resource's own blips. { key = 'pink'|'teal', r, g, b }, the
+--- HUD_COLOUR_WAYPOINT entry of Config.Nav.waypointColour.
+exports('GetAccentColour', function()
+    local key = characterAccentKey()
+    local rgb = Config.Nav.waypointColour and Config.Nav.waypointColour[1] and Config.Nav.waypointColour[1][key]
+        or { 252, 116, 164 }
+    return { key = key, r = rgb[1], g = rgb[2], b = rgb[3] }
+end)
 
 --- Which of the wanted tells are still live, as an array of strings matching
 --- html/app.js's TELL_SVG keys (array membership is the signal — see
@@ -2911,8 +2947,9 @@ local function countNearbyPlayers(ped)
     return n
 end
 
-local function getWantedTells(wanted)
+local function getWantedTells(wanted, wstate)
     if wanted <= 0 then
+        if ViceWantedMemory then ViceWantedMemory.clear() end
         -- The police have lost you: every sighting is spent. This is the ONLY
         -- thing that clears a latched sighting -- see tellSightings above for
         -- why driving back out of a camera's view is deliberately not enough.
@@ -2926,19 +2963,28 @@ local function getWantedTells(wanted)
         return {}
     end
 
-    local ped = cache.ped or PlayerPedId()
-
     -- Wanted inside a building: it has CCTV, so the police have you on
     -- camera. Latched like any other sighting, until the stars are gone.
-    if Config.WantedIndoorCameras ~= false and GetInteriorFromEntity(ped) ~= 0 then
+    if Config.WantedIndoorCameras ~= false and GetInteriorFromEntity(cache.ped or PlayerPedId()) ~= 0 then
         tellSightings.camera.indoors = true
     end
 
     local out = {}
     if tellOverrides.camera or next(tellSightings.camera) then out[#out + 1] = 'camera' end
 
+    -- The weapon tell: a weapon in hand that the police have reason to know
+    -- about -- one fired in the last Config.WantedTells.weaponMemoryMs
+    -- (LastShotAt, client_awareness.lua), or one out while they are looking
+    -- at you. It used to light for anything merely held, seen or not, which
+    -- is what the single-player GTA6Hud's "fired recently" rule fixed there.
+    local ped = cache.ped or PlayerPedId()
     local _, wep = GetCurrentPedWeapon(ped, true)
-    if wep and wep ~= `WEAPON_UNARMED` then out[#out + 1] = 'weapon' end
+    if wep and wep ~= `WEAPON_UNARMED` then
+        local memMs = (Config.WantedTells and Config.WantedTells.weaponMemoryMs) or 12000
+        if wstate == 'contact' or GetGameTimer() - (LastShotAt or -1e9) < memMs then
+            out[#out + 1] = 'weapon'
+        end
+    end
 
     if GetResourceState('fenix-police') == 'started' then
         local ok, t = pcall(function() return exports['fenix-police']:GetTells() end)
@@ -2948,8 +2994,15 @@ local function getWantedTells(wanted)
             if t.vehicle then out[#out + 1] = 'vehicle' end
         end
     else
-        out[#out + 1] = 'hanger'
-        out[#out + 1] = (countNearbyPlayers(ped) > 0) and 'people' or 'person'
+        -- What the police actually saw (ViceWantedMemory, client_awareness.lua),
+        -- rather than the old placeholder that lit clothing and face for the
+        -- whole of any wanted level, seen or not.
+        local m = ViceWantedMemory and ViceWantedMemory.tells(ped)
+        if m then
+            if m.outfit then out[#out + 1] = 'hanger' end
+            if m.face then out[#out + 1] = (countNearbyPlayers(ped) > 0) and 'people' or 'person' end
+            if m.vehicle then out[#out + 1] = 'vehicle' end
+        end
     end
 
     return out
@@ -3392,7 +3445,7 @@ CreateThread(function()
         -- Computed every tick, not just when wanted/state change: a tell
         -- can clear (or reappear) mid-pursuit purely from the player changing
         -- clothes or vehicles, with wanted level and state untouched.
-        local tells = getWantedTells(wanted)
+        local tells = getWantedTells(wanted, wstate)
         local tellsKey = table.concat(tells, ',')
         if wanted ~= lastWanted or wstate ~= lastWantedState or tellsKey ~= lastTellsKey then
             lastWanted, lastWantedState, lastTellsKey = wanted, wstate, tellsKey
@@ -3429,6 +3482,13 @@ CreateThread(function()
         -- for melee, so the ammo row is driven off whether the weapon takes
         -- ammo at all rather than off the count being non-zero.
         local _, wep = GetCurrentPedWeapon(ped, true)
+        -- In a vehicle that's the last gun he had, out or not: it shows only
+        -- while he aims or shoots from it (Config.WeaponInVehicle).
+        if wep and wep ~= `WEAPON_UNARMED` and Config.WeaponInVehicle ~= true and IsPedInAnyVehicle(ped, false)
+            and not IsPlayerFreeAiming(PlayerId()) and not IsControlPressed(0, 68)
+            and GetGameTimer() - (LastShotAt or -1e9) > 3000 then
+            wep = nil
+        end
         if wep and wep ~= `WEAPON_UNARMED` then
             -- Icon comes from ox_inventory's own art via nui://, so the HUD and
             -- the inventory show the same image. WeaponIcons is generated in
@@ -3558,6 +3618,8 @@ CreateThread(function()
                 fuel = veh.fuel, engineOn = veh.engine,
                 engineHealth = veh.health, trackerState = vehicleTracker,
                 nitrous = vehicleNitrous,
+                noFuel = veh.cls == 13 or veh.cls == 21,
+                noEngine = veh.cls == 13,
             })
             vehShown = true
         else
@@ -3662,7 +3724,7 @@ local function defaultPoliceTune()
         -- 'round'  GTA VI's row of lights rising from the edge (sprite frames)
         -- 'wide'   the classic soft lamps the sliders below shape
         shape        = 'round',
-        size         = 100,   -- GTA VI row size, % (60-140)
+        size         = 100,   -- GTA VI row size, % (60-140; 0 = no row, the arrow keeps its own switch)
         arrow        = true,  -- GTA VI's police arrow round the middle of the screen
         maxOpacity   = Config.PoliceLights.maxOpacity,
         flashMs      = Config.PoliceLights.flashMs,
@@ -3772,11 +3834,6 @@ local function perimeterPoint(relDeg)
     return 50.0 + dx * t * 50.0, 50.0 + dy * t * 50.0
 end
 
-local ignoredSirenModels = {}
-for _, name in ipairs(Config.PoliceLights.ignoreModels or {}) do
-    ignoredSirenModels[joaat(name)] = true
-end
-
 --- Shared detection math: walks active police sirens in range and calls
 --- `fn(rel, strength, dist)` for each one that's actually lighting something
 --- up. The scan below combines these calls for every mode and shape — the
@@ -3793,8 +3850,18 @@ local function forEachSiren(fn)
     local maxDist  = PoliceTune.maxDistance or cfg.maxDistance
     local fullDist = math.min(PoliceTune.fullDistance or cfg.fullDistance, maxDist - 1)
 
+    -- Class 18 is every emergency vehicle, so an ambulance on a call used to
+    -- flash the screen red and blue too. Config.PoliceLights.ignoreModels, as
+    -- hashes, built once and kept on the config table (not a new file-level
+    -- local: see the 200-local note at the top of client_vitals.lua).
+    if not cfg._ignoreHashes then
+        cfg._ignoreHashes = {}
+        for _, name in ipairs(cfg.ignoreModels or {}) do cfg._ignoreHashes[joaat(name)] = true end
+    end
+    local ignore = cfg._ignoreHashes
+
     for _, vehicle in ipairs(GetGamePool('CVehicle')) do
-        if cfg.classes[GetVehicleClass(vehicle)] and not ignoredSirenModels[GetEntityModel(vehicle)] then
+        if cfg.classes[GetVehicleClass(vehicle)] and not ignore[GetEntityModel(vehicle)] then
             if (not cfg.requireSiren) or IsVehicleSirenOn(vehicle) then
                 local vx, vy = table.unpack(GetEntityCoords(vehicle))
                 local dist = #(vector2(px, py) - vector2(vx, vy))

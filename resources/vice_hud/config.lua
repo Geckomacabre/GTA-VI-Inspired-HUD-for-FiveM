@@ -59,6 +59,12 @@ Config.NitrousHintHoldBag = 'customs:menuOpen'
 -- broke the in-vehicle radio.
 Config.HideNativeHealthBars = true
 
+-- In a vehicle GTA V keeps your last gun as the current weapon for the whole
+-- drive. false (the default, as in the single-player HUD): the gun and its
+-- ammo show there only while you aim or shoot from the vehicle. true: they
+-- stay up the whole drive.
+Config.WeaponInVehicle = false
+
 -- Things held in the hands that are not weapons, shown where the weapon icon
 -- goes and for as long as they are held. Each entry is a player state bag key
 -- some resource sets while the thing is in hand, and the image to show for it.
@@ -79,21 +85,21 @@ Config.HideSatNav = true
 -- The drawn minimap: the island in flat colour seen at a slant, sea and sand
 -- in their own colours and the buildings standing up, in place of the engine's
 -- radar. The idea and the world it draws come from the "GTA VI MiniMap (3D
--- Buildings) (Legacy & Enhanced)" mod by loneeps (Discord @moddims), ported
--- to FiveM with their permission:
+-- Buildings) (Legacy & Enhanced)" mod by loneeps (Discord @moddims):
 --     https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced
 -- The camera it is seen through and its colours are measured off the
 -- reference footage. The frame, the player marker, the route colour, the
 -- distance figure and everything around the map stay this HUD's own.
 --
--- There is nothing to build: the world, converted from that mod's survey of
--- the map, ships with the resource in html/map3d/. To rebuild it:
+-- IT NEEDS BUILDING FIRST. The world is that mod's survey of the map and is
+-- not in this repository (its author asks that the mod not be re-uploaded).
+-- Download the mod from the page above, then:
 --
 --     python tools/map3d/build.py --mod "path/to/MiniMap.dll"
 --     python tools/map3d/blips.py --docs path/to/fivem-docs     (blip pictures)
 --
--- If it is ever missing the page reports there is no world, one line is
--- printed, and the engine's radar carries on exactly as before.
+-- Until then the page reports there is no world, one line is printed, and the
+-- engine's radar carries on exactly as before.
 --
 -- It is drawn on the HUD's page, by WebGL, because nothing else a server can
 -- hand its players is able to draw it: the engine's radar is a flat picture
@@ -110,6 +116,13 @@ Config.Map3D = {
 
     buildings = true,       -- false: footprints only, nothing standing
     blips = true,           -- draw the game's blips (false: none at all)
+
+    -- Blip sprites left off the drawn minimap, as GTA VI keeps its minimap
+    -- quiet; the pause map still has them all. The single-player HUD's list:
+    -- 24/7s, barbers, Los Santos Customs, clothes stores, tattoo parlours,
+    -- bars, car washes, Ammu-Nation, the strip club, cinemas and gas
+    -- stations. Empty it to have them all back.
+    hiddenBlips = { 52, 71, 72, 73, 75, 93, 100, 110, 121, 135, 361 },
     route = { length = 500.0 },     -- metres of GPS line to draw; false for none
 
     view = {
@@ -278,6 +291,10 @@ Config.Stamina = {
 Config.Focus = {
     -- Seconds of continuous use to drain the meter from full to empty.
     drainSeconds = 8.0,
+
+    -- The Focus skill (skills.lua) stretches that: at 100% the meter lasts
+    -- this much longer (0.5 = half as long again, 12 s). 0 to leave it alone.
+    skillDrainBonus = 0.5,
 
     -- Seconds to refill from empty, once regeneration starts.
     refillSeconds = 12.0,
@@ -789,6 +806,34 @@ Config.Crosshair = {
     -- raw hit count and bone value it saw for every kill.
 }
 
+-- What the police remember about you, for the wanted tells when
+-- fenix-police is NOT running (with it, its own memory is used). Taken from
+-- the single-player GTA6Hud's PoliceMemory: when a cop has line of sight the
+-- current outfit, whether your face was visible and your vehicle's plate are
+-- noted, and each tell lights only while what you look like now still
+-- matches (client_awareness.lua). `weaponMemoryMs` is how long after you last
+-- fired the weapon tell stays lit. Only decides WHICH of the existing tells
+-- light; nothing new is drawn.
+Config.WantedTells = {
+    weaponMemoryMs = 12000,
+}
+
+-- The game's own help messages (GTA V's black box, top left) shown in
+-- vice_hud's help box instead, from the single-player GTA6Hud. The game
+-- cannot hand the text back, so a help message is identified by asking
+-- whether it is each of a list of labels: `labels` (your server's own, e.g.
+-- 'esxHelpNotification' for ESX-style help) first, then
+-- data/help_labels.txt (GTA V's), `scanPerFrame` a frame, only while a help
+-- message is actually up. Help pushed in as raw text with no label, and lines
+-- with a slot the game fills in, are left in the native box -- see
+-- client_nativetext.lua.
+Config.NativeHelp = {
+    enable = true,
+    labels = {},
+    scanPerFrame = 40,
+    recent = 24,
+}
+
 -- =============================================================================
 -- Default HUD layout
 -- =============================================================================
@@ -973,8 +1018,8 @@ Config.PoliceLights = {
     -- Require the siren to actually be ON, not merely a police vehicle.
     requireSiren = true,
 
-    -- Emergency-class models that are not the police. Their sirens never light
-    -- the screen or the arrow (same three the single-player HUD skips).
+    -- Emergency vehicles that are NOT police: their sirens do not paint the
+    -- screen red and blue. Class 18 covers ambulances and fire engines too.
     ignoreModels = { 'ambulance', 'firetruk', 'lguard' },
 
     -- GTA VI lights (the default shape; /hudpolice edit can switch back to
@@ -999,6 +1044,11 @@ Config.PoliceLights = {
     arrowGone = 8.0,
 }
 
+-- Wanted inside a building lights the camera tell (the building has CCTV),
+-- and it stays lit until the stars are gone. false leaves the camera tell to
+-- resources that report it (exports.vice_hud:ReportWantedTellSighting).
+Config.WantedIndoorCameras = true
+
 -- =============================================================================
 -- Exhaustion
 -- =============================================================================
@@ -1014,8 +1064,11 @@ Config.Exhaustion = {
     -- Below this the player starts slowing and the screen effect fades in.
     tiredAt = 35,
 
-    -- At or below this, sprinting is blocked entirely — they can still jog.
+    -- At or below this, sprinting is blocked entirely — they can still jog —
+    -- and it STAYS blocked until stamina is back to unwindAt. Holding sprint
+    -- while blocked also keeps the bar from refilling: let go to recover.
     spentAt = 5,
+    unwindAt = 25,
 
     -- Move rate at 0 stamina. 1.0 = normal, lower = slower. Applied on a curve
     -- between tiredAt and 0 rather than snapping.

@@ -1311,6 +1311,22 @@ raise melee damage.
 | Flying | `FLYING_ABILITY` | seconds airborne |
 | Wheelie | `WHEELIE_ABILITY` | seconds on one wheel |
 
+Two more have no GTA stat and start at zero (`noSeed`). **Health** lengthens the
+health bar. **Focus** is GTA VI's, as its basketball shows it: practice raises it
+("Focus +2%" beside "1 scored"), and its level is how long the Focus meter lasts,
+up to `Config.Focus.skillDrainBonus` longer at 100. Nothing here watches for
+Focus; gk_basketball grants it from its server for each basket made outside a
+match, with the gain card.
+
+### The gain card
+
+A level-up gets the gold toast. A skill that goes up a little at a time in front
+of the player gets the gain card instead: bottom right, the skill's name over
+"+2%", and a ring that is the skill's standing (level and the way through the
+next one) with what this award added drawn in white from where it stood. Ask for
+it with `{ card = true }` on `AddSkillXp` or `AddPlayerSkillXp`. It was measured
+off GTA VI's basketball at 1440p (see `#statgain` in style.css).
+
 ### Why levels are 0-100
 
 Because GTA's stats are. Making a skill level *be* the stat value means there is
@@ -1339,6 +1355,7 @@ somebody looked at rather than an accident of the constants:
   strength         8            83          8258   melee hits landed
   lung             8            83          8258   seconds underwater
   shooting        17           167         16517   shots on target
+  focus            1             5           496   baskets made
   stealth         50           500         49550   metres moved crouched
   driving       1000         10000        991000   metres driven without a crash
   flying          25           250         24775   seconds airborne
@@ -1402,8 +1419,14 @@ exports.vice_hud:GetSkills()            --> { [id] = { xp, level } }
 
 -- server, authoritative: for rewards the client should not claim for itself
 exports.vice_hud:AddPlayerSkillXp(src, 'driving', 500)
+exports.vice_hud:AddPlayerSkillXp(src, 'focus', 200, { card = true })   -- with the gain card
 exports.vice_hud:GetPlayerSkills(src)
 ```
+
+A server grant is already in the stored total, so the save ceiling (XP a second
+since the last save) is still measured from the last save, not from the grant:
+measuring from the grant left the next save a second's allowance for whatever
+the player had sprinted or jogged meanwhile, and clamped it.
 
 A skills system nothing else can feed only ever rewards the handful of
 activities this resource happens to watch, which is why the grant exists on both

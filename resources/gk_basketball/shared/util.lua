@@ -6,6 +6,49 @@ BB = BB or {}
 --- writes it and the client that reads it cannot disagree about the name.
 BB.STATE_HOOPS = 'gk_basketball:hoops'
 
+--- Global state key for which practice balls have been picked up off the floor.
+BB.STATE_BALLS = 'gk_basketball:balls'
+
+--- True if a court that only exists some of the time (an arena floor that has to
+--- be set up for basketball) is there right now.
+function BB.courtReady(courtId)
+    local cfg = Config.Courts[courtId]
+    local need = cfg and cfg.requires
+
+    return not need or GlobalState[need.state] == need.value
+end
+
+--- Where a court's practice balls lie: where Config.Courts says, or failing that
+--- a few set down near the middle of it.
+--- @return table list of { x, y, z, settle }  settle = the height still has to be found from the floor
+function BB.ballSpots(court)
+    local cfg = Config.Courts[court.id]
+    local spots = {}
+
+    if cfg and cfg.balls then
+        for i, at in ipairs(cfg.balls) do
+            spots[i] = { x = at.x, y = at.y, z = at.z }
+        end
+
+        return spots
+    end
+
+    local n = Config.Ball.looseBalls or 0
+
+    for i = 1, n do
+        local a = (i - 1) / n * 2.0 * math.pi + 0.6
+
+        spots[i] = {
+            x = court.centre.x + math.cos(a) * 1.6,
+            y = court.centre.y + math.sin(a) * 1.6,
+            z = court.centre.z,
+            settle = true,
+        }
+    end
+
+    return spots
+end
+
 function BB.round(n, places)
     local mult = 10 ^ (places or 0)
     return math.floor(n * mult + 0.5) / mult
@@ -122,4 +165,65 @@ function BB.pickTargetHoop(hoops, from, forward, maxRange, team)
     end
 
     return best, bestDist
+end
+
+--[[
+    The 'rings' shot (Config.Shot.style). Pure, like the rest of this file, so
+    tests/rings_test.lua runs it as the game does.
+]]
+
+--- The rim under the reticle: the one nearest the middle of the screen, within
+--- `maxAngle` degrees of it, in range of the shooter. Unlike pickTargetHoop this
+--- is about where you are looking, pitch and all, because the reticle is.
+--- @param eye vector3 Where the camera is
+--- @param look vector3 Which way it looks (normalised)
+--- @param from vector3 The shooter, for the range
+--- @return table|nil hoop, number|nil distance (on the ground, from the shooter), number|nil degrees off
+function BB.hoopInSights(hoops, eye, look, from, maxRange, team, maxAngle)
+    local best, bestDist, bestAngle
+    local limit = math.cos(math.rad(maxAngle))
+
+    for _, hoop in ipairs(hoops) do
+        if not (team and hoop.team and hoop.team == team) then
+            local dist = BB.dist2d(from, hoop.coords)
+
+            if dist <= maxRange then
+                local dx, dy, dz = hoop.coords.x - eye.x, hoop.coords.y - eye.y, hoop.coords.z - eye.z
+                local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+                if len > 0.01 then
+                    local cos = (dx * look.x + dy * look.y + dz * look.z) / len
+
+                    if cos >= limit then
+                        local angle = math.deg(math.acos(math.min(cos, 1.0)))
+
+                        if not bestAngle or angle < bestAngle then
+                            best, bestDist, bestAngle = hoop, dist, angle
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return best, bestDist, bestAngle
+end
+
+--- How big the yellow ring is for a shot from `distance`, as a share of the
+--- white one: nearSize up to closeRange, down to farSize at farAt and beyond.
+function BB.ringSize(distance)
+    local rings = Config.Shot.rings
+    local close = Config.Shot.closeRange
+    local t = BB.clamp((distance - close) / math.max(rings.farAt - close, 0.01), 0.0, 1.0)
+
+    return rings.nearSize + (rings.farSize - rings.nearSize) * t
+end
+
+--- How far from the moment the rings met a release was, in ms: negative early,
+--- positive late. The white ring closes from 1 to 0 in closeMs at a steady
+--- speed, so it meets one of `size` (1 - size) * closeMs after it starts.
+--- @param heldMs number How long THROW was held
+--- @param size number The yellow ring, as from BB.ringSize
+function BB.ringError(heldMs, size)
+    return heldMs - (1.0 - size) * Config.Shot.rings.closeMs
 end

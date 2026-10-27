@@ -640,6 +640,17 @@
          digit is up for 0.3 s a second apart and "go" for 1.1 s. -->
     <div id="race-count" class="hidden" aria-hidden="true"></div>
 
+    <!-- Race marker -------------------------------------------------------------
+         The next checkpoint's icon, standing on top of its light pillar out in
+         the world: an accent dot over the distance ("453 ft"), or at the finish
+         a chequered accent tile. Its bottom centre is the world point, projected
+         every frame by client_overlays.lua (exports.vice_hud:SetRaceMarker),
+         which also draws the pillar and the finish smoke. -->
+    <div id="race-marker" class="hidden" aria-hidden="true">
+        <div id="race-marker-icon"></div>
+        <div id="race-marker-dist"></div>
+    </div>
+
     <!-- Nitrous hint ----------------------------------------------------------
          "Hold [key] to activate nitrous (icon)" -- the one-line tip the
          reference shows top-left the first time a car has nitrous to use.
@@ -674,6 +685,26 @@
     <div id="objective" class="hidden"></div>
     <div id="help-text" class="hidden"></div>
     <div id="feed"></div>
+    <!-- The gain card: "Focus +2%" bottom right (client_skills.lua, award's
+         `card`). The ring is drawn in units of 100 from twelve o'clock round;
+         app.js sets the two arcs. -->
+    <div id="statgain" class="hidden" aria-hidden="true">
+        <span id="statgain-ring">
+            <svg viewBox="0 0 100 100">
+                <circle class="sg-track" cx="50" cy="50" r="43"></circle>
+                <circle class="sg-arc sg-fill" id="statgain-fill" cx="50" cy="50" r="43" pathLength="100"
+                        stroke-dasharray="0 100" transform="rotate(-90 50 50)"></circle>
+                <circle class="sg-arc sg-gain" id="statgain-gain" cx="50" cy="50" r="43" pathLength="100"
+                        stroke-dasharray="0 100" transform="rotate(-90 50 50)"></circle>
+                <path class="sg-eye" d="M33 50 Q50 33 67 50 Q50 67 33 50 Z"></path>
+                <circle class="sg-pupil" cx="50" cy="50" r="5.6"></circle>
+            </svg>
+        </span>
+        <span id="statgain-copy">
+            <span id="statgain-label"></span>
+            <span id="statgain-text"></span>
+        </span>
+    </div>
     <div id="title-card" class="hidden"></div>
     <div id="binoculars" class="hidden">
         <div id="bino-lens"></div>
@@ -829,7 +860,14 @@
         <circle id="lp-track" class="lp-arc" cx="50" cy="50" r="29"/>
         <path id="lp-capacity" class="lp-arc"
               d="M 21.000 50.000 L 21.057 51.821 L 21.229 53.635 L 21.514 55.434 L 21.911 57.212 L 22.419 58.961 L 23.036 60.676 L 23.760 62.348 L 24.587 63.971 L 25.514 65.539 L 26.539 67.046 L 27.655 68.485 L 28.860 69.852 L 30.148 71.140 L 31.515 72.345 L 32.954 73.461 L 34.461 74.486 L 36.029 75.413 L 37.652 76.240 L 39.324 76.964 L 41.039 77.581 L 42.788 78.089 L 44.566 78.486 L 46.365 78.771 L 48.179 78.943 L 50.000 79.000 L 51.821 78.943 L 53.635 78.771 L 55.434 78.486 L 57.212 78.089 L 58.961 77.581 L 60.676 76.964 L 62.348 76.240 L 63.971 75.413 L 65.539 74.486 L 67.046 73.461 L 68.485 72.345 L 69.852 71.140 L 71.140 69.852 L 72.345 68.485 L 73.461 67.046 L 74.486 65.539 L 75.413 63.971 L 76.240 62.348 L 76.964 60.676 L 77.581 58.961 L 78.089 57.212 L 78.486 55.434 L 78.771 53.635 L 78.943 51.821 L 79.000 50.000"/>
+        <!-- The key clone check's window, under the fill as in the approved
+             key cloning mock (lp-clone mode only, see app.js
+             onKeyCloneProgress). -->
+        <path id="lp-window" class="lp-arc" d=""/>
         <path id="lp-fill" class="lp-arc" d=""/>
+        <!-- Its dot: r 4.58 is the single-player ring's 8.8 px dot on its
+             27.84 px radius, scaled to this r 29. -->
+        <circle id="lp-dot" cx="21" cy="50" r="4.58"/>
     </svg>
     <div class="lp-center">
         <div id="lp-glyph">
@@ -841,6 +879,7 @@
         </div>
     </div>
     <div id="lp-alarm-banner" aria-hidden="true">&#128680; Alarm triggered</div>
+    <div id="lp-done-banner" aria-hidden="true">Key cloned</div>
 </div>
 
 <!-- Police light editor -----------------------------------------------------
@@ -866,7 +905,9 @@
             <div class="pol-ed-group">GTA VI lights</div>
             <div class="pol-ed-row pol-ed-round-only" data-k="size">
                 <label>Size</label>
-                <input type="range" min="60" max="140" step="5">
+                <!-- 0 is off (no row at the edge, the arrow keeps its own
+                     switch); between 0 and 60 snaps to one or the other. -->
+                <input type="range" min="0" max="140" step="5">
                 <span class="pol-ed-val"></span>
             </div>
             <label id="pol-ed-arrow-row">
@@ -1086,11 +1127,5 @@
 <script src="app.js"></script>
 <script src="map3d.js"></script>
 
-<!-- Targeting's screen-space page: the /targetadmin panel, /targetui
-     preferences and the rail's sounds. It was osm-target's own ui_page; a
-     resource has one, so it lives here as a frame and app.js passes its
-     messages through (see onTargetNui). Clicks reach it only while one of its
-     panels is open. -->
-<iframe id="target-ui" src="../target/html/index.html" title="targeting" tabindex="-1"></iframe>
 </body>
 </html>

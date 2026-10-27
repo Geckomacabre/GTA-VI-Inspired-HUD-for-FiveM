@@ -52,7 +52,17 @@ local function currentVehicle()
     return veh
 end
 
+-- Another resource's full-screen menu is up (Config.BlockedBy): the buttons
+-- are that menu's for now.
+local function menuHasInput()
+    for _, key in ipairs(Config.BlockedBy or {}) do
+        if LocalPlayer.state[key] then return true end
+    end
+    return false
+end
+
 local function canUseRadio()
+    if menuHasInput() then return false end
     if currentVehicle() ~= 0 then return true end
     return Config.AllowOnFoot and IsMobilePhoneRadioActive()
 end
@@ -1053,44 +1063,10 @@ exports('GetOnDemandTrack', function()
 end)
 exports('OpenOnDemand', openPanel)
 
--- audio scenes that silence the radio ----------------------------------------
-
--- See Config.RadioMutingScenes. On Demand is not the game's audio at all (it is
--- xsound's), so only a real station counts as "the radio is playing" here.
-local suspendedScenes = {}
-
-local function restoreScenes()
-    for scene in pairs(suspendedScenes) do
-        if not IsAudioSceneActive(scene) then StartAudioScene(scene) end
-    end
-    suspendedScenes = {}
-end
-
-CreateThread(function()
-    local scenes = Config.RadioMutingScenes or {}
-    if #scenes == 0 then return end
-    while true do
-        Wait(500)
-        local station = currentVehicle() ~= 0 and GetPlayerRadioStationName() or nil
-        local playing = station ~= nil and station ~= 'OFF' and not muted
-        if playing then
-            for _, scene in ipairs(scenes) do
-                if IsAudioSceneActive(scene) then
-                    StopAudioScene(scene)
-                    suspendedScenes[scene] = true
-                end
-            end
-        elseif next(suspendedScenes) then
-            restoreScenes()
-        end
-    end
-end)
-
 -- cleanup --------------------------------------------------------------------
 
 AddEventHandler('onResourceStop', function(name)
     if name ~= RES then return end
-    restoreScenes()
     SetTimeScale(1.0)
     ClearTimecycleModifier()
     DisplayRadar(true)

@@ -258,7 +258,10 @@ CreateThread(function()
     while true do
         Wait(50)
         if focusActive then
-            focusMeter = math.max(0, focusMeter - (50 / (Config.Focus.drainSeconds * 1000)) * 100)
+            -- The Focus skill (client_skills.lua) makes the meter last longer.
+            local skill = SkillFocus and SkillFocus() or 0.0
+            local lasts = Config.Focus.drainSeconds * (1.0 + (Config.Focus.skillDrainBonus or 0.0) * skill)
+            focusMeter = math.max(0, focusMeter - (50 / (lasts * 1000)) * 100)
             if focusMeter <= 0 then
                 focusMeter = 0
                 exitFocus()
@@ -345,6 +348,16 @@ local RANGE_MIN = 0.05
 local exhaustLevel = 0.0      -- 0 = fresh, 1 = fully spent
 local overExertMs  = 0.0      -- ms spent sprinting on empty
 local lastVignette = -1
+
+-- Winded: latched at Config.Exhaustion.spentAt, released only at unwindAt.
+-- Sprint used to be blocked straight off exhaustLevel (stamina under ~0.5%),
+-- so the first refill tick unblocked it, the ped sprinted, and the bar was
+-- back at zero half a second later: holding the key on empty gave a stutter
+-- of short bursts, and the over-exertion drain below could never reach its
+-- grace period because every burst reset it. spentAt was documented but not
+-- read. The latch is the single-player GTA6Hud's "winded" state: once spent
+-- you stay spent until you have genuinely caught your breath.
+local winded = false
 
 -- Accumulated over-exertion, 0..1. See Config.Exhaustion.fatigue.
 --
@@ -443,6 +456,11 @@ local function readStamina(ped, playerId, dtMs)
         if IsPedSprinting(ped) then
             regenHoldMs = tonumber(sc.regenDelayMs) or 900
             manualStamina = math.max(0.0, manualStamina - (100.0 / sprintSeconds()) * step)
+        elseif winded and IsDisabledControlPressed(0, 21) and GetEntitySpeed(ped) > 1.8 then
+            -- Winded and still trying to run: nothing comes back until you
+            -- let go (the single-player GTA6Hud's rule). Without it the bar
+            -- refilled under a held key and the latch was just a delay.
+            regenHoldMs = tonumber(sc.regenDelayMs) or 900
         elseif regenHoldMs > 0.0 then
             -- Catching your breath. Nothing comes back yet.
             regenHoldMs = regenHoldMs - dtMs
@@ -1153,6 +1171,7 @@ CreateThread(function()
                 fatigue, fatigueDebt = 0.0, 0.0
                 hpDrainCarry, hpHealCarry = 0.0, 0.0
                 overExertMs = 0.0
+                winded = false
                 goto continueExhaust
             end
 
@@ -1202,13 +1221,12 @@ CreateThread(function()
             end
 
             -- ---- pushing on at zero -------------------------------------
-            -- IsControlPressed, NOT IsPedSprinting. `spentAt` disables the
-            -- sprint control before this threshold is reachable, so the ped is
-            -- never sprinting here and this branch could never run — the whole
-            -- health drain was dead code. Holding the key is what "still
-            -- pushing" actually means once the game has stopped obeying it.
-            if cfg.drainHealth and exhaustLevel >= 0.985
-               and IsControlPressed(0, 21) and onFoot then
+            -- The KEY, NOT IsPedSprinting: sprint is disabled while winded, so
+            -- the ped is never sprinting here. And IsDisabledControlPressed,
+            -- not IsControlPressed: the latter reads false for a control this
+            -- very loop disables, which kept this branch from ever running.
+            if cfg.drainHealth and winded
+               and IsDisabledControlPressed(0, 21) and onFoot then
                 overExertMs = overExertMs + dt * 1000.0
                 if overExertMs > cfg.drainGraceMs then
                     takeHealth(ped, cfg.drainHpPerSecond * dt, 100 + cfg.drainFloor)
@@ -1221,12 +1239,13 @@ CreateThread(function()
                 -- Slow them down on a curve rather than a cliff.
                 local rate = 1.0 - ((1.0 - cfg.minMoveRate) * exhaustLevel)
                 SetPedMoveRateOverride(ped, rate)
-
-                -- Once spent, block sprint outright. INPUT_SPRINT is 21; the
-                -- player can still walk and jog, they just cannot push it.
-                if exhaustLevel >= 0.985 then
-                    DisableControlAction(0, 21, true)
-                end
+            end
+            -- Once spent, block sprint outright until unwound (see `winded`).
+            -- INPUT_SPRINT is 21; the player can still walk and jog, they just
+            -- cannot push it. Keyed off the latch, not off exhaustLevel, so it
+            -- holds all the way back up to unwindAt.
+            if winded and onFoot then
+                DisableControlAction(0, 21, true)
             end
 
             ::continueExhaust::
@@ -1243,6 +1262,14 @@ UpdateExhaustion = function(stamina)
 
     lastStaminaSeen = stamina
     exhaustLevel = exhaustionFrom(stamina)
+
+    local spentAt = tonumber(cfg.spentAt) or 5
+    local unwindAt = math.max(spentAt + 1, tonumber(cfg.unwindAt) or 25)
+    if stamina <= spentAt then
+        winded = true
+    elseif winded and stamina >= unwindAt then
+        winded = false
+    end
 
     -- The vignette shows whichever is worse: how empty you are RIGHT NOW, or
     -- how much exertion you have banked without paying it back. Without the

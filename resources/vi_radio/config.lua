@@ -56,6 +56,14 @@ Config.DisableVanillaRadioControls = true
 Config.DriverOnly      = true   -- false = driver or passenger; true = driver only
 Config.AllowOnFoot     = false  -- true = also works with the mobile radio on foot
 
+-- Menus the radio stands down for. Each entry is a state bag key on the LOCAL
+-- player that another resource holds true while its full-screen menu is up.
+-- The pad is read directly (see Controller above), so without this a menu that
+-- steers with the D-pad opens the wheel on every "left". While any key reads
+-- true the wheel and the mute key do nothing; whatever is playing carries on.
+--   'customs:menuOpen'   the mod shop (Lenonida_customs)
+Config.BlockedBy = { 'customs:menuOpen' }
+
 -- ---------------------------------------------------------------------------
 -- Feel / effects
 -- ---------------------------------------------------------------------------
@@ -125,22 +133,12 @@ Config.Hud = {
 -- game reports them unlocked. Add hidden = true to drop one from the wheel.
 Config.IncludeOff = true        -- include the "Radio Off" entry
 
--- Audio scenes that take the game radio down with them.
---
--- A common way to quieten the city (distant sirens, alarms) is to leave
--- CHARACTER_CHANGE_IN_SKY_SCENE running for the whole session; that is what
--- qbx_smallresources' `disable.ambience = true` does. It is the mix the game
--- uses while the camera is up in the sky during a character switch, and in
--- that mix the car radio is silent as well: the station is on, the HUD says
--- so, and nothing comes out.
---
--- Any scene listed here is stopped while a station is actually playing in the
--- vehicle you are sat in, and started again the moment it is not (radio off,
--- muted, out of the car), so the city stays as quiet as it was the rest of
--- the time. Empty the list to leave audio scenes alone.
-Config.RadioMutingScenes = {
-    'CHARACTER_CHANGE_IN_SKY_SCENE',
-}
+-- Note: an audio scene left running for the whole session can silence the car
+-- radio while the HUD still shows the station (CHARACTER_CHANGE_IN_SKY_SCENE,
+-- which qbx_smallresources' `disable.ambience` starts, does exactly that). An
+-- audio scene belongs to the resource that started it, so this resource cannot
+-- stop it; the resource that starts the scene has to lift it while a station
+-- plays (um_smallresources does, in qbx_ignore/client.lua).
 Config.OffLabel   = 'RADIO OFF'
 
 Config.Stations = {

@@ -13,6 +13,13 @@
 local matches   = {}    -- [courtId] = match
 local playerOf  = {}    -- [src] = courtId
 local lastScore = {}    -- [src] = ms, anti double-count
+local botCourt  = {}    -- [aiId] = courtId
+
+-- NPCs use negative ids, which can never collide with a real server id, so they
+-- slot into `players` unchanged. One counter for the whole server rather than
+-- one per court: ball.lua tracks who is holding a ball by this id, and two
+-- courts each with a bot "-1" would be the same holder to it.
+local nextAiId = -1
 
 local function newMatch()
     return {
@@ -22,9 +29,75 @@ local function newMatch()
         clock   = nil,
         countdown = nil,
         result  = nil,
-        nextAiId = -1,     -- NPCs use negative ids, which can never collide with a
-                           -- real server id, so they slot into `players` unchanged
     }
+end
+
+--------------------------------------------------------------------------------
+-- Lookups for the rest of the server side
+--------------------------------------------------------------------------------
+
+local function entryFor(id)
+    local courtId = id > 0 and playerOf[id] or botCourt[id]
+    local match = courtId and matches[courtId]
+
+    return match and match.players[id], match, courtId
+end
+
+--- The player whose game is running an NPC, or nil if there's no such NPC.
+function BB.botDriver(aiId)
+    local entry = entryFor(aiId)
+    return entry and entry.ai and entry.driver or nil
+end
+
+--- The Config.AI.difficulties entry an NPC was added at.
+function BB.botSkill(aiId)
+    local entry = entryFor(aiId)
+    if not entry or not entry.ai then return nil end
+
+    for _, skill in ipairs(Config.AI.difficulties) do
+        if skill.id == entry.ai then return skill end
+    end
+end
+
+--- @return string|nil courtId, boolean live
+function BB.courtOf(src)
+    local courtId = playerOf[src]
+    local match = courtId and matches[courtId]
+
+    return courtId, match ~= nil and match.state == 'live'
+end
+
+--- Everyone signed up on a court, players and NPCs, by id.
+function BB.courtMembers(courtId)
+    local list = {}
+    local match = matches[courtId]
+
+    if match then
+        for id in pairs(match.players) do list[#list + 1] = id end
+    end
+
+    return list
+end
+
+--- True only for two members of the same match on the same side.
+function BB.sameTeam(a, b)
+    local first, matchA = entryFor(a)
+    local second, matchB = entryFor(b)
+
+    return first ~= nil and second ~= nil and matchA == matchB and first.team == second.team
+end
+
+--- True for two members of the same match, whichever sides they are on.
+function BB.sameMatch(a, b)
+    local first, matchA = entryFor(a)
+    local second, matchB = entryFor(b)
+
+    return first ~= nil and second ~= nil and matchA == matchB
+end
+
+local function forgetBot(aiId)
+    botCourt[aiId] = nil
+    BB.forgetHolder(aiId)
 end
 
 --- Removes every NPC from a court and tells the drivers to delete the peds.
@@ -38,6 +111,7 @@ local function stopAI(courtId)
                 TriggerClientEvent('gk_basketball:stopAI', player.driver, id)
             end
             match.players[id] = nil
+            forgetBot(id)
         end
     end
 end
@@ -157,6 +231,7 @@ local function removePlayer(src, reason)
         for id, player in pairs(match.players) do
             if player.ai and player.driver == src then
                 match.players[id] = nil
+                forgetBot(id)
             end
         end
 
@@ -168,6 +243,23 @@ local function removePlayer(src, reason)
             sync(courtId)
         end
     end
+end
+
+--- Ends whatever is happening on a court and sends everyone off it. For a court
+--- that has stopped existing (an arena floor being changed to something else).
+function BB.closeCourt(courtId)
+    local match = matches[courtId]
+    if not match then return end
+
+    local people = {}
+    for id, player in pairs(match.players) do
+        if not player.ai then people[#people + 1] = id end
+    end
+
+    for _, src in ipairs(people) do removePlayer(src, Config.Text.court_closed) end
+
+    stopAI(courtId)
+    matches[courtId] = nil
 end
 
 RegisterNetEvent('gk_basketball:join', function(courtId)
@@ -202,8 +294,11 @@ RegisterNetEvent('gk_basketball:join', function(courtId)
     playerOf[source] = courtId
 
     -- Into the court's own instance. Everyone on a court ends up in the same bucket
-    -- because it is derived from the court, not from who arrived first.
-    BB.enterInstance(source, courtId)
+    -- because it is derived from the court, not from who arrived first. A court
+    -- with people watching it (an arena) is played in the open instead.
+    if (Config.Courts[courtId] or {}).instance ~= false then
+        BB.enterInstance(source, courtId)
+    end
 
     TriggerClientEvent('gk_basketball:notify', source,
         Config.Text.joined:format(Config.Match.teams[team].label), 'success')
@@ -249,8 +344,9 @@ RegisterNetEvent('gk_basketball:addAI', function(courtId, difficultyId)
         return
     end
 
-    local aiId = match.nextAiId
-    match.nextAiId = aiId - 1
+    local aiId = nextAiId
+    nextAiId = aiId - 1
+    botCourt[aiId] = courtId
 
     match.players[aiId] = {
         team   = team,
@@ -279,6 +375,7 @@ RegisterNetEvent('gk_basketball:aiFailed', function(aiId)
     local player = match.players[aiId]
     if player and player.ai and player.driver == source then
         match.players[aiId] = nil
+        forgetBot(aiId)
         TriggerClientEvent('gk_basketball:notify', source, Config.Text.ai_failed, 'error')
         sync(courtId)
     end
@@ -288,6 +385,60 @@ AddEventHandler('playerDropped', function()
     removePlayer(source)
     lastScore[source] = nil
 end)
+
+--------------------------------------------------------------------------------
+-- Possession (one-ball matches)
+--------------------------------------------------------------------------------
+
+--- Somebody on a team to hand the ball to: a person if there is one, an NPC if not.
+--- @param team string|nil nil for anyone on the court
+local function pickReceiver(match, team)
+    local people, npcs = {}, {}
+
+    for id, player in pairs(match.players) do
+        if not team or player.team == team then
+            local list = player.ai and npcs or people
+            list[#list + 1] = id
+        end
+    end
+
+    local from = #people > 0 and people or npcs
+    if #from == 0 then return nil end
+
+    return from[math.random(#from)]
+end
+
+--- Starts a live match with exactly one ball, in somebody's hands.
+local function tipOff(courtId)
+    local match = matches[courtId]
+    if not match or not Config.Match.oneBall then return end
+
+    BB.clearCourtBalls(courtId, true)
+
+    local receiver = pickReceiver(match, nil)
+    if not receiver then return end
+
+    BB.giveMatchBall(receiver)
+    announce(courtId, Config.Text.possession:format(match.players[receiver].name), 'inform')
+end
+
+--- After a basket the side that was scored on gets the ball.
+local function changePossession(courtId, conceded)
+    if not Config.Match.oneBall then return end
+
+    SetTimeout(Config.Match.inboundDelay, function()
+        local match = matches[courtId]
+        if not match or match.state ~= 'live' then return end
+
+        BB.clearCourtBalls(courtId, false)
+
+        local receiver = pickReceiver(match, conceded) or pickReceiver(match, nil)
+        if not receiver then return end
+
+        BB.giveMatchBall(receiver)
+        announce(courtId, Config.Text.possession:format(match.players[receiver].name), 'inform')
+    end)
+end
 
 --------------------------------------------------------------------------------
 -- Starting and ending
@@ -411,10 +562,19 @@ RegisterNetEvent('gk_basketball:scored', function(data)
     local points = (data.points == 3) and 3 or 2
     lastScore[scorer] = now
 
-    -- Freeplay, a lobby, or a basket on someone else's court: just flavour, no score.
+    -- Freeplay, a lobby, or a basket on someone else's court: just flavour, no
+    -- score. The shooter's game says so its own way (client/look.lua), and
+    -- with vice_hud it is practice for the Focus skill, granted from here
+    -- because this is where the basket was checked.
     if not match or match.state ~= 'live' or hoop.court ~= courtId then
-        TriggerClientEvent('gk_basketball:notify', source, Config.Text.scored_self:format(points), 'success')
-        TriggerClientEvent('gk_basketball:scoreFlash', source, hoop.id, points, data.clean == true)
+        if not isBot then
+            TriggerClientEvent('gk_basketball:practiceBasket', source, hoop.id, points, data.clean == true)
+
+            local xp = Config.Hud.focusXp or 0
+            if xp > 0 and Config.Hud.vice and GetResourceState('vice_hud') == 'started' then
+                exports.vice_hud:AddPlayerSkillXp(source, 'focus', xp, { card = true })
+            end
+        end
         return
     end
 
@@ -442,6 +602,8 @@ RegisterNetEvent('gk_basketball:scored', function(data)
 
     if Config.Match.scoreLimit > 0 and match.score[team] >= Config.Match.scoreLimit then
         finish(courtId)
+    else
+        changePossession(courtId, team == 'home' and 'away' or 'home')
     end
 end)
 
@@ -482,6 +644,7 @@ CreateThread(function()
                         match.countdown = nil
                         match.clock     = Config.Match.duration > 0 and Config.Match.duration or nil
                         announce(courtId, Config.Text.match_live, 'success')
+                        tipOff(courtId)
                     else
                         announce(courtId, Config.Text.match_starting:format(match.countdown))
                     end

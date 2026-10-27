@@ -414,6 +414,10 @@ local SKIP_SPRITE = { [4] = true, [5] = true, [6] = true, [7] = true, [8] = true
 -- (SetBlipDisplay(blip, 4)) and the engine's radar shows those blips; leaving
 -- 4 in this list threw away nearly every blip on a real server.
 local NOT_ON_MINIMAP = { [0] = true, [1] = true, [3] = true, [7] = true }
+-- Config.Map3D.hiddenBlips, as a set. A hidden blip still counts for the
+-- route's end ring below, it just isn't drawn.
+local HIDDEN_SPRITE = {}
+for _, sprite in ipairs(C.hiddenBlips or {}) do HIDDEN_SPRITE[sprite] = true end
 local BLIP_CAP = 400
 
 -- Police are not drawn. The reference shows none on its minimap, only the
@@ -474,7 +478,7 @@ feed('blip', function()
                         if blip ~= mine and GetBlipAlpha(blip) > 0
                             and not NOT_ON_MINIMAP[GetBlipInfoIdDisplay(blip)] then
                             local kind = GetBlipInfoIdType(blip)
-                            if isPolice(blip, sprite, kind) then
+                            if HIDDEN_SPRITE[sprite] or isPolice(blip, sprite, kind) then
                                 -- not drawn
                             elseif kind == 1 or kind == 2 or kind == 3 then
                                 found[blip] = sprite

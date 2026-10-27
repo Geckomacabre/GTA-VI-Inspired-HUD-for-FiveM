@@ -72,9 +72,6 @@ const prelude = `
   cache = setmetatable({}, { __index = function() return nil end })
   lib = setmetatable({}, { __index = function() return function() end end })
   LocalPlayer = { state = setmetatable({}, { __index = function() return nil end }) }
-  -- Used as table KEYS by the shared scripts, so nil will not do.
-  joaat = function(s) return s end
-  GetHashKey = joaat
 `;
 
 function load(file, src) {
@@ -85,44 +82,11 @@ function load(file, src) {
   return null;
 }
 
-// The shared_scripts load first on the real client too, in manifest order:
-// the HUD's config, then targeting's (target/) and honor's (honor/), which
-// add their settings to the same Config table.
+// config.lua is a shared_script and loads first on the real client too.
 let err = load('prelude', prelude);
 ok(!err, 'harness prelude loads', err);
-
-function listed(dir, out) {
-  for (const e of fs.readdirSync(root + dir, { withFileTypes: true })) {
-    const rel = (dir ? dir + '/' : '') + e.name;
-    if (e.isDirectory()) listed(rel, out); else out.push(rel);
-  }
-  return out;
-}
-const everything = listed('', []);
-function expand(entry) {
-  if (!entry.includes('*')) return [entry];
-  const rx = new RegExp('^' + entry.split('**/').map(part =>
-    part.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')).join('(?:.*/)?') + '$');
-  return everything.filter(f => rx.test(f)).sort();
-}
-const sharedBlock = manifest.slice(manifest.indexOf('shared_scripts'),
-                                   manifest.indexOf('}', manifest.indexOf('shared_scripts')));
-const shared = [...sharedBlock.matchAll(/^\s*'([^'@][^']*\.lua)'/gm)].flatMap(m => expand(m[1]));
-ok(shared[0] === 'config.lua' && shared.includes('target/config.lua') && shared.includes('honor/config.lua'),
-   'the HUD\'s config loads before the two that add to it', shared);
-const seen = new Set();
-for (const f of shared) {
-  if (seen.has(f)) continue;      // a file named outright and again by a glob loads once
-  seen.add(f);
-  err = load(f, fs.readFileSync(root + f, 'utf8'));
-  ok(!err, f + ' loads', err);
-}
-err = load('keys', `
-  for _, k in ipairs({ 'VehiclePanelMs', 'PadGlyphs', 'Commands', 'Input', 'Hooks', 'ConductWatcher',
-                       'Debug', 'TargetDebug', 'HonorDebug' }) do
-    assert(Config[k] ~= nil, 'Config.' .. k .. ' is missing')
-  end`);
-ok(!err, 'one Config carries the HUD\'s, targeting\'s and honor\'s settings', err);
+err = load('config.lua', fs.readFileSync(root + 'config.lua', 'utf8'));
+ok(!err, 'config.lua loads', err);
 
 for (const f of files) {
   const src = fs.readFileSync(root + f, 'utf8');

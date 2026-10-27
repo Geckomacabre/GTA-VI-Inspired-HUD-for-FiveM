@@ -54,9 +54,27 @@ return {
         -- to go to the door you intend to climb through.
         targetBones = { 'door_dside_f', 'window_lf' },
 
-        baseDurationMs = 4500,        -- progress duration at neutral honor, before the tier multiplier
+        baseDurationMs = 4500,        -- total time at neutral honor, before the tier multiplier
         alarmDurationMs = 15000,      -- how long the vehicle alarm wails after a smash
         stressGain = { 2, 6 },        -- min/max stress applied on a successful smash
+
+        ---How far through the forced-entry clip (0-1) the elbow actually
+        ---connects with the glass. SMASH_VEHICLE_WINDOW is called at exactly
+        ---this point of the animation instead of when the progress bar ends,
+        ---which is what stopped the glass and the swing from lining up.
+        ---Raise it if the glass goes before the strike lands, lower it if it
+        ---goes after.
+        smashAtPhase = 0.35,
+
+        ---Walks the player onto the driver's door before the break-in plays,
+        ---using the engine's own entry point for that door
+        ---(GET_ENTRY_POINT_POSITION) and facing the car side-on -- the clips
+        ---themselves carry almost no offset, so without this the player just
+        ---plays the swing wherever they happen to be stood. See
+        ---solveBreakInScene in client/smashwindow.lua for how it is solved.
+        ---Set false to skip the walk and play them in place if an addon
+        ---vehicle ends up looking wrong.
+        alignToVehicle = true,
 
         ---Honor tuning. Tier comes from qbx_honor (angel / devil / nil for neutral);
         ---if qbx_honor isn't running, every player is treated as neutral and the
@@ -115,6 +133,12 @@ return {
 
         stressGain = { 2, 5 },         -- min/max stress on a successful pick
 
+        -- While the ring runs, he bends to the window and works a slim jim
+        -- (a 50 cm strip, in his fists) into the door, with the single-
+        -- player version's own clips (stream/vi_slimjim.ycd,
+        -- stream/vi_prop_slimjim). false: config.anims.slimJim instead.
+        animation = true,
+
         -- Same honor-tuning shape as smashWindow, scaling the ring's fill
         -- duration -- a career criminal works the lock faster.
         honor = {
@@ -129,10 +153,25 @@ return {
         ---(illegally entering someone else's vehicle).
     },
 
+    -- Clone Key (client/keyclone.lua): the single-player HUD's key cloning on
+    -- a locked car's driver door, for a player carrying a key cloner (an
+    -- ox_inventory item, never used up). The timing game is vice_hud's key
+    -- clone check: three hits clone the key with no alarm, three misses set
+    -- the car's alarm off (smashWindow.alarmDurationMs).
+    keyClone = {
+        enable = true,
+        maxDistance = 2.5,             -- ox_target interaction distance
+        targetBones = { 'door_dside_f' },
+        item = 'key_cloner',
+        stressGain = { 1, 3 },         -- min/max stress on a clean clone
+    },
+
     -- Police Alert Settings
     alertCooldown = 10000,         -- Cooldown period in milliseconds (10 seconds)
-    policeAlertChance = 0.75,      -- Chance of alerting the police during the day
-    policeNightAlertChance = 0.50, -- Chance of alerting the police at night (times: 01-06)
+    -- Lowered from 0.75 / 0.50: every alert becomes a 1-star fenix-police
+    -- response via um_fenix_bridge, so most break-ins were drawing cops.
+    policeAlertChance = 0.40,      -- Chance of alerting the police during the day
+    policeNightAlertChance = 0.25, -- Chance of alerting the police at night (times: 01-06)
     policeAlertNightStartHour = 1,
     policeAlertNightDuration = 5,
 
@@ -250,7 +289,8 @@ return {
 
     ---@class AnimConfigEntities
     ---@field hotwire AnimConfigEntry
-    ---@field smashWindow AnimConfigEntry
+    ---@field smashTryDoor AnimConfigEntry
+    ---@field smashImpact AnimConfigEntry
     ---@field searchKeys AnimConfigEntry
     ---@field lockpick AnimConfigEntry
     ---@field holdup AnimConfigEntry
@@ -275,27 +315,105 @@ return {
             model = {}
         },
         lockpick = {
+            -- Any of default/class/model may be ONE { dict, clip } or a LIST
+            -- of them, in which case one is picked at random per attempt. See
+            -- ResolveVehicleAnim in client/functions.lua. A variant whose dict
+            -- does not exist on this build is dropped and reported once in the
+            -- console, so a bad entry degrades to the ones that do work rather
+            -- than playing nothing at all.
+            --
+            -- The dict is named for the player model the clips were authored
+            -- on (p_m_one is Franklin, whose break-in reads as working a door
+            -- with a tool rather than wrenching it open). They are plain
+            -- skeletal animation and play on freemode peds fine, which the
+            -- rest of the server already relies on.
+            --
+            -- REAL clip list for this dict, from DurtyFree's animDictsCompact
+            -- dump (not guesswork): low_force_entry_ds/ps, low_locked_ds/ps,
+            -- std_force_entry_ds/ps/rds/rps, std_locked_ds/ps/rds/rps. Note
+            -- the naming: `force_entry` is the break-in itself and `locked`
+            -- is the shorter "tried the handle, it's locked" clip -- there is
+            -- no `force_entry_locked` variant, which is why the second entry
+            -- here used to be dropped at startup and every lockpick played
+            -- the same single clip.
+            --
+            -- `ds` = driver side, `ps` = passenger, `rds`/`rps` = the rear
+            -- doors; `std` vs `low` is the vehicle's entry height (see
+            -- smashImpact below). An invalid clip makes TaskPlayAnim silently
+            -- no-op, so do not add one that is not on that list.
             default = {
-                dict = 'veh@break_in@0h@p_m_one@',
-                clip = 'low_force_entry_ds'
+                { dict = 'veh@break_in@0h@p_m_one@', clip = 'low_force_entry_ds' },
+                { dict = 'veh@break_in@0h@p_m_one@', clip = 'low_locked_ds' },
             },
             class = {},
             model = {}
         },
-        smashWindow = {
+        -- Slim jim is the same act as the lockpick above with a different tool
+        -- in hand, so it shares those gentler working-the-door clips rather
+        -- than the one-shot strike smashImpact plays below.
+        slimJim = {
             default = {
-                -- 'high_force_entry_ds' does not exist in this dict (verified
-                -- against the real clip list: only low_force_entry_ds and
-                -- std_force_entry_ds, plus their _locked_ variants). An
-                -- invalid clip makes TaskPlayAnim silently no-op, so nothing
-                -- ever played, which is why the window smash had no
-                -- animation. std_force_entry_ds is the forceful break-in
-                -- clip in this dict, distinct from lockpick's gentler
-                -- low_force_entry_ds above.
-                dict = 'veh@break_in@0h@p_m_one@',
-                clip = 'std_force_entry_ds'
+                { dict = 'veh@break_in@0h@p_m_one@', clip = 'low_force_entry_ds' },
+                { dict = 'veh@break_in@0h@p_m_one@', clip = 'low_locked_ds' },
             },
             class = {},
+            model = {}
+        },
+        -- ------------------------------------------------------------------
+        -- The two halves of a window smash, both taken straight from the
+        -- clips Rockstar's own vehiclelayouts.meta hands the enter-vehicle
+        -- task for a locked car:
+        --
+        --   <AlternateTryLockedDoorClipId>STD_Locked_DS
+        --   <AlternateForcedEntryClipId>STD_Force_Entry_DS
+        --
+        -- so `smashTryDoor` below is literally the game's "tried the handle,
+        -- it's locked" clip and `smashImpact` is its break-in. Running them
+        -- in that order is what the engine does, and is why the sequence now
+        -- reads as a vanilla break-in rather than one clip on repeat.
+        --
+        -- p_m_zero is Michael's break-in set. That choice matters: Michael
+        -- and Trevor put an elbow through the glass, Franklin (p_m_one, used
+        -- by lockpick/slimJim above) works the door with a tool instead --
+        -- which is exactly the split those two options want.
+        --
+        -- std vs low is the vehicle's entry height. The engine picks it per
+        -- entry point in vehiclelayouts.meta, which script cannot read, so
+        -- the low-slung classes are listed under `class` as the practical
+        -- approximation -- on a Comet the std clip swings above the glass.
+        -- A specific model that reads wrong can be pinned under `model`.
+        --
+        -- 'veh@common@car@ds' / 'smash' (an earlier guess) is NOT real --
+        -- confirmed dropped in the F8 console on 2026-09-13. The clip names
+        -- used here are from DurtyFree's animDictsCompact dump; see the
+        -- lockpick entry above for the dict's full contents.
+        -- ------------------------------------------------------------------
+        smashTryDoor = {
+            default = {
+                dict = 'veh@break_in@0h@p_m_zero@',
+                clip = 'std_locked_ds',
+            },
+            class = {
+                [VehicleClass.COUPES] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_locked_ds' },
+                [VehicleClass.SPORTS_CLASSICS] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_locked_ds' },
+                [VehicleClass.SPORTS] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_locked_ds' },
+                [VehicleClass.SUPER] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_locked_ds' },
+                [VehicleClass.OPEN_WHEEL] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_locked_ds' },
+            },
+            model = {}
+        },
+        smashImpact = {
+            default = {
+                dict = 'veh@break_in@0h@p_m_zero@',
+                clip = 'std_force_entry_ds',
+            },
+            class = {
+                [VehicleClass.COUPES] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_force_entry_ds' },
+                [VehicleClass.SPORTS_CLASSICS] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_force_entry_ds' },
+                [VehicleClass.SPORTS] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_force_entry_ds' },
+                [VehicleClass.SUPER] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_force_entry_ds' },
+                [VehicleClass.OPEN_WHEEL] = { dict = 'veh@break_in@0h@p_m_zero@', clip = 'low_force_entry_ds' },
+            },
             model = {}
         },
         holdup = {

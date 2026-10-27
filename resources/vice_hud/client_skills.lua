@@ -112,18 +112,44 @@ end
 -- Awarding
 -- =============================================================================
 
+--- A skill's standing as a percentage, 0..100: its level and the way through
+--- the next one. What the gain card draws.
+local function percent(total)
+    local level, _, _, frac = Skills.resolve(total)
+    if level >= Skills.MAX_LEVEL then return 100.0 end
+    return level + frac
+end
+
 --- Add XP to a skill, apply any level change, and announce it.
 ---
 --- Every award goes through here so there is exactly one place that can level a
 --- skill up — and therefore exactly one place that can be wrong about it.
-local function award(id, amount)
+---
+--- `card`: say what this award did on the gain card ("Focus +2%"), level or
+--- no level, in place of the level-up toast. For a skill that goes up a
+--- little at a time in front of the player, the way GTA VI's Focus does with
+--- each basket.
+local function award(id, amount, card)
     if not loaded then return end
     local def = Skills.ById[id]
     if not def or not amount or amount <= 0 then return end
 
-    local before = (Skills.resolve(xp[id]))
+    local was = xp[id]
+    local before = (Skills.resolve(was))
     xp[id] = xp[id] + amount
     dirty = true
+
+    if card then
+        local from, to = percent(was), percent(xp[id])
+        local gain = to - from
+
+        if gain > 0 then
+            ui('statGain', {
+                id = id, label = def.label, from = from / 100, to = to / 100,
+                text = gain >= 0.95 and ('+%d%%'):format(math.floor(gain + 0.5)) or ('+%.1f%%'):format(gain),
+            })
+        end
+    end
 
     local after = (Skills.resolve(xp[id]))
     if after == before then return end
@@ -131,7 +157,8 @@ local function award(id, amount)
     applyStat(id, after)
     pushSkills(false)          -- refresh the panel's numbers without opening it
 
-    if CFG.announce then
+    -- With the card up, the toast would say the same thing twice.
+    if CFG.announce and not card then
         ui('skillUp', { id = id, label = def.label, level = after, blurb = def.blurb })
         lib.notify({
             id = 'vice_hud:skill:' .. id,
@@ -161,8 +188,9 @@ function ViceSkillAward(id, amount) award(id, amount) end
 
 -- Other resources can grant XP too. A skills system nothing else can feed is
 -- one that only rewards the handful of activities this file happens to watch.
-exports('AddSkillXp', function(id, amount)
-    award(id, tonumber(amount) or 0)
+-- opts (optional): { card = true } shows the gain card for it (see award).
+exports('AddSkillXp', function(id, amount, opts)
+    award(id, tonumber(amount) or 0, type(opts) == 'table' and opts.card == true)
     return true
 end)
 
@@ -188,6 +216,13 @@ function SkillFitness()
     return (Skills.resolve(xp.stamina)) / Skills.MAX_LEVEL
 end
 
+--- Read by the Focus meter (client_vitals.lua): how long it lasts. 0 at level
+--- 0, 1 at max.
+function SkillFocus()
+    if not loaded then return 0.0 end
+    return (Skills.resolve(xp.focus)) / Skills.MAX_LEVEL
+end
+
 -- =============================================================================
 -- Persistence
 -- =============================================================================
@@ -195,10 +230,10 @@ end
 -- A server-side grant (arm wrestling win, another resource's AddPlayerSkillXp).
 -- Added on top of local XP rather than replacing it -- see the export in
 -- server_skills.lua for why.
-RegisterNetEvent('vice_hud:skills:grant', function(id, amount)
+RegisterNetEvent('vice_hud:skills:grant', function(id, amount, card)
     amount = tonumber(amount)
     if not amount or amount <= 0 or not Skills.ById[id] then return end
-    award(id, amount)
+    award(id, amount, card == true)
 end)
 
 RegisterNetEvent('vice_hud:skills:load', function(stored)

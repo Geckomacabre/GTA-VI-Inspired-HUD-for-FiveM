@@ -70,32 +70,16 @@ on entering                          for the rest of the drive
   truncated spawn tokens and all.
 - **Gauge rings** on engine and fuel that fill to the actual reading, so the
   strip answers *how much* rather than only *is it bad yet*.
-- **The icons are about change.** On the name plate you see everything the
-  car has, lit if the engine is running and dim if it is switched off. After
-  that an icon lights only when its reading changes (fuel dropping a step or
-  being topped up, the engine taking a knock, nitrous being used), drops back
-  to dim a few seconds after the last change, and the whole row goes away
-  once nothing has changed for a while. Lit means "this just moved", not
-  "this is bad"; a healthy car that is just driving shows no icons at all. The third pip is a tracker that follows the
+- **The pips earn their place.** Fuel and engine show while the panel is
+  announcing the car, then only the ones with something to say stay once it
+  collapses, meaning fuel and engine in the amber or red bands. A healthy car
+  stops drawing a panel at all. The third pip is a tracker that follows the
   player's wanted state automatically (police have eyes on you: red, still
   hunting: amber, no stars: hidden), and stays hidden the rest of the time.
   Other resources can drive it directly too, with `exports.vice_hud:
   SetVehicleTracker` (clear, searching, spotted), for anything with nothing
   to do with wanted stars. Door lock status lives in qbx_vehiclekeys now, not
   here.
-- **A nitrous pip, only on cars that have nitrous.** A fourth disc carrying
-  the reference's mark — a wide chevron over a small one — whose ring is the
-  tank: it appears when you are driving a car with a kit, drains while you
-  boost, goes grey while locked out after running dry and fills back up as
-  the tank does. The ring is the only thing that moves. On a car with a kit
-  the collapsed row is the reference's row, engine and fuel sitting dim beside
-  it; a car with no kit never draws any of it. vice_hud does not run the
-  nitrous itself — it reads a state bag (`Config.NitrousStateBag`,
-  `customs:nitrous` by default) that whichever resource owns the nitrous
-  writes, or takes it from `exports.vice_hud:SetVehicleNitrous`.
-- **"Hold [key] to activate nitrous."** The one-line tip from the reference,
-  top left, shown once when a kit has just been fitted to the car you are
-  sitting in, with the player's live bind in the key cap.
 - **A parked car goes monochrome.** Green, amber and red on a car nothing is
   burning fuel in is just noise.
 
@@ -109,10 +93,27 @@ on entering                          for the rest of the drive
 | **Wanted** | Star row, plus GTA VI's "cops are searching for you" box and its tells (it pops up when a new tell lights or the stars go up; wanted indoors lights the camera tell) |
 | **Money** | Cash and bank, in GTA's own Pricedown |
 | **Honor** | A standing panel and a separate centre-screen change indicator |
-| **Police lights** | GTA VI's police lights: a row of blue and red lights glowing up from the screen edge toward the siren, bigger the closer the police are, and GTA VI's curved police arrow pointing at the car. The classic edge glow is still one click away in `/hudpolice edit` |
+| **Police lights** | GTA VI's police lights: a row of blue and red lights glowing up from the screen edge toward the siren, bigger the closer the police are, and GTA VI's curved police arrow pointing at the car. The classic edge glow is still one click away in `/hudpolice edit`, and its Size slider goes down to Off (the arrow keeps its own switch) |
 | **Exhaustion** | A vignette that breathes in as stamina empties |
-| **Skills** | Eight skills that write straight into the character's stats, so levelling changes how the game plays |
+| **Skills** | Eight skills that write straight into the character's stats, so levelling changes how the game plays, plus Health (a longer health bar) and Focus (a longer-lasting Focus meter, trained by shooting hoops in gk_basketball) |
 | **Prompts** | `ShowActionPrompt` for other resources, auto-cleaned if the caller crashes |
+
+### Fixes from the single-player GTA6Hud
+
+Behaviour taken from **FBICat**'s single-player GTA6Hud (a ScriptHookVDotNet
+mod), which got these right first. None of it draws anything
+new: every element on screen is still the one measured off the reference.
+
+| | |
+| --- | --- |
+| **Wanted, without fenix-police** | The stars go to *searching* when the game greys them, and the tells light from what the police actually saw (outfit, uncovered face, vehicle plate) instead of all being on for the whole chase. The weapon tell needs a shot in the last 12 s or a cop looking at you (`Config.WantedTells`) |
+| **Kill mark** | Headshots now classify. The bone check compared against the wrong number, so the red mark never showed |
+| **Stamina** | Once spent you stay winded until 25% (`Config.Exhaustion.unwindAt`), instead of sprint stuttering on and off at empty |
+| **Vehicle panel** | No fuel or engine pip on a bicycle (no fuel pip on a train); fuel is read from ox_fuel's state bag first |
+| **Zone bar** | The water bar on boats and jet skis, not only while swimming |
+| **Police lights** | Ambulances, fire engines and lifeguard trucks no longer flash the screen (`Config.PoliceLights.ignoreModels`) |
+| **Native help** | The game's own help messages go into vice_hud's help box instead of GTA V's black one, buttons and all, when they can be identified by label (`Config.NativeHelp`, `data/help_labels.txt`) |
+| **Spoken subtitles** | `ShowSpokenSubtitle` puts a line up when the ped starts talking and takes it down when they stop |
 
 ---
 
@@ -121,9 +122,9 @@ on entering                          for the rest of the drive
 | | |
 | --- | --- |
 | **Required** | [`ox_lib`](https://github.com/overextended/ox_lib) |
-| **Required** | [`oxmysql`](https://github.com/overextended/oxmysql) — targeting keeps its `/targetadmin` settings in the database |
 | **Optional** | `ox_inventory` — weapon icons, omitted cleanly if absent |
-| **Optional** | `qbx_core` — the money readout, skill XP persistence, and honor (built in, see below) |
+| **Optional** | `qbx_core` — the money readout and skill XP persistence |
+| **Optional** | `qbx_honor` — the honor system |
 | **Optional** | `speedlimits`, `zseatbelt` — positioned by the editor's *Other resources* rows |
 
 Nothing optional is a hard failure: each is probed with `GetResourceState` and
@@ -217,169 +218,29 @@ exports.vice_hud:IsHudElementHidden(element)       -- 'speedlimit' / 'seatbelt' 
 exports.vice_hud:GetMinimapOnFoot()                -- /hudminimap's choice: true = the map on foot too
 exports.vice_hud:SetMinimapOnFoot(state)           -- set it (saved, as /hudminimap does)
 
-exports.vice_hud:AddSkillXp(id, amount)
+exports.vice_hud:AddSkillXp(id, amount, opts)
+-- opts (optional): { card = true } shows the gain card bottom right ("Focus +2%")
+-- instead of the level-up toast. Server side: AddPlayerSkillXp(src, id, amount, opts).
 exports.vice_hud:GetSkill(id)                      -- { id, xp, level, into, need, frac }
 
+exports.vice_hud:ShowHelpText(text, durationMs, opts)
+-- opts.keys = { 25, 24 }: those controls' buttons in the line where the text says
+-- [[1]], [[2]] ('aim with [[1]] and hold [[2]]'). opts.tells: the wanted tells.
+exports.vice_hud:ShowFeed(text, opts)
+-- opts: { icon, duration, counter = 'yourresource:name' } -- a counter is a size
+-- up and replaces the last line with the same name ("1 scored" -> "2 scored").
+exports.vice_hud:ShowSpokenSubtitle(ped, text, opts)
+-- The subtitle line, shown once `ped` starts speaking and gone 450 ms after it
+-- stops. opts.context plays that speech on the ped first (opts.params, default
+-- 'SPEECH_PARAMS_FORCE_SHOUTED'); opts.maxMs caps it (8000). Dropped if the ped
+-- has not spoken within 700 ms or is over 30 m away. The words are yours.
+
 exports.vice_hud:SetVehicleTracker(state)          -- 'clear' | 'searching' | 'spotted' | nil
-exports.vice_hud:SetVehicleNitrous(state)          -- { installed, level, active, ready } | nil
-exports.vice_hud:ShowNitrousHint(opts)             -- { command, key, duration } | nil
-exports.vice_hud:HideNitrousHint()
-
-exports.vice_hud:SetLapTimer(data)                 -- the race HUD; see below
 ```
-
-### Buttons: controller, keyboard and mouse
-
-Every button the HUD draws (action prompts, world prompts, the nitrous tip) is
-the one the player would actually press, on whichever device they touched
-last. Pick up the controller and the prompts become its buttons; touch the
-keyboard and they become key caps and the mouse.
-
-| | |
-| --- | --- |
-| `Config.PadGlyphs = 'xbox'` | A B X Y, LB RB LT RT, Menu / View. The default. |
-| `Config.PadGlyphs = 'playstation'` | cross circle square triangle, L1 R1 L2 R2, Options / touchpad |
-| `/hudpad xbox` / `/hudpad playstation` | a player's own choice, remembered for them; it wins over the config |
-
-A world prompt option can carry `more = true` (three dots on a disc between
-the button and the name: it opens a list) or `dot = true` / `'#rrggbb'` (a
-coloured dot there). `ShowWorldActions(options, coords, opts)` takes
-`{ compact = false }` to keep the name at any distance, `{ centred = true }` to
-put the button on the point itself, and `{ id = 'my_resource' }` so that
-`HideWorldActions('my_resource')` only takes down a prompt that is still that
-resource's. `SetWorldActionsCoords(coords, id)` moves a prompt that is up.
-The merged targeting's walk-up prompts (`Config.Proximity`) are drawn with it.
-It is drawn at 70% of the corner prompts' size: `--wa-scale` on
-`#world-actions` in `html/style.css` (1 is the same size as the corner ones).
-
-`ShowActionPrompt` and `ShowWorldActions` take a control id (or an ox_lib
-keybind's `.hash`) as before and need nothing new: the button is resolved from
-the live bind by `client_glyphs.lua`. A prompt with `opts.hold` gets a ring
-round its button that fills as it is held. The targeting rail uses the same
-Xbox / PlayStation setting, so the two cannot disagree.
-
-Not checked in game yet: the mapping from the game's button icon numbers to
-buttons comes from the FiveM docs' instructional-buttons table, whose D-pad
-left / right and stick entries are the ones most worth a look on a real pad.
-
-### The nitrous pip
-
-The pip needs nothing called on it if your nitrous resource writes its state
-to the local player's state bag — that is the default path, and it means the
-two resources never depend on each other or on load order:
-
-```lua
--- in the resource that owns the nitrous, client side
-LocalPlayer.state:set('customs:nitrous', {
-    installed = true,       -- driving a car with a kit; false (or nil) hides the pip
-    level     = 0.62,       -- tank fill, 0.0 .. 1.0 -- this is the ring
-    active    = false,      -- boosting right now
-    ready     = true,       -- false while locked out after running dry; optional
-    command   = '+nitrous', -- optional: your RegisterKeyMapping command, for the tip
-}, false)
-```
-
-The key is `Config.NitrousStateBag`. Extra fields are ignored, the level is
-clamped, and the pip disappears the moment `installed` goes false, so leaving
-the car is just another write. A resource that would rather push can call
-`SetVehicleNitrous` with the same table instead; that takes the pip over
-until it is called with `nil`, which hands it back to the state bag.
-
-The **tip** shows by itself when the reading goes from "no kit" to "kit"
-while the player is already sitting in the car — a kit being fitted — once
-per car per session, for `Config.NitrousHintMs`. `command` puts the player's
-live bind for that key mapping in the key cap; `key` takes a control id or a
-ready-made label instead. `ShowNitrousHint` shows it on demand, for a resource
-that knows better when a player needs telling. `/hudnitrous` previews it.
-
-### The race HUD
-
-Bottom right, as in the reference: a first row, the chequered plate with your
-position in the field, and the clock. The first row is `PROGRESS` and a
-percentage for a point to point, and `LAP` with the count on a chip (`2/2`)
-for a race that has laps: one or the other, as the reference draws them.
-
-```lua
-exports.vice_hud:SetLapTimer({
-    position  = 1,  racers = 6,    -- "1 / 6" on the plate
-    progress  = 0.30,              -- 0.0 .. 1.0 along the route
-    lap = 1, laps = 1,             -- laps > 1 swaps PROGRESS for "LAP 1/2"
-    cp  = 5, cpTotal = 16,         -- checkpoints this lap / per lap
-    elapsedMs = 30390, running = true,
-})
-exports.vice_hud:SetLapTimer({ show = false })
-```
-
-Only the clock is required. With no `position` the plate shows the checkpoint
-count; with no `progress` the percentage is worked out from the checkpoints.
-`elapsedMs` is a snapshot — push on events and the page runs the clock between
-them. While the block is up, action prompts and the honor toast move above it
-rather than sit underneath. `/hudlaptimer` previews it.
-
-The rest of a race is four more calls, each held on screen for as long as
-the reference holds it and cut in and out with no fade, as it is there:
-
-```lua
--- before the start: small line, the race's name, small line (1.9 s)
-exports.vice_hud:ShowRaceTitle({
-    series = "HIT 'N' RUN VC", name = 'SALTON TO WANING SANDS', type = 'GROUP RACE',
-})
-
--- 3, 2, 1, go in Pricedown: a digit a second for 0.3 s each, then "go" for 1.1 s
-exports.vice_hud:ShowRaceCountdown()              -- the whole run from 3, timed by the page
-exports.vice_hud:ShowRaceCountdown({ from = 5 })
-exports.vice_hud:ShowRaceCountdown(3)             -- or one beat at a time: 3, 2, 1, 'go'
-exports.vice_hud:ShowRaceCountdown(false)         -- stop and clear
-
--- as the last lap starts: FINAL LAP over the lap just finished (3.0 s)
-exports.vice_hud:ShowRaceBanner({ text = 'FINAL LAP', timeMs = 89290 })
-
--- at the finish: placing over the time to the millisecond (2.0 s)
-exports.vice_hud:ShowRaceResult({ position = 1, timeMs = 88893 })   -- "1ST" / "01:28.893"
-exports.vice_hud:ShowRaceResult({ label = 'DNF' })
-```
-
-`duration` (ms) on the title, the banner and the result overrides how long
-they stay; `0` leaves one up until the same export is called with `nil`.
-`/hudrace` plays the whole sequence, as a two-lap race.
 
 Prompts are cleaned up automatically when the resource that registered them
 stops, so a crashed script cannot strand one on screen — give ids the
 `yourresource:something` form for that to work.
-
-### Screen text and overlays
-
-Each of these is one export, empty until it is called, and measured off the
-reference. Text takes two marks: `**bold**` for a key word and `{braces}` for
-the thing the line is about, which is drawn pink. Durations are in ms; where
-one is optional, `nil` is the element's own default and `0` is "until hidden".
-
-| Export | What it draws |
-| --- | --- |
-| `ShowSubtitle(text, ms)` | one or two lines of speech, bottom centre (4 s) |
-| `ShowObjective(text, ms)` | what to do next, under the subtitle: `'Return to {Lucia}'` (until hidden) |
-| `ShowHelpText(text, ms, { tells = {...} })` | the help box, top left (7 s) |
-| `ShowFeed(text, { icon, duration })` | a line in the feed on the right: `'Crime reported'` (3.5 s) |
-| `ShowTitleCard(text, style, ms)` | `'center'` (PROLOGUE), `'stack'` (one word a line), `'location'` (a place name) |
-| `SetBinocularOverlay(on, { label, key })` | the lens mask; see `resources/vi_binoculars` for the binoculars themselves |
-| `ShowShopItem(data)` / `HideShopItem()` | store, category, price, item, variant, swatches, and why it cannot be bought; `strip = true` (with `counter`, `more`, `progress`, `status`) turns the swatches into a row of item pictures, as GTA VI's barber shows its hairstyles |
-| `ShowVehicleStats(data)` / `HideVehicleStats()` | make over model, rated bars, the two ratings |
-| `SetCinematicFx(on, { strength, bars, pulse })` | the Focus effect in black with bars; stays up while the HUD is hidden (the crash cam uses it) |
-
-Passing `nil` / `false` as the text hides a text element. `ShowActionPrompt`
-takes `opts.off = true` to show a prompt greyed (there, but not usable right
-now), and while a shop panel is up the prompts lie in a row.
-
-WASTED and BUSTED are not here: they are `resources/vi_wasted`.
-
-`/hudtext`, `/hudtitle [center|stack|location]`, `/hudshop` and `/hudvehstats`
-show samples.
-
-### The top-right corner
-
-Wanted stars, tells, ammo, the weapon and money were re-measured against the
-clips where all of them are up at once, and those sizes are now the base
-styles; the shipped layout no longer scales that corner.
 
 ### The camera tell
 
@@ -446,7 +307,6 @@ anything shipped in this repo.
 | `/hudrects` · `/hudmatch` · `/hudcross` | Draw the engine's own component rects, and line them up |
 | `/hudminimap` | Show the map on foot |
 | `/hudspeedlimit` · `/hudseatbelt` | Hide or show the speed limit sign / seatbelt light (toggle, or `on` / `off`). Same as their "Show on HUD" row in `/movehud`; saved with the layout |
-| `/hudmap3d` | The drawn minimap or the game's radar, per player |
 
 </details>
 
@@ -494,6 +354,8 @@ node tools/wheelheld.test.js  # weapon wheel detection covers both enabled and d
 node tools/stamina.test.js   # the fatigue model
 node tools/waypoint.test.js  # waypoint route colour (one line, not two)
 node tools/vehpanel.test.js  # the vehicle panel
+node tools/awareness.test.js # police memory for the tells
+node tools/nativetext.test.js # native help into the help box, spoken subtitles
 ```
 
 The Lua suites run the shipped client files themselves through
@@ -572,238 +434,6 @@ manufacturer marks (via the [GTA Wiki](https://gta.fandom.com/wiki/Vehicle_Manuf
 property; this project claims no rights over them and the licence below covers
 only the code.
 
-**`html/fonts/PlusJakartaSans-Variable.ttf`** is Plus Jakarta Sans, licensed
-under the [SIL Open Font License 1.1](html/fonts/PlusJakartaSans-OFL.txt) —
-free to bundle and redistribute. It's a stand-in for whatever GTA VI's own
-scrollable item-select lists actually set (see the comment above its
-`@font-face` rule in `html/style.css`), and the same face
-[osm-target](https://github.com/Geckomacabre/osm-target) uses for its own UI
-text. An earlier version of this file used Belle Sans Extra Condensed Bold,
-a commercial font with no redistributable tier; swapped out for that reason.
-
-## Merged in: targeting and honor
-
-Two resources that used to sit beside this one are part of it now, so there is
-one HUD, one targeting system and one set of prompts instead of three
-resources drawing over each other.
-
-| Folder | Was | What it is |
-| --- | --- | --- |
-| `target/` | `osm-target` | the targeting engine, its *Context Rail* list drawn in the world, `/targetadmin`, `/targetui`, and the `ox_target` / `qb-target` / `qtarget` APIs |
-| `honor/` | `qbx_honor` | the honor stat, its hooks and exports, and the greet / antagonise options on peds |
-
-`vice_hud` `provide`s `osm-target`, `ox_target`, `qb-target`, `qtarget` and
-`qbx_honor`, and none of the five may be installed as a resource of its own
-beside it. What that covers, and what it does not:
-
-| A script that does this | Still works? |
-| --- | --- |
-| `dependency 'ox_target'` (or any of the five) in its manifest | Yes, through `provide` |
-| `exports.ox_target:addBoxZone(...)`, `exports['qb-target']:...`, `exports.qbx_honor:AddHonor(...)` | Yes. `provide` does not alias exports, so the code registers each one under the old name itself (`ExportAs` in `target/client/api/native.lua`, `HonorExport` in `honor/alias.lua`) |
-| `GetResourceState('ox_target') == 'started'` (or `'qbx_honor'`, `'osm-target'`) | **No.** `provide` does not make a name report as started |
-
-For the last row there are two ways out. The resources in this bundle that
-tested a name that way (`gk_basketball`, `qbx_vehiclekeys`) now also accept
-`vice_hud`. For anything else, either change the test the same way, or run a
-manifest-only resource of that name beside `vice_hud` (a folder with nothing
-but an `fxmanifest.lua`) and delete the matching `provide` line from this
-resource's manifest, so the name has one claimant.
-
-What each kind of interaction is drawn by, so nothing is offered twice:
-
-| Interaction | Drawn by |
-| --- | --- |
-| Anything registered through a target API | the rail (`target/`) |
-| Slim Jim / Smash Window on a locked car | the two-button world prompt (`ShowWorldActions`); `qbx_vehiclekeys` leaves its target option unregistered while this resource runs |
-| A single contextual action | an action prompt (`ShowActionPrompt`) |
-| `OpenInteractMenu` | the HUD's own list. Nothing in this bundle calls it; it is kept for scripts that do |
-
-All three parts share one `Config` table: `config.lua`, then
-`target/config.lua`, then `honor/config.lua`. The only name they had in common
-was the debug switch, which is now `Config.Debug` (HUD), `Config.TargetDebug`
-and `Config.HonorDebug`.
-
-What was changed in `target/` to load it from here, and nothing else:
-
-- `config.lua` adds to the shared `Config` instead of replacing it, the debug
-  switch is renamed as above, and the GitHub version check is off (it would
-  compare this resource's version with osm-target's releases);
-- the in-world surfaces load their page from `target/html/`, and the design
-  packs are looked for under `target/designs/`;
-- its screen-space page (admin panel, preferences, sounds) is a frame inside
-  this resource's page, since a resource has one `ui_page`; `client/ui/nui.lua`
-  sends its messages through the HUD page, and `html/index.html` takes the
-  resource name from the frame's own address when the game does not supply it;
-- its controller-brand preference reads and writes the HUD's setting;
-- its exports are also answered under the name `osm-target`;
-- `use_experimental_fxv2_oal` is not carried over, as it would apply to the
-  whole HUD.
-
-Its original manifest is kept as `target/fxmanifest.lua.original`, and
-honor's as `honor/fxmanifest.lua.original`. `tools/split.test.js` loads every
-shared and client script in manifest order, which is the check that the three
-parts still load together.
-
-None of this has been run on a live server from this repository yet.
-
-## Something in your hands that is not a weapon
-
-The weapon icon's place in the top-right corner also shows what you are
-holding when it is not a weapon. `Config.HeldIcons` lists player state bag
-keys and the image for each; `gk_basketball` sets `bbBall` while you have the
-ball, so a basketball shows there, from ox_inventory's own item art like the
-weapon icons. A weapon in hand always wins.
-
-```lua
-exports.vice_hud:SetHeldIcon('nui://ox_inventory/web/images/basketball.png')   -- or any image
-exports.vice_hud:SetHeldIcon(nil)                                              -- clear
-```
-
-## The drawn minimap: flat colour, sea and sand, buildings standing
-
-The reference minimap is not GTA V's dark radar. It is the map in flat colour,
-seen at a slant, with the sea and the beach in their own colours and the
-buildings standing up off the ground. `Config.Map3D` draws that in place of the
-engine's radar.
-
-It began as a port of, and the world it draws is that of,
-[GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced),
-a single-player mod by **loneeps** (Discord `@moddims`), ported to FiveM with
-their permission:
-its roads, its 3,589 building outlines and their heights, and its survey of
-where the map is water and where it is sand. The idea of a minimap drawn this
-way, and the week of work that mapped the island for it, are theirs; this is
-that map redrawn on the HUD's page so a server can show it. The camera it is
-seen through and its colours have since been measured off the reference
-footage (see below). Around it everything is still
-this HUD's: the frame and where it sits, the player marker measured off the
-reference, the route in the HUD's accent colour, the distance figure, the
-direction panel, and the game's own blips.
-
-**There is nothing to build.** The map ships with the resource, in
-`html/map3d/`: `world.bin` and `ground.png` are the mod's map, converted, and
-`blips.png` / `blips.json` are the game's blip pictures. Drop the resource in
-and it draws.
-
-They can be rebuilt, if the mod is updated or you want to change how its map
-is converted:
-
-```bash
-python tools/map3d/build.py --mod "path/to/MiniMap.dll"
-python tools/map3d/blips.py --docs path/to/fivem-docs
-```
-
-- `build.py` writes `world.bin` and `ground.png` from a copy of the mod.
-  Nothing in the mod is run; its map is read out of the file. Needs numpy,
-  scipy and Pillow.
-- `blips.py` writes the sheet of blip pictures, from a clone of
-  [fivem-docs](https://github.com/citizenfx/fivem-docs). Needs numpy and
-  Pillow.
-- If `world.bin` is ever missing the page says so, one line is printed, and
-  the engine's radar carries on. Without the blip sheet every blip is a round
-  dot in its own colour.
-
-What to know about it:
-
-- **It is seen through a real camera, the reference's.** The reference's
-  minimap is a camera behind and above the player, looking down past them at
-  about 27 degrees, and this is that camera: its pitch and lens are read off
-  the footage (a rectangular roof gives two vanishing points and so the
-  horizon; a helipad's circle, drawn a third as tall as it is wide, agrees).
-  A metre ahead of the player is drawn 0.59 of a metre across, buildings
-  stand their own height through the same lens, the far end of the map pales
-  toward the horizon, and the panel is opaque. `Config.Map3D.view.camera`.
-- **The camera rides at your height.** On a roof the city falls away below
-  you; under a parachute or in an aircraft it shrinks, and what is on the
-  ground directly beneath you slides toward the bottom edge. A wall or roof
-  that stands between the camera and you is seen through round your marker;
-  a roof you are standing on is not. `Config.Map3D.altitude = false` keeps
-  it on the ground. The ground itself is flat: the map has no hills.
-- **Its colours are the reference's**, sampled off its opaque panel: pale
-  pinkish paving with the roads a shade lighter, a deep teal sea that is
-  lighter along the shore, and lavender-slate buildings darker than the
-  ground they stand on.
-- **It is drawn on the HUD's page, by WebGL.** The mod paints straight onto
-  the game's frame from a plugin, which a server cannot give its players, and
-  the engine's own radar is a flat picture that cannot stand a building up.
-  The geometry is uploaded to the graphics card once. After that a frame is a
-  few dozen draw calls over the 256 m squares around the player, and a frame
-  is only drawn when the player or the camera moved. A player with it switched
-  off downloads none of it.
-- **Indoors the engine's radar comes back**, because it has the floor plan and
-  the drawn map does not (`engineIndoors`).
-- **Blips are read from the game** every two seconds, and the ones riding a
-  ped or vehicle are followed in between. A blip that is not short-range stays
-  pinned to the edge, as on the radar. Radius and area blips are not drawn:
-  the game will not say how big they are.
-- **The route** is the game's own GPS line, read back from it, for the
-  waypoint and for a blip a script gave a route. The game hands it over with
-  kinks in it and a tail behind the player, so it is smoothed, started where
-  the player is, and brought in gradually just ahead of the marker.
-- **Where a route ends is ringed**: four arcs in the route's colour, as the
-  reference marks a destination. In the ring is a plain disc of that colour,
-  or, when the waypoint was set on a place, that place's own blip.
-- **Wanted, the map says so and nothing else does.** The reference puts no
-  police on its minimap. The ground round the player floods one flat colour,
-  roads and all: red while the police can see you, blue while they have lost
-  sight and are searching, a faded red once they are shaken off but the
-  wanted level has not gone. It is driven by the same state the wanted stars
-  use (fenix-police's contact model when it is running). The blips the game
-  hangs on officers, their cars and helicopters are left off
-  (`policeBlips`), and the two search rings are off by default
-  (`Config.PoliceSearch`). Police stations are places and stay.
-- **Spending stamina sends rings out from your marker**, as the reference's
-  does while its player runs: thin and light, a new one from the marker's rim
-  every 0.4 s, each growing 2.65 marker radii a second and faded out by 4, so
-  two or three are on the map at once. They start with the sprint (or with
-  the bar falling, swimming or pedalling flat out) and the last is gone about
-  a second after it ends. `Config.Map3D.ripple` has the numbers; `false`
-  switches them off. The bolt beside the stamina bar follows the same thing:
-  for as long as the bar is going down it flashes red every 0.9 s, red at
-  once and faded back to teal a fifth of a second later, as the reference's
-  does (`Config.Stamina.boltRedEvery`, `boltRedMs`; `boltRed = 'drain'` holds
-  it red steadily instead, `false` leaves it teal).
-- **After dark the map is dark**: slate land with the roads standing out of
-  it, changing over gradually at dusk and dawn by the game's clock
-  (`night`, `nightHours`, `paintNight`).
-- The pause map and the big map are the engine's and are untouched.
-- **It goes when the game's radar would**: a cutscene, a character switch, a
-  faded-out screen, as well as the pause menu and the inventory.
-- **Things that stand beside the map can follow it.** `vice_hud:minimap` is
-  raised with `true` or `false` each time the minimap comes or goes, and
-  `exports.vice_hud:IsMinimapShown()` answers the same at any time: enough
-  for a speed-limit sign or a seatbelt light in another resource to hide
-  when the map does.
-- `/hudmap3d` switches between it and the game's radar for that player.
-
-`Config.Map3D.view` has the zoom, the camera, where the player sits on the panel
-and the opacity; `Config.Map3D.paint` the colours.
-
-## The player marker on the minimap
-
-The reference marks the player with a black-ringed disc and a pale arrowhead,
-not GTA V's white arrow. The minimap is a scaleform and that arrow is a vector
-shape inside it, so the marker is made by swapping the shape in a copy of the
-game's own `minimap.gfx`: the game still places it and turns it with you, at
-no cost, and it cannot drift from the map the way a marker drawn over it would.
-
-`tools/minimap_marker/build.py` does the swap and checks that nothing else in
-the file changed. It needs your game build's `minimap.gfx` and JPEXS Free
-Flash Decompiler; the script's own header says where each comes from.
-
-```bash
-python tools/minimap_marker/build.py --ffdec path/to/ffdec-cli.jar --in minimap.gfx --out stream/minimap.gfx
-```
-
-- The built file is not in this repository: it is the game's own file with
-  three shapes changed, and it is different for every game build. Build it
-  from yours, and again after changing `sv_enforceGameBuild`.
-- Its size is **Player arrow** in the HUD editor's map panel (0 is the game's
-  own size).
-- Delete `stream/minimap.gfx` to get the stock arrow back. Only one resource
-  on a server can stream that file.
-- The pause-menu map has its own scaleform and keeps the stock arrow.
-
 ## Licence
 
 [CC BY-NC-SA 4.0](LICENSE) — **non-commercial**. You may use, modify and
@@ -811,11 +441,6 @@ redistribute this resource, including on a server of your own, but not sell it
 or bundle it into anything paid, and a modified version has to carry the same
 licence. This matches the repository's own licence and every other resource in
 it.
-
-`target/` is the exception. It is a modified fork of osm-target by OsmFX Mods
-and stays under the [OsmFX Mods Source-Available License v1.0](target/LICENSE),
-with its own README and notices; being loaded by this resource's manifest does
-not change that. `honor/` is CC BY-NC-SA 4.0 like the rest and keeps its copy.
 
 > [!NOTE]
 > The copyright line in `LICENSE`'s *How to Apply* section is left for you to
@@ -835,25 +460,6 @@ badge art), and the wanted-tell icon set are from the
 mod on GTA5-Mods.com. The BuckMe bank icon and its ring
 (`html/icons/buckme.png`, `html/icons/buckme_ring/`,
 `html/icons/fill_purple.png`) are original, made in-house.
-
-The top-right weapon icon draws whatever ox_inventory has for that weapon.
-With this repo's ox_inventory patch installed, that is
-[FBICat](https://www.gta5-mods.com/users/fbicat)'s side-profile weapon art
-from their single-player GTA VI HUD. It includes material from the
-[Grand Figma Kit VI](https://www.figma.com/community/file/1675253765382840726/grand-figma-kit-vi-a-grand-theft-auto-6-ui-pack)
-by Axel Latuff ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
-The full credit and terms are in the repository's main README, under License.
-
-The drawn minimap (`Config.Map3D`) began as a port of
-[GTA VI MiniMap (3D Buildings) (Legacy & Enhanced)](https://www.gta5-mods.com/scripts/gtavi-minimap-3d-buildings-legacy-enhanced)
-by **loneeps** (Discord `@moddims`) on GTA5-Mods.com, and the world it draws
-(roads, building outlines and heights, sea and sand) is all that mod's, as is
-the idea. What is ours is the WebGL redraw that lets a FiveM server show it,
-the camera and colours since measured off the reference, and what sits on top
-of it. It is ported with loneeps' permission, given on the one condition that
-they are credited, which this is. The converted map ships in `html/map3d/`;
-`tools/map3d/build.py` is what made it. The blip pictures beside it are the
-game's own, taken from [fivem-docs](https://github.com/citizenfx/fivem-docs).
 
 Thanks to GravityExploitz for BuckMe's satire paragraph and for help with the
 BuckMe card design.

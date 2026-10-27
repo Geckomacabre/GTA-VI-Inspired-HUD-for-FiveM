@@ -248,6 +248,7 @@ function StartSingleplayerRun(routeId, def, useOwnVehicle)
                 cpPerLap    = (def.scheme == 'circuit') and (#def.checkpoints + 1) or #def.checkpoints,
             }
             SKCheckpoints.show(activeRun.checkpoints, 1, #activeRun.checkpoints == 1, activeRun.meta)
+            SKRaceObjective(def, false)
 
             -- Nothing completed yet — cp starts at 0, not SKLapProgress(1,
             -- ...)'s "heading to checkpoint 1" reading, which is a different
@@ -323,6 +324,7 @@ local function completeGate(run, status)
     -- hit", which is exactly the pip count that should light up.
     local lap, cpInLap = SKLapProgress(run.index, run.cpPerLap, run.laps)
     local finished = run.index >= #run.checkpoints
+    if not finished then SKCheckpoints.passed() end
 
     run.index = run.index + 1
     if run.index > #run.checkpoints then

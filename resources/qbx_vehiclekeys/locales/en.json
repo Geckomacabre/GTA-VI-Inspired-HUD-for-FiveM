@@ -47,16 +47,22 @@
     "player_offline": "This player is not online!",
     "vehicle_is_unlocked": "Vehicle is already unlocked!",
     "window_smashed": "You put the window through and pop the lock!",
-    "no_lockpick": "You need a lockpick to try that."
+    "no_lockpick": "You need a Slim Jim to try that.",
+    "no_key_cloner": "You need a key cloner to try that.",
+    "key_cloned": "Key cloned. The car is yours to drive.",
+    "key_clone_failed": "Alarm triggered!"
   },
   "progress": {
     "attempting_carjack": "Attempting Carjacking...",
     "searching_keys": "Searching for the car keys...",
     "takekeys": "Taking keys from body...",
-    "smashing_window": "Smashing the window..."
+    "smashing_window": "Smashing the window...",
+    "trying_door": "Trying the door..."
   },
   "target": {
     "smash_window": "Smash Window",
-    "slim_jim": "Slim Jim"
+    "slim_jim": "Slim Jim",
+    "slim_jim_missing": "Requires slim jim",
+    "clone_key": "Clone Key"
   }
 }

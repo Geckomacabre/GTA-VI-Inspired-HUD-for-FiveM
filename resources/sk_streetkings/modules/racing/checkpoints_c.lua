@@ -1,12 +1,51 @@
 -- Checkpoint rendering shared by the singleplayer and multiplayer race flows.
--- Pure natives (CreateCheckpoint/blips/GPS route) — no framework dependency,
--- ported near-directly from StreetKings' portable route/preview approach.
+--
+-- With vice_hud running, a road or offroad checkpoint is drawn the way the
+-- GTA VI race footage draws one: a light pillar standing on the track with a
+-- dot and the distance over it, a chequered tile and coloured smoke at the
+-- finish, all in the character's HUD accent (exports.vice_hud:SetRaceMarker).
+-- Air gates keep Rockstar's rings, since a stunt-plane gate is flown THROUGH
+-- and the ring is the gate; they get the icon and distance over them too.
+-- Without vice_hud, every gate is Rockstar's CreateCheckpoint art, as before.
 
 SKCheckpoints = {}
 
 local activeCheckpointHandle = nil
 local activeBlip = nil
 local nextBlip = nil
+local markerUp = false
+
+local function viceHud() return GetResourceState('vice_hud') == 'started' end
+
+-- The character's HUD accent (pink / teal), or Rockstar's race yellow without vice_hud.
+local function accent()
+    if viceHud() then
+        local ok, a = pcall(function() return exports.vice_hud:GetAccentColour() end)
+        if ok and type(a) == 'table' and a.r then return a end
+    end
+    return { r = 254, g = 207, b = 12 }
+end
+
+-- SET_BLIP_COLOUR takes an RGBA colour as one int (0xRRGGBBAA), not only a palette index. Signed:
+-- the native's int is 32-bit.
+local function rgbaInt(c, alpha)
+    local v = (math.floor(c.r) << 24) | (math.floor(c.g) << 16) | (math.floor(c.b) << 8) | (alpha or 255)
+    if v >= 0x80000000 then v = v - 0x100000000 end
+    return v
+end
+
+-- The GPS line. A custom RGBA colour is documented for a blip but not for its route, so the line
+-- takes the nearest stock colour to the accent unless Config.RaceBlips.exactRoute says to try it.
+local function routeColour(c)
+    local cfg = Config.RaceBlips or {}
+    if c.key and cfg.exactRoute then return rgbaInt(c) end
+    return (c.key and cfg.routeColour and cfg.routeColour[c.key]) or cfg.defaultRouteColour or 5
+end
+
+-- GTA heading (degrees) of travel from a to b.
+local function headingOf(a, b)
+    return math.deg(math.atan(-(b.x - a.x), b.y - a.y)) % 360.0
+end
 
 function SKCheckpoints.clear()
     if activeCheckpointHandle then
@@ -16,6 +55,15 @@ function SKCheckpoints.clear()
     if activeBlip and DoesBlipExist(activeBlip) then RemoveBlip(activeBlip) end
     if nextBlip and DoesBlipExist(nextBlip) then RemoveBlip(nextBlip) end
     activeBlip, nextBlip = nil, nil
+    if markerUp then
+        markerUp = false
+        if viceHud() then exports.vice_hud:ClearRaceMarker() end
+    end
+end
+
+-- A checkpoint was reached: Rockstar's race checkpoint sound (net_races.sch, Country_Race.sc).
+function SKCheckpoints.passed()
+    PlaySoundFrontend(-1, 'CHECKPOINT_NORMAL', 'HUD_MINI_GAME_SOUNDSET', true)
 end
 
 -- What a race hands the renderer so gates look like Rockstar's (shared/gates_sh.lua):
@@ -52,17 +100,45 @@ function SKCheckpoints.show(checkpoints, index, isLast, meta)
     local chevron = SKGates.chevronForTurn(prev, cp, nextCp)
     local art, r, g, b = SKGates.art(kind, gateKind, stunt, isLast, isLapEnd, chevron)
 
-    local size = Config.CheckpointSize[kind] or Config.CheckpointSize.road
-    activeCheckpointHandle = CreateCheckpoint(art, cp.x, cp.y, cp.z, dir.x, dir.y, dir.z, size, r, g, b, 180, 0)
+    local hud = viceHud()
+    if kind == 'air' or not hud then
+        local size = Config.CheckpointSize[kind] or Config.CheckpointSize.road
+        activeCheckpointHandle = CreateCheckpoint(art, cp.x, cp.y, cp.z, dir.x, dir.y, dir.z, size, r, g, b, 180, 0)
+    end
 
+    if hud then
+        -- Which way the road runs through the finish lays its smoke across it: the way the cars
+        -- come in, or for a circuit's start/finish line the way the grid faces.
+        local heading
+        if isLast or isLapEnd then
+            if src == 0 and meta and meta.start and meta.start.w then
+                heading = meta.start.w + 0.0
+            elseif prev then
+                heading = headingOf(prev, cp)
+            end
+        end
+        exports.vice_hud:SetRaceMarker({
+            coords = vector3(cp.x, cp.y, cp.z),
+            kind = isLast and 'finish' or 'checkpoint',
+            heading = heading,
+            -- an air gate is a ring in the sky: no pillar, no smoke, no settling onto the ground
+            pillar = kind ~= 'air', smoke = kind ~= 'air', snap = kind ~= 'air',
+            iconHeight = kind == 'air' and 14.0 or nil,
+        })
+        markerUp = true
+    end
+
+    -- The minimap: the next checkpoint as an accent dot (the finish as the chequered flag), the GPS
+    -- line to it, and the one after as a smaller, fainter dot.
+    local c = accent()
     activeBlip = AddBlipForCoord(cp.x, cp.y, cp.z)
     SetBlipSprite(activeBlip, isLast and 38 or 1)
-    SetBlipColour(activeBlip, isLast and 1 or 5)
-    SetBlipScale(activeBlip, 1.0)
+    SetBlipColour(activeBlip, rgbaInt(c))
+    SetBlipScale(activeBlip, isLast and 1.0 or 0.9)
     -- A GPS line to a gate in the sky is a line to nowhere.
     if kind ~= 'air' then
         SetBlipRoute(activeBlip, true)
-        SetBlipRouteColour(activeBlip, 5)
+        SetBlipRouteColour(activeBlip, routeColour(c))
     end
     BeginTextCommandSetBlipName('STRING')
     AddTextComponentSubstringPlayerName(isLast and 'Finish' or ('Checkpoint ' .. index))
@@ -71,9 +147,9 @@ function SKCheckpoints.show(checkpoints, index, isLast, meta)
     if nextCp then
         nextBlip = AddBlipForCoord(nextCp.x, nextCp.y, nextCp.z)
         SetBlipSprite(nextBlip, 1)
-        SetBlipColour(nextBlip, 3)
-        SetBlipScale(nextBlip, 0.7)
-        SetBlipAlpha(nextBlip, 170)
+        SetBlipColour(nextBlip, rgbaInt(c))
+        SetBlipScale(nextBlip, 0.6)
+        SetBlipAlpha(nextBlip, 150)
     end
 end
 
@@ -113,6 +189,28 @@ function SKRaceTitle(def, kind)
     if GetResourceState('vice_hud') ~= 'started' or not def then return end
     exports.vice_hud:ShowRaceTitle({ series = 'STREET KINGS', name = def.name, type = kind })
     Wait(1900)
+end
+
+-- The objective line at GO, the way the reference opens its race with one ("Beat a member of
+-- Billy's crew"): a lobby race names the field, a time trial the time to beat. Braces are the
+-- word vice_hud draws in the accent.
+function SKRaceObjective(def, multiplayer)
+    if not viceHud() or not def then return end
+    local function clock(sec)
+        sec = math.floor(sec + 0.5)
+        return ('%d:%02d'):format(sec // 60, sec % 60)
+    end
+    local text
+    if multiplayer then
+        text = 'Beat the other {racers}'
+    elseif def.medals then
+        text = ('Beat {%s} for gold'):format(clock(def.medals.gold))
+    elseif def.goalTime then
+        text = ('Beat {%s}'):format(clock(def.goalTime))
+    else
+        text = 'Set your best {time}'
+    end
+    exports.vice_hud:ShowObjective(text, 6000)
 end
 
 function SKRaceResult(position, elapsedMs)

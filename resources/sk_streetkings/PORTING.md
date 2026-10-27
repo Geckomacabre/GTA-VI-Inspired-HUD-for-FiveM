@@ -53,7 +53,7 @@ easy to miss:
 | `streetkings_blips` | `stream/minimap.ytd` + `blips_texturesheet_ng_2.dds` | **installed, sheet only** |
 | `txAdminRecipe` | full-server recipe, not useful here | ignore |
 
-Both are installed at `[Scripts]/streetkings_audio` and
+Both are installed at `[VI]/streetkings_audio` and
 `[Scripts]/streetkings_blips`, covered by the existing `ensure [Scripts]`.
 
 **`streetkings_audio`** registers a new soundset and wavepack and replaces no
@@ -184,7 +184,7 @@ Stat key already valid: `clothingPurchased`.
 ## The um_customs hook (only edit outside this resource)
 
 > **2026-10-10: um_customs was retired from this server** (moved to `_Retired/um_customs_2026-10-10`)
-> and replaced by `[UM]/Lenonida_customs`, which needs no hook. It sells nitrous through two exports
+> and replaced by `[VI]/Lenonida_customs`, which needs no hook. It sells nitrous through two exports
 > in `modules/tuning/tuning_c.lua`, `GetNitrousShop(vehicle)` and `BuyNitrous(vehicle, tier)`, and the
 > nitrous module mirrors its gauge into `LocalPlayer.state['customs:nitrous']` for vice_hud's icon.
 > What follows only matters if um_customs is ever brought back.

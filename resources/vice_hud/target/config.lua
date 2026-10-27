@@ -218,6 +218,7 @@ Config.Input = {
   directKeyByName = {
     ['qbx_vehiclekeys:slimjim']     = { kbm = { 51 }, pad = { 204 } }, -- E / Y, Triangle
     ['qbx_vehiclekeys:smashwindow'] = { kbm = { 47 }, pad = { 194 } }, -- G / B, Circle (== cancel.pad)
+    ['qbx_vehiclekeys:clonekey']    = { kbm = { 74 }, pad = { 203 } }, -- H / X, Square (the single-player HUD's CLONE KEY face button)
   },
 
   -- Control suppression: disable weapon and vehicle cycling during interaction.

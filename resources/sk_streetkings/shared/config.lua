@@ -188,6 +188,18 @@ Config = {
     -- in game was not checked; change them here if a ring looks wrong.
     CheckpointSize = { road = 8.0, offroad = 10.25, air = 16.0 },
 
+    -- Race checkpoint blips on the minimap. With vice_hud running, the blips take the character's
+    -- HUD accent exactly (pink / teal, the same colour as the race plate's bar and the waypoint
+    -- route). The GPS line to the next checkpoint takes the nearest stock blip colour instead,
+    -- because an exact RGBA colour is documented for a blip but not for its route: 8 is Pink
+    -- (#fe7ac3) for the pink accent, 30 Dark Cyan (#29a5b8) for teal, 5 the old yellow otherwise.
+    -- Set exactRoute = true to try the exact accent on the line too, and check it draws.
+    RaceBlips = {
+        routeColour = { pink = 8, teal = 30 },
+        defaultRouteColour = 5,
+        exactRoute = false,
+    },
+
     -- ── Multiplayer reward scaling ──────────────────────────────────────────
     MultiplayerRewardScaling = {
         positionMultipliers      = { 1.00, 0.80, 0.65, 0.55, 0.48, 0.42, 0.38, 0.34, 0.30, 0.28 },

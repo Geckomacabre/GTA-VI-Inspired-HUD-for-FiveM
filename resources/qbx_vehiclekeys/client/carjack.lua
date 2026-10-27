@@ -24,10 +24,10 @@ local function makePedsPutHandsUpAndScream(occupants, vehicle)
         local occupant = occupants[p]
         CreateThread(function()
             Wait(math.random(100, 600)) --Random reaction time to increase realism
-            local anim = config.anims.holdup.model[GetEntityModel(vehicle)]
-                or config.anims.holdup.class[GetVehicleClass(vehicle)]
-                or config.anims.holdup.default
-            lib.playAnim(occupant, anim.dict, anim.clip, 8.0, -8.0, -1, 49, 0, false, false, false)
+            local anim = ResolveVehicleAnim(config.anims.holdup, vehicle)
+            if anim then
+                lib.playAnim(occupant, anim.dict, anim.clip, 8.0, -8.0, -1, 49, 0, false, false, false)
+            end
             PlayPain(occupant, 6, 0)
         end)
     end

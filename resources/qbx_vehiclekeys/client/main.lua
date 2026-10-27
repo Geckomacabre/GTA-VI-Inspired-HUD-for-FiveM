@@ -114,12 +114,8 @@ local function toggleEngine(vehicle)
     if not GetIsVehicleAccessible(vehicle) then return end
     local engineOn = GetIsVehicleEngineRunning(vehicle)
 
-    local vehicleModel = GetEntityModel(vehicle)
-    local vehicleClass = GetVehicleClass(vehicle)
-    local anim = config.anims.toggleEngine.model[vehicleModel]
-        or config.anims.toggleEngine.class[vehicleClass]
-        or config.anims.toggleEngine.default
-    if next(anim) then
+    local anim = ResolveVehicleAnim(config.anims.toggleEngine, vehicle)
+    if anim then
         lib.playAnim(cache.ped, anim.dict, anim.clip, 8.0, 8.0,-1, 48, 0)
         Wait(0)
         CreateThread(function()

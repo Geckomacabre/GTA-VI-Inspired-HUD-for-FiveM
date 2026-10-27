@@ -31,11 +31,41 @@ local function load()
     print(('^2[gk_basketball]^7 loaded %s hoop(s)'):format(#BB.hoops))
 end
 
+--[[
+    Every hoop that can be played on right now.
+
+    Two kinds. The ones admins have placed with /bball_place, which live in
+    hoops.json and are always there. And the ones that come with a court in
+    Config.Courts: hoops that are part of a map, at measured positions, which
+    exist only while that court does (an arena that has its basketball floor
+    down). Nobody places or removes those; they follow the map.
+]]
+local function active()
+    local list = {}
+
+    for _, hoop in ipairs(BB.hoops) do list[#list + 1] = hoop end
+
+    for courtId, cfg in pairs(Config.Courts) do
+        if cfg.hoops and BB.courtReady(courtId) then
+            for _, hoop in ipairs(cfg.hoops) do
+                list[#list + 1] = {
+                    id     = hoop.id,
+                    court  = courtId,
+                    team   = hoop.team,
+                    coords = { x = hoop.coords.x, y = hoop.coords.y, z = hoop.coords.z },
+                }
+            end
+        end
+    end
+
+    return list
+end
+
 --- @return table hoops with vector3 coords, ready for BB.buildCourts
 function BB.hoopList()
     local list = {}
 
-    for _, hoop in ipairs(BB.hoops) do
+    for _, hoop in ipairs(active()) do
         list[#list + 1] = {
             id     = hoop.id,
             court  = hoop.court,
@@ -48,7 +78,7 @@ function BB.hoopList()
 end
 
 function BB.findHoop(id)
-    for _, hoop in ipairs(BB.hoops) do
+    for _, hoop in ipairs(active()) do
         if hoop.id == id then return hoop end
     end
 end
@@ -67,12 +97,39 @@ end
     nothing at all.
 ]]
 local function publish()
-    GlobalState[BB.STATE_HOOPS] = BB.hoops
+    GlobalState[BB.STATE_HOOPS] = active()
 end
 
 local function broadcast()
+    local before = BB.courts or {}
+
     BB.courts = BB.buildCourts(BB.hoopList())
+
+    -- A court that has gone (its floor has been taken up) can't have a game on it.
+    for courtId in pairs(before) do
+        if not BB.courts[courtId] and BB.closeCourt then BB.closeCourt(courtId) end
+    end
+
     publish()
+end
+
+-- Courts that depend on something else follow it: when that changes, so does
+-- what is published. Deferred a tick, because a handler runs before the new
+-- value can be read back.
+do
+    local watched = {}
+
+    for _, cfg in pairs(Config.Courts) do
+        local need = cfg.requires
+
+        if need and not watched[need.state] then
+            watched[need.state] = true
+
+            AddStateBagChangeHandler(need.state, 'global', function()
+                SetTimeout(250, broadcast)
+            end)
+        end
+    end
 end
 
 local function canManage(source)

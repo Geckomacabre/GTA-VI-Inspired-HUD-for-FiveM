@@ -153,20 +153,26 @@ end)
 
 --- Grant XP authoritatively. For other server-side resources that want to
 --- reward something the client cannot be trusted to claim for itself — a job
---- completed, a heist finished.
-exports('AddPlayerSkillXp', function(src, id, amount)
+--- completed, a heist finished, a basket made.
+--- opts (optional): { card = true } shows the gain card for it on the player's
+--- screen ("Focus +2%"), as AddSkillXp's does.
+exports('AddPlayerSkillXp', function(src, id, amount, opts)
     if not Skills.ById[id] then return false end
     amount = math.floor(tonumber(amount) or 0)
     if amount <= 0 then return false end
 
     local current = session[src] and session[src].xp or Skills.normalise(metaGet(src))
     current[id] = (current[id] or 0) + amount
-    session[src] = { xp = current, at = os.time() }
+    -- The clock the save ceiling is measured from is left alone: it is about
+    -- what the client claims for itself, and a grant is already in `current`.
+    -- Restarting it here left the next save a second's allowance for whatever
+    -- the player had jogged or sprinted since the last one.
+    session[src] = { xp = current, at = session[src] and session[src].at or os.time() }
     metaSet(src, current)
     -- A grant, NOT a reload. Reloading would overwrite the client's unsaved XP
     -- (up to saveMs of jogging) with the stored table plus this amount; the client
     -- adds it on top of what it holds instead, and its next save agrees with ours.
-    TriggerClientEvent('vice_hud:skills:grant', src, id, amount)
+    TriggerClientEvent('vice_hud:skills:grant', src, id, amount, type(opts) == 'table' and opts.card == true)
     return true
 end)
 

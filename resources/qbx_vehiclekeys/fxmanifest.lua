@@ -23,6 +23,7 @@ client_scripts {
     'client/carjack.lua',
     'client/smashwindow.lua',
     'client/slimjim.lua',
+    'client/keyclone.lua',
     'bridge/qb/client.lua',
 }
 
@@ -40,6 +41,10 @@ files {
     'config/client.lua',
     'config/shared.lua'
 }
+
+-- the slim jim's clips (vi_slimjim.ycd) and strip (vi_prop_slimjim) in stream/;
+-- the strip's .ytyp has to be requested to be spawnable
+data_file 'DLC_ITYP_REQUEST' 'stream/vi_prop_slimjim.ytyp'
 
 lua54 'yes'
 use_experimental_fxv2_oal 'yes'

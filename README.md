@@ -140,11 +140,37 @@ included here.
   resource, with a Slim Jim and Smash Window addition on top. Third-eye a
   locked car's driver door for either option: Smash Window costs time, noise
   and honor rather than a tool, Slim Jim needs a lockpick and plays out on
-  vice_hud's own "hold, release inside the zone" ring instead of a plain
-  skill check. Both hand off into the resource's existing hotwire flow once
+  vice_hud's own lockpick ring instead of a plain skill check: keep the key
+  held and drag (or push the stick) left to 100% to open it, while right to
+  100% is the trap that sets the car's alarm off. While the ring runs he steps up to the door and works a slim
+  jim (a 50 cm strip in his fists) into the window's gap, with the same clips
+  and strip as the single-player version, built on GTA's own break-in
+  animation and streamed from the resource (`slimJim.animation` in its
+  `config/client.lua`). Both hand off into the resource's existing hotwire flow once
   the doors are open. Falls back to a plain `ox_target` prompt with no ring
   if vice_hud isn't running. Depends on `qbx_core`, `ox_target`,
   `ox_inventory`.
+
+  **Clone Key** is the single-player version's key cloning. A player carrying a
+  key cloner also gets a Clone Key row on that door (players without one keep
+  the two-button prompt). He holds a phone, the cloner, while a dot sweeps the
+  ring: press E (Square / X on a pad) while it's in the pink window. Each hit
+  fills a third of the ring and speeds the dot up. Three hits and the key is
+  his, the doors open and there's no alarm, so no hotwire either. Three misses
+  set the car's alarm off. The cloner is a tool, never used up. Add it to
+  `ox_inventory/data/items.lua`:
+
+  ```lua
+  ['key_cloner'] = {
+      label = 'Key Cloner',
+      weight = 250,
+      client = { image = 'hacking_device.png' },
+  },
+  ```
+
+  and sell it where the slim jims are (`data/shops.lua`), for example
+  `{ name = 'key_cloner', price = 2500 },`. `keyClone` in
+  `config/client.lua` switches it off or renames the item.
 
 - **`gk_pausemenu`**: A custom NUI pause menu that takes over the native ESC
   menu with a dashboard UI — sidebar profile/stats/OOC chat, navbar, Player

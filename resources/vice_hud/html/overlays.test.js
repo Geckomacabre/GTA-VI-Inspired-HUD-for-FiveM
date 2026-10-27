@@ -57,6 +57,51 @@ msg({ action: 'helpText', show: true, text: 'The cops are searching for you', te
 ok($('help-text').querySelectorAll('.help-tells .tell').length === 2, 'and can carry the wanted tells under the line');
 msg({ action: 'helpText', show: false });
 ok(hidden('help-text'), 'it hides');
+msg({ action: 'helpText', show: true, holdMs: 0,
+      text: 'To shoot, aim with [[1]] and hold [[2]] until the rings overlap, then release.',
+      glyphs: [{ glyph: 'b_aim', device: 'kb' }, { glyph: 'b_attack', device: 'kb' }] });
+{
+  const g = $('help-text').querySelectorAll('.help-glyph');
+  ok(g.length === 2 && !$('help-text').textContent.includes('[['), 'buttons sit in the line where the text names them',
+     $('help-text').innerHTML);
+  ok(g.length === 2 && g[0].getAttribute('data-key') === '1' && g[1].getAttribute('data-key') === '2'
+     && $('help-text').textContent.indexOf('aim with') < $('help-text').textContent.indexOf('and hold'),
+     'in the order they are named');
+}
+msg({ action: 'helpText', show: false });
+
+console.log('\n-- a count in the feed --');
+{
+  const before = $('feed').querySelectorAll('.feed-line').length;
+  msg({ action: 'feed', text: '1 scored', icon: 'hoop.svg', holdMs: 0, counter: 'gk_basketball:scored' });
+  msg({ action: 'feed', text: '2 scored', icon: 'hoop.svg', holdMs: 0, counter: 'gk_basketball:scored' });
+  const counts = $('feed').querySelectorAll('.feed-line.counter');
+  ok(counts.length === 1 && counts[0].textContent === '2 scored', 'a new count replaces the last one, not stacks',
+     [...counts].map((n) => n.textContent));
+  ok(counts[0] && counts[0].querySelector('img') !== null, 'with its picture after it');
+  msg({ action: 'feed', text: 'Crime reported', holdMs: 0 });
+  ok($('feed').querySelectorAll('.feed-line').length === before + 2
+     && $('feed').querySelectorAll('.feed-line.counter').length === 1, 'and ordinary lines still stack around it');
+  $('feed').replaceChildren();      // (the feed checks below start from an empty one)
+}
+
+console.log('\n-- the gain card --');
+ok(hidden('statgain'), 'down until a skill goes up with it');
+msg({ action: 'statGain', id: 'focus', label: 'Focus', text: '+2%', from: 0, to: 0.02 });
+ok(!hidden('statgain') && $('statgain-label').textContent === 'Focus' && $('statgain-text').textContent === '+2%',
+   'says which skill and by how much');
+ok($('statgain-fill').getAttribute('stroke-dasharray') === '0.00 100'
+   && $('statgain-gain').getAttribute('stroke-dasharray') === '2.00 100'
+   && parseFloat($('statgain-gain').getAttribute('stroke-dashoffset')) === 0,
+   'the ring: nothing before, the 2% just gained from twelve o\'clock',
+   [$('statgain-fill').getAttribute('stroke-dasharray'), $('statgain-gain').getAttribute('stroke-dasharray')]);
+msg({ action: 'statGain', id: 'focus', label: 'Focus', text: '+0.2%', from: 0.512, to: 0.514 });
+ok($('statgain-fill').getAttribute('stroke-dasharray') === '51.20 100'
+   && $('statgain-gain').getAttribute('stroke-dashoffset') === '-51.20'
+   && parseFloat($('statgain-gain').getAttribute('stroke-dasharray')) >= 1.5,
+   'further on: what there was, and a gain too small to see drawn as a sliver');
+runTimers(4000);
+ok(hidden('statgain'), 'and it goes by itself');
 msg({ action: 'feed', text: 'Crime reported', holdMs: 0 });
 msg({ action: 'feed', text: '+ $6', icon: 'icons/cash.png', holdMs: 3500 });
 let lines = $('feed').querySelectorAll('.feed-line');
@@ -105,8 +150,43 @@ ok(d.querySelector('#prompts .prompt').classList.contains('off'), 'a prompt that
 msg({ action: 'prompt', id: 'buy', show: false });
 msg({ action: 'shop', show: true, price: 20, name: 'Cap', afford: true });
 ok(!$('shop').classList.contains('cant') && hidden('shop-note'), 'an affordable item has no warning');
+msg({ action: 'shop', show: true, name: 'Cap', swatches: [
+  { color: '#111', image: 'https://cfx-nui-illenium-appearance/thumbs/male_prop_0_5_1.png' },
+  { color: '#222', image: 'javascript:alert(1)' }, { color: '#333', image: 'https://x/a.png");background:url("//evil' }, { color: '#444' }] });
+const pics = $('shop-swatches').querySelectorAll('.shop-swatch');
+ok(pics[0].classList.contains('pic') && /male_prop_0_5_1\.png/.test(pics[0].style.backgroundImage) && !pics[0].style.backgroundColor,
+   'a swatch with a picture shows the picture, not the colour', pics[0].getAttribute('style'));
+ok(!pics[1].classList.contains('pic') && !pics[2].classList.contains('pic') && !pics[1].style.backgroundImage && !pics[2].style.backgroundImage,
+   'an address that is not a plain https one is not used: the swatch keeps its colour');
+ok(!pics[3].classList.contains('pic') && pics[3].style.backgroundColor, 'and one without a picture is a colour as before');
+ok(!$('shop').classList.contains('strip') && $('shop-counter').textContent === '' && hidden('shop-more') && hidden('shop-progress') && hidden('shop-status'),
+   'a plain panel has no counter, arrow, hairline or status');
+msg({ action: 'shop', show: true, store: "Kurt's Barber Shop", category: 'Hairstyle', price: 75, name: 'Straight Bob', strip: true,
+      swatches: [1, 2, 3, 4, 5, 6].map((n) => ({ image: 'https://cfx-nui-illenium-appearance/thumbs/female_2_' + n + '.webp' })),
+      selected: 1, counter: '1 / 9', more: true, progress: { first: 1, shown: 6, total: 9 }, status: 'Not applied', afford: true });
+ok($('shop').classList.contains('strip') && $('shop-swatches').querySelectorAll('.shop-swatch.pic').length === 6, 'a strip: the row is the items\' pictures');
+ok($('shop-counter').textContent === '1 / 9' && !hidden('shop-more'), 'with its counter, and an arrow while the list goes on');
+const thumb = $('shop-progress-thumb');
+ok(!hidden('shop-progress') && thumb.style.left === '0%' && Math.abs(parseFloat(thumb.style.width) - 66.667) < 0.01,
+   'and a hairline as long as six tiles are of nine', thumb.getAttribute('style'));
+ok(!hidden('shop-status') && $('shop-status').textContent === 'Not applied' && hidden('shop-note'), 'the status is a plain line, not the warning');
+msg({ action: 'shop', show: true, name: 'Pixie', strip: true, swatches: [{ image: 'https://x/a.webp' }], selected: 1,
+      counter: '9 / 9', progress: { first: 4, shown: 6, total: 9 }, afford: true });
+ok(hidden('shop-more') && Math.abs(parseFloat(thumb.style.left) - 33.333) < 0.01 && !hidden('shop-progress'), 'at the end: no arrow, the hairline at the far end', thumb.getAttribute('style'));
+msg({ action: 'shop', show: true, name: 'Cap', swatches: [], afford: true });
+ok(!$('shop').classList.contains('strip') && hidden('shop-strip') && hidden('shop-progress'), 'no swatches, no row at all');
 msg({ action: 'shop', show: false });
 ok(hidden('shop') && !stage.classList.contains('shopping'), 'closing it puts the prompts back in their column');
+
+console.log('\n-- money while a clothing / barber / tattoo store is open --');
+const css = fs.readFileSync(base + 'style.css', 'utf8');
+ok(stage.contains($('money')) && stage.contains($('money-pop')) &&
+   /#stage\.money-off #money, #stage\.money-off #money-pop \{ visibility: hidden !important; \}/.test(css),
+   'the money rows and the pop are both under the stage the rule hides them on');
+msg({ action: 'moneyHidden', hidden: true });
+ok(stage.classList.contains('money-off'), 'a store open: the money is off the screen');
+msg({ action: 'moneyHidden', hidden: false });
+ok(!stage.classList.contains('money-off'), 'closed: it is back');
 
 console.log('\n-- vehicle stats --');
 msg({ action: 'vehStats', show: true, make: 'Maibatsu', model: 'Sanchez',

@@ -126,10 +126,115 @@ end
 -- Blips and target zones
 --------------------------------------------------------------------------------
 
+local attendants = {}   -- peds stood at courts to be talked to
+local worldToken = 0    -- bumped whenever the world is rebuilt, so a ped still loading knows it's stale
+
 local function clearWorld()
+    worldToken = worldToken + 1
+
     for _, zone in ipairs(zones) do exports.ox_target:removeZone(zone) end
     for _, blip in ipairs(blips) do RemoveBlip(blip) end
-    zones, blips = {}, {}
+
+    for _, ped in ipairs(attendants) do
+        if DoesEntityExist(ped) then
+            exports.ox_target:removeLocalEntity(ped)
+            DeleteEntity(ped)
+        end
+    end
+
+    zones, blips, attendants = {}, {}, {}
+end
+
+--- Everything you can do at a court, as ox_target options. The same list whether
+--- it hangs off a spot on the floor or off somebody stood at the side of it.
+local function courtOptions(id)
+    return {
+        {
+            name     = 'gk_basketball:join:' .. id,
+            label    = Config.Text.court_join,
+            icon     = 'fas fa-basketball',
+            canInteract = function() return BB.court == nil end,
+            onSelect = function() TriggerServerEvent('gk_basketball:join', id) end,
+        },
+        {
+            name     = 'gk_basketball:start:' .. id,
+            label    = Config.Text.court_start,
+            icon     = 'fas fa-stopwatch',
+            canInteract = function()
+                return BB.court == id and BB.match and BB.match.state == 'lobby'
+            end,
+            onSelect = function() TriggerServerEvent('gk_basketball:start', id) end,
+        },
+        {
+            name     = 'gk_basketball:ball:' .. id,
+            label    = Config.Text.court_ball,
+            icon     = 'fas fa-hand',
+            canInteract = function()
+                return Config.Match.freeBallsOnCourt and not BB.isHolding()
+            end,
+            onSelect = function() TriggerServerEvent('gk_basketball:requestBall', id) end,
+        },
+        {
+            name     = 'gk_basketball:ai:' .. id,
+            label    = Config.Text.court_ai,
+            icon     = 'fas fa-robot',
+            canInteract = function()
+                return Config.AI.enabled and BB.court == id
+            end,
+            onSelect = function() BB.showDifficultyMenu(id) end,
+        },
+        {
+            name     = 'gk_basketball:leave:' .. id,
+            label    = Config.Text.court_leave,
+            icon     = 'fas fa-door-open',
+            canInteract = function() return BB.court == id end,
+            onSelect = function() TriggerServerEvent('gk_basketball:leave') end,
+        },
+    }
+end
+
+--- Stands somebody at a court for players to talk to. Local to this client:
+--- everyone has their own copy of the same person in the same place.
+--- @param spec table { model?, coords = vec4(x, y, z, heading) } z is where their feet are
+local function standAttendant(spec, options)
+    local token = worldToken
+
+    CreateThread(function()
+        local model = spec.model or Config.Attendant.model
+        if not IsModelInCdimage(model) then return end
+
+        RequestModel(model)
+
+        local deadline = GetGameTimer() + 8000
+        while not HasModelLoaded(model) do
+            if GetGameTimer() > deadline then return end
+            Wait(0)
+        end
+
+        -- The world was rebuilt while this was loading: somebody else's job now.
+        if token ~= worldToken then return end
+
+        local at = spec.coords
+        local ped = CreatePed(4, model, at.x, at.y, at.z, at.w, false, true)
+        SetModelAsNoLongerNeeded(model)
+
+        if not ped or ped == 0 then return end
+
+        SetEntityInvincible(ped, true)
+        SetBlockingOfNonTemporaryEvents(ped, true)
+        SetPedCanRagdoll(ped, false)
+        SetPedCanBeTargetted(ped, false)
+        FreezeEntityPosition(ped, true)
+        SetEntityAsMissionEntity(ped, true, true)
+
+        if Config.Attendant.scenario then
+            TaskStartScenarioInPlace(ped, Config.Attendant.scenario, 0, true)
+        end
+
+        exports.ox_target:addLocalEntity(ped, options)
+
+        attendants[#attendants + 1] = ped
+    end)
 end
 
 --[[
@@ -185,54 +290,18 @@ local function buildWorld()
             blips[#blips + 1] = blip
         end
 
-        zones[#zones + 1] = exports.ox_target:addSphereZone({
-            coords = court.centre,
-            radius = 2.5,
-            debug  = Config.Debug,
-            options = {
-                {
-                    name     = 'gk_basketball:join:' .. id,
-                    label    = Config.Text.court_join,
-                    icon     = 'fas fa-basketball',
-                    canInteract = function() return BB.court == nil end,
-                    onSelect = function() TriggerServerEvent('gk_basketball:join', id) end,
-                },
-                {
-                    name     = 'gk_basketball:start:' .. id,
-                    label    = Config.Text.court_start,
-                    icon     = 'fas fa-stopwatch',
-                    canInteract = function()
-                        return BB.court == id and BB.match and BB.match.state == 'lobby'
-                    end,
-                    onSelect = function() TriggerServerEvent('gk_basketball:start', id) end,
-                },
-                {
-                    name     = 'gk_basketball:ball:' .. id,
-                    label    = Config.Text.court_ball,
-                    icon     = 'fas fa-hand',
-                    canInteract = function()
-                        return Config.Match.freeBallsOnCourt and not BB.isHolding()
-                    end,
-                    onSelect = function() TriggerServerEvent('gk_basketball:requestBall', id) end,
-                },
-                {
-                    name     = 'gk_basketball:ai:' .. id,
-                    label    = Config.Text.court_ai,
-                    icon     = 'fas fa-robot',
-                    canInteract = function()
-                        return Config.AI.enabled and BB.court == id
-                    end,
-                    onSelect = function() BB.showDifficultyMenu(id) end,
-                },
-                {
-                    name     = 'gk_basketball:leave:' .. id,
-                    label    = Config.Text.court_leave,
-                    icon     = 'fas fa-door-open',
-                    canInteract = function() return BB.court == id end,
-                    onSelect = function() TriggerServerEvent('gk_basketball:leave') end,
-                },
-            },
-        })
+        -- A court with somebody to talk to has them; any other has a spot on the
+        -- floor at its centre.
+        if courtCfg and courtCfg.ped then
+            standAttendant(courtCfg.ped, courtOptions(id))
+        else
+            zones[#zones + 1] = exports.ox_target:addSphereZone({
+                coords  = court.centre,
+                radius  = 2.5,
+                debug   = Config.Debug,
+                options = courtOptions(id),
+            })
+        end
     end
 end
 

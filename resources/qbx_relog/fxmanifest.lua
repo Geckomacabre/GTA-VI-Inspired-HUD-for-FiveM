@@ -31,7 +31,7 @@ files {
     -- font 404 fails silently. Same call qb-menu makes.
     --
     -- Regenerate with:
-    --   cp '[standalone]/vice_hud/html/fonts/GTAArtDeco*.ttf' '[qbx]/qbx_relog/html/fonts/'
+    --   cp '[VI]/vice_hud/html/fonts/GTAArtDeco*.ttf' '[VI]/qbx_relog/html/fonts/'
     'html/fonts/GTAArtDecoRegular.ttf',
     'html/fonts/GTAArtDecoMedium.ttf',
 }

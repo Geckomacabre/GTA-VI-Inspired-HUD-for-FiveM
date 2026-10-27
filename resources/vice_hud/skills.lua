@@ -80,6 +80,20 @@ Skills.List = {
         blurb = 'Less recoil and a tighter spread.',
     },
     {
+        -- Not a GTA stat. GTA VI's Focus, as its basketball shows it: a
+        -- percentage that practice raises ("Focus +2%" beside "1 scored"), on
+        -- a card with the Focus eye. The level is how long the Focus meter
+        -- (client_vitals.lua) lasts before it runs dry: up to
+        -- Config.Focus.skillDrainBonus longer at 100. Earned from zero, like
+        -- Health. Nothing here watches for it; other resources grant it
+        -- (gk_basketball, per basket made outside a match: one `rate` each,
+        -- which is +2% at the start).
+        id = 'focus', label = 'Focus', stat = nil, noSeed = true,
+        unit = 'baskets made',
+        rate = 200.0,
+        blurb = 'The Focus meter lasts longer before it runs dry.',
+    },
+    {
         id = 'stealth', label = 'Stealth', stat = 'STEALTH_ABILITY',
         unit = 'metres moved crouched',
         rate = 2.0,

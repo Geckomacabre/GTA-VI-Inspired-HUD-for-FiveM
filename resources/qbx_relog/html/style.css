@@ -22,7 +22,7 @@
    merged. This is .plate (the zone bar / vehicle panel: warm purple-grey at
    0.88, hairline INSET ring, top-lit line, two-gradient sheen, and crucially NO
    specular cap), not .glass (the near-black popup material ox_lib uses). The
-   recipe is copied from [standalone]/vice_hud/html/style.css; change it there
+   recipe is copied from [VI]/vice_hud/html/style.css; change it there
    and this has to move with it.
 
    NO backdrop-filter, deliberately -- on a transparent NUI page CEF has no

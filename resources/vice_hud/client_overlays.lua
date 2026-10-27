@@ -96,9 +96,14 @@ end
 -- directly, NOT the damage event's own payload — see client_skills.lua's own
 -- note on why CEventNetworkEntityDamage's argument layout isn't safe to index
 -- by position for anything past victim/attacker.
+-- That native returns the bone's TAG (the id GetPedBoneIndex takes), which
+-- for SKEL_Head is 31086 -- not joaat('SKEL_Head'). This used to compare
+-- against the joaat, which no bone ever reports, so a headshot never
+-- classified and the red mark never showed. (Found while diffing against the
+-- single-player GTA6Hud, which uses 31086; fenix-police does too.)
 -- Not `local`: client.lua is close to Lua's 200-local-per-chunk parse-time
 -- cap. A plain global costs nothing against that limit.
-HEAD_BONE = `SKEL_Head`
+HEAD_BONE = 31086
 
 -- victim entity -> hits WE landed on them so far. Cleared the moment they
 -- die (or the table would grow forever), so a target that gets away and
@@ -291,6 +296,208 @@ exports('ShowRaceCountdown', function(data)
     end
 end)
 
+-- ---- race marker ------------------------------------------------------------
+-- The next checkpoint, out in the world, as the dirt-bike race draws it: a
+-- thin light pillar standing on the track in the accent colour, a dot over
+-- it with the distance in feet under that ("453 ft"), and at the finish a
+-- chequered tile instead of the dot and coloured smoke across the line.
+-- Like the race block, it is fed by the race resource (sk_streetkings) and
+-- knows nothing about races: a point on the ground, what kind it is, and for
+-- the finish which way the road runs through it.
+--
+-- Measured off the reference at 1080p:
+--   pillar   about 0.8 m across at every range (14 px at 80 m, 4 px at 250 m);
+--            ~13 m tall at 260 ft and ~35 m at ~800 ft, so its height grows
+--            with distance (0.15 x range, kept between 10 and 45 m) rather
+--            than being a fixed size;
+--   icon     sits on top of the pillar; dot ~14 px, the distance's centre
+--            30 px under the dot's, the pillar starting just under the text;
+--   finish   no pillar: the chequered tile hangs ~8 m over the line, the line
+--            itself a bank of coloured smoke across the road.
+-- The pillar and the smoke are world-space (DrawMarker / a looped particle);
+-- the icon is the page's, projected here every frame, the same way the
+-- world-anchored action prompt below is.
+local RM_PILLAR_WIDTH = 0.85
+local RM_PILLAR_PER_METRE, RM_PILLAR_MIN, RM_PILLAR_MAX = 0.15, 10.0, 45.0
+local RM_FINISH_ICON_HEIGHT = 8.0
+-- Rockstar's own coloured ground smoke (Smuggler's Run's package flare, tinted
+-- with SET_PARTICLE_FX_LOOPED_COLOUR in fm_content_generic_misc.sch). One
+-- emitter every few metres across the line; started inside RM_SMOKE_ON and
+-- stopped past RM_SMOKE_OFF so a finish across the map costs nothing.
+local RM_SMOKE_ASSET, RM_SMOKE_FX = 'scr_sm', 'scr_sm_hl_package_flare'
+local RM_SMOKE_SPACING, RM_SMOKE_SCALE = 4.5, 1.5
+local RM_SMOKE_ON, RM_SMOKE_OFF = 300.0, 350.0
+
+local raceMarker = nil   -- { coords, kind, heading, width, pillar, iconHeight, rgb, smoke, ... }
+local rmSent = nil       -- what the page was last told, to push changes only
+
+--- "453 ft" under 1,000 ft, then "0.3 mi": whole feet, as the reference
+--- prints them (unlike the nav badge, which rounds to the nearest 5).
+local function raceMarkerDistance(m)
+    local ft = m * 3.28084
+    if ft < 1000.0 then return ('%d ft'):format(math.floor(ft + 0.5)) end
+    return ('%.1f mi'):format(m / 1609.344)
+end
+
+local function stopRaceSmoke(m)
+    if not m or not m.smoke then return end
+    for _, fx in ipairs(m.smoke) do StopParticleFxLooped(fx, false) end
+    m.smoke = nil
+    RemoveNamedPtfxAsset(RM_SMOKE_ASSET)
+end
+
+local function startRaceSmoke(m)
+    m.smoke = {}
+    RequestNamedPtfxAsset(RM_SMOKE_ASSET)
+    local deadline = GetGameTimer() + 3000
+    while not HasNamedPtfxAssetLoaded(RM_SMOKE_ASSET) do
+        if GetGameTimer() > deadline or raceMarker ~= m then return end
+        Wait(0)
+    end
+    if raceMarker ~= m then return end
+    -- Across the road: GTA's heading h faces (-sin h, cos h), so its right
+    -- hand is (cos h, sin h). No heading given: one bank on the point.
+    local h = math.rad(m.heading or 0.0)
+    local rx, ry = math.cos(h), math.sin(h)
+    local n = m.heading and math.max(2, math.floor(m.width / RM_SMOKE_SPACING + 0.5)) or 1
+    local c = m.coords
+    for i = 1, n do
+        local off = (i - (n + 1) / 2) * (m.width / n)
+        UseParticleFxAsset(RM_SMOKE_ASSET)
+        local fx = StartParticleFxLoopedAtCoord(RM_SMOKE_FX, c.x + rx * off, c.y + ry * off, c.z,
+            0.0, 0.0, 0.0, RM_SMOKE_SCALE, false, false, false, true)
+        if fx and fx ~= 0 then
+            SetParticleFxLoopedColour(fx, m.rgb[1] / 255.0, m.rgb[2] / 255.0, m.rgb[3] / 255.0, true)
+            m.smoke[#m.smoke + 1] = fx
+        end
+    end
+end
+
+local function clearRaceMarker()
+    if raceMarker then stopRaceSmoke(raceMarker) end
+    raceMarker, rmSent = nil, nil
+    ui('raceMarker', { show = false })
+end
+
+--- The next checkpoint. data:
+---   coords      vector3 on the ground where the checkpoint stands (the road
+---               surface; the pillar rises from here)
+---   kind        'checkpoint' (dot, pillar) or 'finish' (chequered tile, smoke)
+---   heading     which way the route runs through it, GTA degrees; lays the
+---               finish smoke across the road. Optional.
+---   width       metres of road the finish smoke spans (default 14)
+---   pillar      false to leave the pillar out (an air gate draws its own ring)
+---   iconHeight  metres over coords for the icon when there is no pillar
+---   smoke       false for a finish with no smoke (a finish gate in the sky)
+---   snap        false to keep coords.z as given; otherwise, once the ground
+---               there has streamed in, the marker settles onto it (a point
+---               a metre off still stands on the road)
+--- nil or false takes it down. Call again for the next one.
+exports('SetRaceMarker', function(data)
+    if type(data) ~= 'table' or not data.coords then clearRaceMarker() return end
+    local accent = exports.vice_hud:GetAccentColour()
+    local kind = data.kind == 'finish' and 'finish' or 'checkpoint'
+    if raceMarker then stopRaceSmoke(raceMarker) end
+    raceMarker = {
+        coords = vector3(data.coords.x + 0.0, data.coords.y + 0.0, data.coords.z + 0.0),
+        kind = kind,
+        heading = tonumber(data.heading),
+        width = tonumber(data.width) or 14.0,
+        pillar = data.pillar ~= false and kind ~= 'finish',
+        iconHeight = tonumber(data.iconHeight) or RM_FINISH_ICON_HEIGHT,
+        smokeWanted = kind == 'finish' and data.smoke ~= false,
+        snapped = data.snap == false,
+        nextSnap = 0,
+        rgb = { accent.r, accent.g, accent.b },
+    }
+    rmSent = nil
+    ui('raceMarker', { show = false, kind = kind })
+end)
+exports('ClearRaceMarker', clearRaceMarker)
+
+CreateThread(function()
+    while true do
+        if not raceMarker then
+            Wait(250)
+        else
+            Wait(0)
+        end
+        -- read after the wait: the marker may have been replaced or taken down while yielding
+        local m = raceMarker
+        if m then
+            local c = m.coords
+            local dist = #(GetEntityCoords(cache.ped or PlayerPedId()) - c)
+
+            -- Onto the ground, once there is ground to find: collision only
+            -- streams in near the player, so a far checkpoint is tried again
+            -- every half second until it answers. Only ever a small move.
+            if not m.snapped and dist < 400.0 and GetGameTimer() >= m.nextSnap then
+                m.nextSnap = GetGameTimer() + 500
+                local found, gz = GetGroundZFor_3dCoord(c.x, c.y, c.z + 2.0, false)
+                if found then
+                    m.snapped = true
+                    if math.abs(gz - c.z) <= 3.0 then
+                        m.coords = vector3(c.x, c.y, gz)
+                        c = m.coords
+                    end
+                end
+            end
+
+            local top = c.z + m.iconHeight
+
+            if m.pillar then
+                local h = math.max(RM_PILLAR_MIN, math.min(RM_PILLAR_MAX, dist * RM_PILLAR_PER_METRE))
+                local r, g, b = m.rgb[1], m.rgb[2], m.rgb[3]
+                -- A soft halo round a brighter core. Type 1 is the vertical
+                -- cylinder, which the game already fades out towards its top.
+                -- Sunk half a metre so it never floats over a dip in the road.
+                DrawMarker(1, c.x, c.y, c.z - 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    RM_PILLAR_WIDTH * 2.2, RM_PILLAR_WIDTH * 2.2, h + 0.5, r, g, b, 40,
+                    false, false, 2, false, nil, nil, false)
+                DrawMarker(1, c.x, c.y, c.z - 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    RM_PILLAR_WIDTH, RM_PILLAR_WIDTH, h + 0.5, r, g, b, 165,
+                    false, false, 2, false, nil, nil, false)
+                top = c.z + h
+            end
+
+            if m.smokeWanted and (m.snapped or dist < 120.0) then
+                if not m.smoke and dist < RM_SMOKE_ON then
+                    m.smoke = {}
+                    CreateThread(function() startRaceSmoke(m) end)
+                elseif m.smoke and dist > RM_SMOKE_OFF then
+                    stopRaceSmoke(m)
+                end
+            end
+
+            local onScreen, sx, sy = GetScreenCoordFromWorldCoord(c.x, c.y, top)
+            local text = raceMarkerDistance(dist)
+            local last = rmSent
+            if not last or last.show ~= onScreen or last.text ~= text
+                or math.abs(last.x - sx) > 0.0004 or math.abs(last.y - sy) > 0.0004 then
+                rmSent = { show = onScreen, x = sx, y = sy, text = text }
+                ui('raceMarker', { show = onScreen, kind = m.kind, x = sx, y = sy, text = text })
+            end
+        end
+    end
+end)
+
+AddEventHandler('onResourceStop', function(res)
+    if res == GetCurrentResourceName() and raceMarker then stopRaceSmoke(raceMarker) end
+end)
+
+RegisterCommand('hudracemarker', function(_, args)
+    local ped = cache.ped or PlayerPedId()
+    local ahead = GetOffsetFromEntityInWorldCoords(ped, 0.0, 80.0, 0.0)
+    local found, gz = GetGroundZFor_3dCoord(ahead.x, ahead.y, ahead.z + 10.0, false)
+    exports.vice_hud:SetRaceMarker({
+        coords = vector3(ahead.x, ahead.y, found and gz or ahead.z),
+        kind = args[1] == 'finish' and 'finish' or 'checkpoint',
+        heading = GetEntityHeading(ped),
+    })
+    print('^3[vice_hud]^7 /hudracemarker [finish] — a race marker 80 m ahead. /hudracemarkeroff to clear.')
+end, false)
+RegisterCommand('hudracemarkeroff', function() exports.vice_hud:ClearRaceMarker() end, false)
+
 -- =============================================================================
 -- Screen text and overlays
 -- =============================================================================
@@ -315,8 +522,16 @@ local function textMessage(action, text, durationMs, extra)
     ui(action, data)
 end
 
+-- Bumped on every ShowSubtitle / ShowHelpText call, so something that put
+-- text up and later wants it gone (client_nativetext.lua) can tell whether
+-- anyone else has used the box since, and leave theirs alone. Globals for
+-- the 200-local reason at the top of this file.
+SubtitleSerial = 0
+HelpTextSerial = 0
+
 --- One or two lines of speech, bottom centre. Default 4 s.
 exports('ShowSubtitle', function(text, durationMs)
+    SubtitleSerial = SubtitleSerial + 1
     textMessage('subtitle', text, durationMs)
 end)
 
@@ -327,17 +542,36 @@ exports('ShowObjective', function(text, durationMs)
 end)
 
 --- The help box, top left. opts.tells = { 'outfit', 'voice', ... } draws that
---- row of wanted tells under the text. Default 7 s.
+--- row of wanted tells under the text. opts.keys = { 25, 24 } puts those
+--- controls' buttons in the line where it says [[1]], [[2]] ('aim with [[1]]
+--- and hold [[2]]'), drawn as the action prompts draw them, for the device in
+--- hand. Default 7 s.
 exports('ShowHelpText', function(text, durationMs, opts)
-    textMessage('helpText', text, durationMs, { tells = type(opts) == 'table' and opts.tells or nil })
+    HelpTextSerial = HelpTextSerial + 1
+    opts = type(opts) == 'table' and opts or {}
+
+    local glyphs
+    if type(opts.keys) == 'table' then
+        glyphs = {}
+        for i, key in ipairs(opts.keys) do
+            local glyph, device = ViceGlyphs.control(key)
+            glyphs[i] = { glyph = glyph, device = device }
+        end
+    end
+
+    textMessage('helpText', text, durationMs, { tells = opts.tells, glyphs = glyphs })
 end)
 
 --- A line in the feed on the right ('Crime reported'). opts.icon is an image
---- in html/ to draw after it; opts.duration defaults to 3.5 s.
+--- in html/ to draw after it; opts.duration defaults to 3.5 s. opts.counter =
+--- a name ('gk_basketball:scored') makes it a count of something going on:
+--- a size up, as the reference draws "2 scored", and each one with that name
+--- replaces the last instead of stacking under it.
 exports('ShowFeed', function(text, opts)
     if text == nil or text == '' then return end
     opts = type(opts) == 'table' and opts or {}
-    ui('feed', { text = tostring(text), icon = opts.icon, holdMs = tonumber(opts.duration) })
+    ui('feed', { text = tostring(text), icon = opts.icon, holdMs = tonumber(opts.duration),
+        counter = type(opts.counter) == 'string' and opts.counter or nil })
 end)
 
 --- A title card. style: 'center' (PROLOGUE), 'stack' (NINE MONTHS AGO., one
@@ -896,6 +1130,133 @@ RegisterCommand('hudlockpick', function()
 end, false)
 RegisterCommand('hudlockpickrelease', function() exports.vice_hud:ReleaseLockpickCheck() end, false)
 end -- close the do opened above local lockpickActive
+
+-- =============================================================================
+-- Key clone check
+-- =============================================================================
+-- The single-player HUD's CLONE KEY (2.7) on the same ring (#lockpick, in its
+-- lp-clone mode): a dot sweeps back and forth along the bottom half, and the
+-- player presses while it is inside the pink window. Each hit fills a third
+-- of the band, moves the window and speeds the dot up (55, 75 then 100% of
+-- the half ring a second). Three hits and the key is cloned, three misses and
+-- it is the alarm. E or the left mouse button; Square / X on a pad (jump, so
+-- he can't also hop); Backspace / Circle / B backs out with no result.
+--
+-- Results are local events, like the lockpick's: vice_hud:keyCloneResult
+-- (true), vice_hud:keyCloneAlarm, vice_hud:keyCloneCancel. The caller
+-- (qbx_vehiclekeys/client/keyclone.lua) owns the car, the phone and what
+-- each result means. Its own do...end, for the same 200-locals reason as the
+-- block above.
+do
+local cloneActive = false
+local clone = { pos = 0, dir = 1, target = 50, hits = 0, misses = 0, startedAt = 0 }
+
+local CLONE_HITS, CLONE_MISSES = 3, 3
+local CLONE_WINDOW = 24 / 1.8      -- the window is 24 degrees of the ring, in the half ring's 0-100
+local CLONE_SPEEDS = { 55, 75, 100 }
+local CLONE_GRACE_MS = 300         -- the press that started it can't count as a try
+local CLONE_SOUNDS = 'DLC_HEIST_BIOLAB_PREP_HACKING_SOUNDS'
+
+-- Somewhere from 10 to 90, at least a quarter of the ring from the dot
+-- (twenty tries, then wherever the last one fell), as the mock and the
+-- single-player HUD place it.
+local function cloneNewTarget()
+    local t = 50
+    for _ = 1, 20 do
+        t = 10 + math.random() * 80
+        if math.abs(t - clone.pos) >= 25 then break end
+    end
+    clone.target = t
+end
+
+local function clonePressed()
+    if waUsingPad() then return IsDisabledControlJustPressed(0, 22) end
+    return IsDisabledControlJustPressed(0, 38) or IsDisabledControlJustPressed(0, 24)
+end
+
+-- He stands at the door with the phone: no walking off, shooting or jumping
+-- while it runs. The camera stays free.
+local CLONE_HELD = { 21, 22, 24, 25, 30, 31, 32, 33, 34, 35, 38, 44, 51, 140, 141, 142, 177, 257, 263, 264 }
+
+local function cloneEnd(name, value)
+    cloneActive = false
+    if name then TriggerEvent(name, value) end
+end
+
+--- cfg: { key (a control ID to show instead of E / jump), glyph (raw text) }.
+exports('StartKeyCloneCheck', function(cfg)
+    cfg = cfg or {}
+    clone.pos, clone.dir, clone.hits, clone.misses = 0, 1, 0, 0
+    clone.startedAt = GetGameTimer()
+    cloneNewTarget()
+    cloneActive = true
+    local glyph, device
+    if cfg.key ~= nil then glyph, device = waResolveKey(cfg.key)
+    elseif cfg.glyph then glyph = cfg.glyph
+    else glyph, device = waResolveKey(waUsingPad() and 22 or 38) end
+    ui('keyClone', { show = true, glyph = glyph or 'E', device = device })
+end)
+
+--- Ends it with no result event, e.g. the car drove off or he walked away.
+exports('CancelKeyCloneCheck', function()
+    if not cloneActive then return end
+    cloneEnd()
+    ui('keyClone', { show = false })
+end)
+
+CreateThread(function()
+    local last = GetGameTimer()
+    while true do
+        Wait(cloneActive and 0 or 250)
+        local now = GetGameTimer()
+        local dt = math.min(now - last, 100) / 1000.0
+        last = now
+        if cloneActive then
+            for _, control in ipairs(CLONE_HELD) do DisableControlAction(0, control, true) end
+            if IsDisabledControlJustPressed(0, 177) then
+                cloneEnd('vice_hud:keyCloneCancel')
+                ui('keyClone', { show = false })
+            else
+                local speed = CLONE_SPEEDS[math.min(clone.hits + 1, #CLONE_SPEEDS)]
+                clone.pos = clone.pos + clone.dir * speed * dt
+                if clone.pos >= 100 then clone.pos, clone.dir = 100, -1
+                elseif clone.pos <= 0 then clone.pos, clone.dir = 0, 1 end
+
+                if now - clone.startedAt >= CLONE_GRACE_MS and clonePressed() then
+                    if math.abs(clone.pos - clone.target) <= CLONE_WINDOW * 0.5 then
+                        clone.hits = clone.hits + 1
+                        if clone.hits >= CLONE_HITS then
+                            PlaySoundFrontend(-1, 'Hack_Success', CLONE_SOUNDS, true)
+                            ui('keyCloneResult', { success = true })
+                            cloneEnd('vice_hud:keyCloneResult', true)
+                        else
+                            PlaySoundFrontend(-1, 'Pin_Good', CLONE_SOUNDS, true)
+                            cloneNewTarget()
+                        end
+                    else
+                        clone.misses = clone.misses + 1
+                        PlaySoundFrontend(-1, 'Pin_Bad', CLONE_SOUNDS, true)
+                        if clone.misses >= CLONE_MISSES then
+                            ui('keyCloneResult', { success = false })
+                            cloneEnd('vice_hud:keyCloneAlarm')
+                        else
+                            ui('keyCloneMiss', {})
+                        end
+                    end
+                end
+                if cloneActive then
+                    ui('keyCloneProgress', { pos = clone.pos, target = clone.target, window = CLONE_WINDOW, hits = clone.hits })
+                end
+            end
+        end
+    end
+end)
+
+RegisterCommand('hudkeyclone', function()
+    exports.vice_hud:StartKeyCloneCheck({})
+    print('^3[vice_hud]^7 /hudkeyclone — press E (Square / X on a pad) while the dot is in the pink window: 3 hits clone it, 3 misses are the alarm. Backspace backs out.')
+end, false)
+end -- close the do opened above local cloneActive
 
 -- =============================================================================
 -- Interact menu — Phase 1 of the ox_target-replacement project

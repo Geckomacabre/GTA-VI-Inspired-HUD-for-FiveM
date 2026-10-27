@@ -20,12 +20,16 @@ local function setSearchLabelState(isAllowed)
     isSearchAllowed = isAllowed and cache.seat == -1
 end
 
+---vehicleModel/vehicleClass are unused now that the shared resolver derives
+---both from the entity itself; kept so the call site keeps its shape.
+---@diagnostic disable-next-line: unused-local
 local function findKeys(vehicleModel, vehicleClass, vehicle)
     local hotwireTime = math.random(config.minKeysSearchTime, config.maxKeysSearchTime)
 
-    local anim = config.anims.searchKeys.model[vehicleModel]
-        or config.anims.searchKeys.model[vehicleClass]
-        or config.anims.searchKeys.default
+    -- Was `.model[vehicleClass]` on the middle line, so a per-CLASS override
+    -- was looked up in the per-MODEL table and could never match. The shared
+    -- resolver checks model then class, which is what was intended.
+    local anim = ResolveVehicleAnim(config.anims.searchKeys, vehicle)
 
     local searchingForKeys = true
     CreateThread(function()

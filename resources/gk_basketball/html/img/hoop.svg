@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="1.2 1.2 21.6 25.2" width="22" height="25">
+  <!-- A backboard with the net under it, as drawn after "2 scored" in the reference. -->
+  <g fill="#d6d6d8" stroke="#111114" stroke-width="1.6" stroke-linejoin="round">
+    <path d="M2.2 14.2 V7.2 Q2.2 3.1 6.4 2.7 Q12 2.1 17.6 2.7 Q21.8 3.1 21.8 7.2 V14.2 Z"/>
+    <path d="M7.1 10.6 H16.9 L14.3 18.2 H9.7 Z"/>
+    <path d="M10.6 18.2 H13.4 V22.4 H10.6 Z"/>
+    <rect x="7.4" y="22.4" width="9.2" height="3.2" rx="1"/>
+  </g>
+</svg>
