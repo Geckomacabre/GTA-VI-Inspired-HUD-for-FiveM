@@ -917,15 +917,26 @@ local function applyMinimap(rebuild)
         }
     end
 
+    -- And while the drawn minimap stands in for the radar, it stands where
+    -- the single-player minimap does, whatever the radar's rect (see
+    -- ViceMap3D.rect in client_map3d.lua).
+    if ViceMap3D and ViceMap3D.rect then
+        local okay, panel = pcall(ViceMap3D.rect)
+        if okay and type(panel) == 'table' then rect = panel end
+    end
+
     rect.showFrame = Config.Minimap.showFrame and true or false
     rect.showCross = showMapCross and true or false
+    -- Which map this rect is: the drawn one's panel, or the radar's. The page
+    -- moves the zone bar and vehicle panel over when it changes (onMapRect).
+    rect.drawn = rect.drawn == true
 
     -- The watchdog thread re-runs this twice a second to reassert the component
     -- positions. Only message the NUI when the rect actually moved, so an
     -- unchanged map is not re-published 120 times a minute.
-    local key = ('%.3f|%.3f|%.3f|%.3f|%s|%s'):format(
+    local key = ('%.3f|%.3f|%.3f|%.3f|%s|%s|%s'):format(
         rect.left, rect.width, rect.bottom, rect.height,
-        tostring(rect.showFrame), tostring(rect.showCross))
+        tostring(rect.showFrame), tostring(rect.showCross), tostring(rect.drawn))
     if key ~= lastRectKey then
         lastRectKey = key
         ui('mapRect', rect)

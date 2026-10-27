@@ -1603,18 +1603,25 @@ html, body {
    var(--w) / 19.2). A dark tint that fades towards the right, a faint top
    edge, light text in sentence case (Segoe UI Variable Display 380, capitals
    16 px tall, so a 22.86 px font, baselines 31 apart, capitals 17.5 px below
-   the top), and a dark red star and tell discs. */
+   the top), and a dark red star and tell discs.
+
+   The star and the tells follow the text rather than sitting at fixed spots:
+   the star a gap after "you", the tells a row under the second line. At the
+   default size that is exactly where GTA VI has them; with the text made
+   bigger in /movehud, or a font with other widths, they move with it instead
+   of landing on it, and the box grows to hold it all (never under 430 x 110). */
 #wanted {
     position: absolute;
     left: 1.5cqw;
     top: 26.7cqh;
-    width: calc(22.396 * var(--w));
-    height: calc(5.729 * var(--w));
+    width: max-content;
+    min-width: calc(22.396 * var(--w));
+    min-height: calc(5.729 * var(--w));
     box-sizing: border-box;
     background: linear-gradient(90deg, rgba(22, 20, 24, 0.88), rgba(40, 34, 44, 0.45));
     border-radius: calc((0.156 * var(--w)) * var(--rad-wanted, 1));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    padding: calc(0.452 * var(--w)) calc(3 * var(--w)) 0 calc(0.859 * var(--w));
+    padding: calc(0.452 * var(--w)) calc(0.859 * var(--w)) calc(0.5 * var(--w)) calc(0.859 * var(--w));
 }
 #wanted-copy {
     display: block;
@@ -1625,21 +1632,21 @@ html, body {
     letter-spacing: var(--ls-wanted, 0.065em);
     white-space: nowrap;
 }
+/* 28 px, a gap after "you", centred on the capitals (0.35 em above the
+   baseline, their middle). */
 #wanted .star {
-    position: absolute;
-    left: calc(19.635 * var(--w));
-    top: calc(0.625 * var(--w));
+    display: inline-block;
     width: calc((1.458 * var(--w)) * var(--ic-wanted, 1));
     height: calc((1.458 * var(--w)) * var(--ic-wanted, 1));
+    margin-left: 0.45em;
+    vertical-align: calc(0.35em - (0.729 * var(--w)) * var(--ic-wanted, 1));
 }
 /* One dark red in every search state, outlined near-black, as in GTA VI. */
-#wanted .star path { fill: rgb(110, 36, 33); stroke: rgb(8, 2, 4); stroke-width: 5.7; opacity: 1; }
+#wanted .star path { fill: rgb(110, 36, 33); stroke: rgb(8, 2, 4); stroke-width: 5.7; opacity: 1; animation: none; }
 #wanted-tells {
-    position: absolute;
-    left: calc(1.042 * var(--w));
-    top: calc(3.854 * var(--w));
     display: flex;
     gap: calc(0.469 * var(--w));
+    margin: calc(0.172 * var(--w)) 0 0 calc(0.183 * var(--w));
 }
 
 /* -----------------------------------------------------------------------------
@@ -2797,30 +2804,28 @@ html, body {
 /* -----------------------------------------------------------------------------
    The drawn minimap (map3d.js)
    -----------------------------------------------------------------------------
-   The frame's rect, grown by a tenth of its height on every side: the island
-   is painted into the middle, exactly what the frame outlines, and the
-   overhang is there for a blip pinned to the edge to sit across it. map3d.js
-   knows the same tenth (OVERHANG) and rounds the island's corners itself, so
-   there is no border-radius here to cut a blip off.
-
-   It follows the frame's own nudges and scaling (--off-mapframe / --sc-mapframe)
-   and not its opacity: the picture brings its own see-through.
-
-   letter-spacing is how the script learns the frame's corner radius in pixels:
-   it does nothing to a canvas, and unlike the frame's own border-radius it can
-   be read while the frame is switched off.
+   The map's rect, grown by a tenth of its height on every side: the island is
+   painted into the middle, and the overhang is there for a blip pinned to the
+   edge to sit across it. While the drawn map stands in for the radar the rect
+   is the single-player minimap's panel (ViceMap3D.rect in client_map3d.lua),
+   and the map is drawn as single player draws it -- its own corners, outline,
+   badge and distance -- so it takes none of the frame's /movehud nudges, and
+   the HUD's own frame, badge and distance figure step aside (body.map3d-on,
+   set by map3d.js).
    -------------------------------------------------------------------------- */
 #map3d {
-    --m3d: calc(var(--map-height, 15.4cqh) * var(--sc-mapframe-y, 1) * 0.1);
+    --m3d: calc(var(--map-height, 15.4cqh) * 0.1);
     position: absolute;
     left: calc(var(--map-left, 1.75cqw) - var(--m3d));
     bottom: calc(var(--map-bottom-edge, 2.6cqh) - var(--m3d));
-    width:  calc(var(--map-width, 15.8cqw) * var(--sc-mapframe-x, 1) + 2 * var(--m3d));
-    height: calc(var(--map-height, 15.4cqh) * var(--sc-mapframe-y, 1) * 1.2);
-    letter-spacing: calc((calc(0.62 * var(--w))) * var(--rad-mapframe, 1));
-    transform: translate(var(--off-mapframe-x,0cqw), var(--off-mapframe-y,0cqh));
-    transform-origin: bottom left;
+    width:  calc(var(--map-width, 15.8cqw) + 2 * var(--m3d));
+    height: calc(var(--map-height, 15.4cqh) * 1.2);
     pointer-events: none;
+}
+.map3d-on #map-frame,
+.map3d-on #map-badge,
+.map3d-on #nav-compass {
+    display: none !important;
 }
 
 /* -----------------------------------------------------------------------------

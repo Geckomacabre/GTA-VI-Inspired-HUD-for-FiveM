@@ -369,10 +369,8 @@
     <!-- Wanted notification ----------------------------------------------- -->
     <div id="wanted" class="hidden">
         <div id="wanted-line">
-            <span id="wanted-copy">The cops are searching for you<br>and they have your description</span>
-            <svg id="wanted-star" class="star searching" viewBox="0 0 100 100" aria-hidden="true">
-                <path d="M50 5 L61 38 L96 38 L68 59 L79 92 L50 71 L21 92 L32 59 L4 38 L39 38 Z"/>
-            </svg>
+            <!-- The star is part of the first line, so it always follows "you". -->
+            <span id="wanted-copy">The cops are searching for you<svg id="wanted-star" class="star searching" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 5 L61 38 L96 38 L68 59 L79 92 L50 71 L21 92 L32 59 L4 38 L39 38 Z"/></svg><br>and they have your description</span>
         </div>
         <div id="wanted-tells"></div>
     </div>

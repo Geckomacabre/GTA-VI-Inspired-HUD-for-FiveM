@@ -14,10 +14,15 @@
 --                               after its feed has failed)
 --   ViceMap3D.show(on, north)   draw it or do not, and whether north is marked
 --
+-- one from where it publishes the map's rect, since the drawn map stands
+-- where the single-player minimap's panel does:
+--
+--   ViceMap3D.rect()            that rect while the map could be drawn, else nil
+--
 -- and one from its wanted readout, which already works out what the police
 -- know for the stars:
 --
---   ViceMap3D.police(state)     'contact', 'searching', 'red', or nil
+--   ViceMap3D.police(state)     'contact', 'searching', 'red', 'hollow' or nil
 --
 -- and one from its status readout, which already knows whether the player is
 -- spending stamina:
@@ -49,7 +54,9 @@ local pageOk = false        -- the page has loaded its world and can draw
 local pageWhy = nil         -- and if it cannot, what it said
 local drawing = false       -- what the page was last told
 local policeState = nil     -- what the police know, as client.lua last said
-local rippling = false      -- the player is spending stamina, likewise
+local wantSent = nil        -- the wanted colouring the page was last told
+local pinging = false       -- and whether the chase rings are going
+local rippling = false      -- the player is spending stamina, as client.lua last said
 local north = true
 local configSent = false
 local routeDirty = true
@@ -89,31 +96,50 @@ function ViceMap3D.show(on, showNorth)
         for k, v in pairs(C.view or {}) do view[k] = v end
         view.north = north and view.north ~= false
         view.buildings = C.buildings ~= false
+        if C.clock == false then view.clock = false end
         if C.altitude == false then view.altitude = false end
         msg.config = { view = view, paint = C.paint, paintNight = C.paintNight,
-                       police = type(C.police) == 'table' and C.police or nil,
                        ripple = type(C.ripple) == 'table' and C.ripple or nil }
     end
     -- Said again with every "draw": the page may have been reloaded, or the
     -- map may have been down while the police found or lost the player.
     if drawing then
-        msg.police = policeState or false
+        msg.want = wantSent or false
+        msg.ping = pinging
         msg.ripple = rippling
     end
     say('map3d', msg)
     if drawing then routeDirty = true end
 end
 
+--- The single-player minimap's panel, which the drawn map stands in: 208
+--- by 115 of its units (a 720th of the screen's height), 4 in from the safe
+--- zone's left edge and 8.5 up from its bottom. In percent of the screen, as
+--- client.lua publishes the map's rect (`bottom` is to the map's TOP): the
+--- left and the width of its width, the rest of its height. A unit is as many
+--- pixels across as up, so on a screen wider than 16:9 the panel keeps single
+--- player's size and shape instead of stretching with the screen.
+--- Config.Map3D.panel = 'native' keeps the engine radar's rect instead. Asked
+--- whenever the drawn map could stand in, shown or not, so the panels that
+--- sit on the map stay put while it is hidden.
+function ViceMap3D.rect()
+    if C.panel == 'native' or not ViceMap3D.owns() then return nil end
+    local rx, ry = GetActiveScreenResolution()
+    if not rx or not ry or rx <= 0 or ry <= 0 then rx, ry = 1920, 1080 end
+    local u = 100.0 / 720.0                 -- a unit, in percent of the height
+    local uw = u * ry / rx                  -- and of the width
+    local inset = (1.0 - GetSafeZoneSize()) * 0.5 * 100.0
+    local height = 115.0 * u
+    return { left = inset + 4.0 * uw, width = 208.0 * uw, height = height, bottom = inset + 8.5 * u + height,
+             drawn = true }
+end
+
 --- What the police know, in client.lua's own words for it (see wantedState()
---- there). The reference puts no police on its minimap: it floods the map red
---- while they can see the player and blue while they are looking, and that is
---- all this passes on.
+--- there). The single-player minimap puts no police on it; what they know
+--- shows as the colour of the whole map (the wanted feed below).
 function ViceMap3D.police(state)
-    if C.police == false then state = nil end
-    if state ~= 'contact' and state ~= 'searching' and state ~= 'red' then state = nil end
-    if state == policeState then return end
+    if state ~= 'contact' and state ~= 'searching' and state ~= 'red' and state ~= 'hollow' then state = nil end
     policeState = state
-    if drawing then say('map3d', { police = state or false }) end
 end
 
 --- Whether the player is spending stamina. While they are, the reference
@@ -178,8 +204,11 @@ end
 
 -- ---- where the player is -----------------------------------------------------
 -- Every frame while the map is up, and only what changed: a parked player
--- costs four native calls a frame and no messages at all.
--- How high the player is, for the camera that rides at their height. Two
+-- costs a few native calls a frame and no messages at all. In a helicopter or
+-- a plane its height above the ground goes too, which pulls the view back.
+local AIRCRAFT = { [15] = true, [16] = true }
+
+-- Out of an aircraft the camera rides at the player's height instead. Two
 -- readings, because neither is right alone (the page puts them together, with
 -- what it knows of the building under the player; see altitudeWanted() in
 -- html/map3d.js):
@@ -198,7 +227,7 @@ local function heightOf(ent, p)
 end
 
 feed('position', function()
-    local lx, ly, lc, lh, ls = 0.0, 0.0, 0.0, 0.0, -1.0
+    local lx, ly, lc, lh, ls, lv, la = 0.0, 0.0, 0.0, 0.0, -1.0, false, -1.0
     local over, street, lo, lst = 0.0, nil, -1.0, nil
     local heightAt = 0
     local sentFor = false
@@ -215,6 +244,8 @@ feed('position', function()
             local head = GetEntityHeading(ent)
             -- Only a vehicle's speed pulls the view back, as on the radar.
             local speed = veh ~= 0 and GetEntitySpeed(veh) or 0.0
+            local air = 0.0
+            if veh ~= 0 and AIRCRAFT[GetVehicleClass(veh)] then air = GetEntityHeightAboveGround(veh) or 0.0 end
             -- Height is asked for five times a second, not every frame: the
             -- street lookup is a search, and the page eases between answers.
             local now = GetGameTimer()
@@ -225,12 +256,14 @@ feed('position', function()
             if not sentFor
                 or math.abs(p.x - lx) + math.abs(p.y - ly) > 0.03
                 or math.abs(cam - lc) > 0.05 or math.abs(head - lh) > 0.4
-                or math.abs(speed - ls) > 0.4
+                or math.abs(speed - ls) > 0.4 or (veh ~= 0) ~= lv
+                or math.abs(air - la) > 1.0
                 or math.abs(over - lo) > 0.4 or (street == nil) ~= (lst == nil)
                 or (street ~= nil and math.abs(street - lst) > 0.4) then
                 sentFor = true
-                lx, ly, lc, lh, ls, lo, lst = p.x, p.y, cam, head, speed, over, street
+                lx, ly, lc, lh, ls, lv, la, lo, lst = p.x, p.y, cam, head, speed, veh ~= 0, air, over, street
                 say('map3dPos', { x = round(p.x, 2), y = round(p.y, 2), c = round(cam, 2), h = round(head, 1), s = round(speed, 1),
+                                  v = veh ~= 0, air = air > 0.0 and round(air, 0) or nil,
                                   g = round(over, 1), a = street and round(street, 1) or nil })
             end
             Wait(0)
@@ -238,35 +271,100 @@ feed('position', function()
     end
 end)
 
--- ---- day and night ---------------------------------------------------------------
+-- ---- day and night, and the clock --------------------------------------------
 -- The map has a daytime look and a night one, and the page mixes between them
--- by a number from 0 to 1. This is that number, off the game's own clock: fully
--- night from `dark` to `dawn`, changing gradually either side of it.
+-- by a number from 0 to 1. This is that number, off the game's clock: night
+-- from `night` o'clock until `day`, coming on over the half hour before
+-- `night` and the hour after it, and going over the hour before `day` and the
+-- half hour after it (19:30 to 21:00, 5:00 to 6:30). Single player does the
+-- same. The page also gets the time, for the clock it shows on the half hour.
 local function nightNow()
     if C.night == false then return 0.0 end
     if C.night == 'always' then return 1.0 end
     local h = C.nightHours or {}
-    local dusk, dark, dawn, light = h.dusk or 19.5, h.dark or 21.0, h.dawn or 5.0, h.light or 6.5
+    local day, dark = h.day or 6, h.night or 20
+    local dusk, black, dawn, light = dark - 0.5, dark + 1.0, day - 1.0, day + 0.5
     local t = GetClockHours() + GetClockMinutes() / 60.0
-    if t >= dark or t < dawn then return 1.0 end
-    if t >= dusk then return (t - dusk) / (dark - dusk) end
+    if t >= black or t < dawn then return 1.0 end
+    if t >= dusk then return (t - dusk) / (black - dusk) end
     if t < light then return 1.0 - (t - dawn) / (light - dawn) end
     return 0.0
 end
 
 feed('clock', function()
-    local sent = -1.0
+    local sentNight, sentMinute = -1, -1
     while true do
         if drawing then
-            local n = nightNow()
-            if math.abs(n - sent) > 0.01 then
-                sent = n
-                say('map3d', { night = round(n, 3) })
+            local n, h, m = round(nightNow(), 3), GetClockHours(), GetClockMinutes()
+            if n ~= sentNight or m ~= sentMinute then
+                sentNight, sentMinute = n, m
+                say('map3d', { night = n, clock = { h, m } })
             end
+            Wait(500)
         else
-            sent = -1.0
+            sentNight, sentMinute = -1, -1
+            Wait(2000)
         end
-        Wait(2000)
+    end
+end)
+
+-- ---- wanted ---------------------------------------------------------------------
+-- The single-player minimap's wanted colouring, decided here and painted by
+-- the page: blue for the first five seconds of being wanted, red for a moment
+-- and a half after the player shoots or aims at someone, red and blue a
+-- second each (red first) while the police can see them or are searching,
+-- blue under hollow stars, nothing under red ones. And while the stars are
+-- not greyed out -- the police are on the player -- rings go out from the
+-- marker. Config.Map3D.police = false switches both off.
+local wantedSince, crimeAt, chaseSince = 0, -1e9, nil
+
+local function wantedNow(ped, pid, now)
+    if C.police == false or GetPlayerWantedLevel(pid) <= 0 then
+        wantedSince, chaseSince = 0, nil
+        return nil, false
+    end
+    if wantedSince == 0 then wantedSince = now end
+    local shooting = IsPedShooting(ped)
+    if not shooting and IsPlayerFreeAiming(pid) then
+        local ok, ent = GetEntityPlayerIsFreeAimingAt(pid)
+        shooting = ok and ent ~= 0 and IsEntityAPed(ent)
+    end
+    if shooting then crimeAt = now end
+    local ping = not ArePlayerStarsGreyedOut(pid)
+    local age = now - wantedSince
+    if age < 5000 then chaseSince = nil return 'blue', ping end
+    if now - crimeAt < 1500 then chaseSince = nil return 'red', ping end
+    if policeState == 'contact' or policeState == 'searching' then
+        chaseSince = chaseSince or now
+        return ((now - chaseSince) // 1000) % 2 == 0 and 'red' or 'blue', ping
+    end
+    chaseSince = nil
+    return policeState == 'hollow' and 'blue' or nil, ping
+end
+
+feed('wanted', function()
+    while true do
+        if not drawing then
+            Wait(250)
+        else
+            local pid = PlayerId()
+            local now = GetGameTimer()
+            local kind, ping = wantedNow(PlayerPedId(), pid, now)
+            local msg = nil
+            if kind ~= (wantSent and wantSent.kind) then
+                wantSent = kind and { kind = kind, age = now - wantedSince } or nil
+                msg = { want = wantSent or false }
+            end
+            if ping ~= pinging then
+                pinging = ping
+                msg = msg or {}
+                msg.ping = ping
+            end
+            if msg then say('map3d', msg) end
+            -- Every frame while wanted, to catch a shot; four times a second
+            -- otherwise.
+            Wait(wantedSince ~= 0 and 0 or 250)
+        end
     end
 end)
 
@@ -322,10 +420,10 @@ local function walkRoute(slot)
     return runs
 end
 
-local function hudRgb(index)
-    local r, g, b = GetHudColour(index)
-    return { r, g, b }
-end
+-- The single-player HUD's route colours: a waypoint's line teal, a
+-- mission's (some script's route) pink, each with a lighter rim.
+local TEAL, TEAL_RIM = { 71, 171, 167 }, { 172, 217, 215 }
+local PINK, PINK_RIM = { 252, 116, 164 }, { 254, 192, 214 }
 
 -- Both set by the blip scan further down.
 local routedBlip = nil      -- the blip some script has given a route
@@ -333,7 +431,7 @@ local places = {}           -- every still blip, as the page gets them
 
 --- The still blip a point is on, if any. A waypoint set on a place in the
 --- pause map lands on that place's blip, so "is the waypoint on a place?" is
---- "is there a blip within a few metres of it?".
+--- "is there a blip within 6 m of it?".
 local function placeAt(x, y)
     local best, bestD = nil, 36.0
     for i = 1, #places do
@@ -352,23 +450,20 @@ feed('route', function()
         if not drawing then
             Wait(500)
         else
-            -- Each route ends in a ring: four arcs in the route's light
-            -- colour. What sits in the ring is the page's business, from what
-            -- it is told here -- the picture of the place the route ends at,
-            -- or, for a waypoint dropped on open ground, nothing but colour.
-            local routes, ends = {}, {}
+            -- The line, on foot as in a vehicle, and where it ends. A waypoint
+            -- set on a place carries that place's picture and colour, which
+            -- the page draws in place of the pin.
+            local ped = PlayerPedId()
+            local routes, ends, remaining = {}, {}, nil
             if IsWaypointActive() then
-                -- 142 / 150 are the waypoint's own purple and its light, which
-                -- client.lua has already repainted in the HUD's accent.
-                local fill, light = hudRgb(142), hudRgb(150)
-                for i, run in ipairs(walkRoute(0)) do
-                    routes[#routes + 1] = { pts = run, rgb = fill, rim = light, head = i == 1 }
+                for _, run in ipairs(walkRoute(0)) do
+                    routes[#routes + 1] = { pts = run, rgb = TEAL, rim = TEAL_RIM }
                 end
                 -- The stock waypoint sprite is left out of the blips: this is it.
                 local blip = GetFirstBlipInfoId(8)
                 if DoesBlipExist(blip) then
                     local at = GetBlipInfoIdCoord(blip)
-                    local e = { x = round(at.x, 1), y = round(at.y, 1), rgb = fill, ring = light }
+                    local e = { x = round(at.x, 1), y = round(at.y, 1), kind = 'waypoint' }
                     local place = placeAt(at.x, at.y)
                     if place then
                         e.icon = place[3]
@@ -379,21 +474,23 @@ feed('route', function()
             end
             local routed = routedBlip
             if routed and DoesBlipExist(routed.blip) then
-                for i, run in ipairs(walkRoute(1)) do
-                    routes[#routes + 1] = { pts = run, rgb = routed.rgb, head = i == 1 }
+                for _, run in ipairs(walkRoute(1)) do
+                    routes[#routes + 1] = { pts = run, rgb = PINK, rim = PINK_RIM }
                 end
                 local at = GetBlipInfoIdCoord(routed.blip)
-                ends[#ends + 1] = { x = round(at.x, 1), y = round(at.y, 1), rgb = routed.rgb,
-                                    icon = routed.sprite, iconRgb = routed.rgb }
+                ends[#ends + 1] = { x = round(at.x, 1), y = round(at.y, 1), kind = 'mission' }
+            end
+            if #routes > 0 then
+                local length = GetGpsBlipRouteLength()
+                if length and length > 0 then remaining = length + 0.0 end
             end
             if #routes > 0 or #ends > 0 or hadRoute or routeDirty then
                 routeDirty = false
                 hadRoute = #routes > 0 or #ends > 0
-                say('map3dRoute', { routes = routes, ends = ends })
+                say('map3dRoute', { routes = routes, ends = ends, remaining = remaining })
             end
             -- The page finds the player on the line every frame, so the line
             -- itself only has to be fetched often enough to follow a re-plan.
-            local ped = PlayerPedId()
             Wait(GetEntitySpeed(ped) > 5.0 and 250 or 600)
         end
     end
@@ -414,19 +511,18 @@ local SKIP_SPRITE = { [4] = true, [5] = true, [6] = true, [7] = true, [8] = true
 -- (SetBlipDisplay(blip, 4)) and the engine's radar shows those blips; leaving
 -- 4 in this list threw away nearly every blip on a real server.
 local NOT_ON_MINIMAP = { [0] = true, [1] = true, [3] = true, [7] = true }
--- Config.Map3D.hiddenBlips, as a set. A hidden blip still counts for the
--- route's end ring below, it just isn't drawn.
+-- Config.Map3D.hiddenBlips, as a set.
 local HIDDEN_SPRITE = {}
 for _, sprite in ipairs(C.hiddenBlips or {}) do HIDDEN_SPRITE[sprite] = true end
 local BLIP_CAP = 400
 
--- Police are not drawn. The reference shows none on its minimap, only the
--- flood of colour (see ViceMap3D.police above), so the blips the game hangs
--- on officers, their cars and their helicopters are left out: by sprite, and
--- for a blip riding a ped or a vehicle, by who that is. Stations are places,
--- not police, and stay. So does another player, whatever their job.
-local POLICE_SPRITE = { [3] = true, [15] = true, [16] = true, [41] = true, [42] = true,
-                        [43] = true, [56] = true, [672] = true }
+-- Police are not drawn, only the colour of the whole map (the wanted feed
+-- above), so the blips the game hangs on officers, their cars and their
+-- helicopters are left out: by sprite, and for a blip riding a ped or a
+-- vehicle, by who that is. Stations (60, 137, 526) are places, not police,
+-- and stay. So does another player, whatever their job.
+local POLICE_SPRITE = { [3] = true, [15] = true, [16] = true, [41] = true, [42] = true, [43] = true,
+                        [56] = true, [58] = true, [128] = true, [227] = true, [233] = true, [672] = true }
 local POLICE_PED = { [6] = true, [27] = true, [29] = true }     -- cop, SWAT, army
 
 local function isPolice(blip, sprite, kind)
@@ -452,13 +548,23 @@ local function blipColour(blip)
     return c
 end
 
-local function describe(blip, sprite)
+--- `riding` for a blip on an entity: is it a vehicle, or someone in one?
+--- (The page draws those dots half as big again.) The handle goes last, so
+--- the page can follow a blip from one list to the next.
+local function describe(blip, sprite, riding)
     local p = GetBlipInfoIdCoord(blip)
     local c = blipColour(blip)
     -- Nothing about which way the blip is turned: the radar draws every icon
     -- upright, and turning them with the camera made them spin on the map.
     local flags = IsBlipShortRange(blip) and 0 or 1
-    return { round(p.x, 1), round(p.y, 1), sprite, c[1], c[2], c[3], GetBlipAlpha(blip), flags }
+    if riding then
+        local ent = GetBlipInfoIdEntityIndex(blip)
+        if ent and ent ~= 0 and DoesEntityExist(ent)
+            and (IsEntityAVehicle(ent) or (IsEntityAPed(ent) and IsPedInAnyVehicle(ent, false))) then
+            flags = flags + 2
+        end
+    end
+    return { round(p.x, 1), round(p.y, 1), sprite, c[1], c[2], c[3], GetBlipAlpha(blip), flags, blip }
 end
 
 local moving = {}       -- blip handle -> sprite, for blips riding an entity
@@ -485,9 +591,7 @@ feed('blip', function()
                             elseif kind ~= 7 then
                                 static[#static + 1] = describe(blip, sprite)
                             end
-                            if DoesBlipHaveGpsRoute(blip) then
-                                routed = { blip = blip, sprite = sprite, rgb = blipColour(blip) }
-                            end
+                            if DoesBlipHaveGpsRoute(blip) then routed = { blip = blip } end
                         end
                         blip = GetNextBlipInfoId(sprite)
                     end
@@ -527,7 +631,7 @@ feed('moving blip', function()
         else
             local list = {}
             for blip, sprite in pairs(moving) do
-                if DoesBlipExist(blip) then list[#list + 1] = describe(blip, sprite) end
+                if DoesBlipExist(blip) then list[#list + 1] = describe(blip, sprite, true) end
             end
             if #list > 0 or had then
                 had = #list > 0

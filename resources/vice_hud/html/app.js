@@ -1484,6 +1484,9 @@
        changes — and the whole point of the snapshot is that only the FIRST one
        counts. See applyPanelRect. */
     var panelSnapped = false;
+    /* Which map the last full rect was: the drawn minimap's panel (true) or
+       the engine radar's (false); null before the first. */
+    var mapDrawn = null;
 
     /* Writes the panel stack's own geometry.
 
@@ -1562,6 +1565,16 @@
             bottom: d.bottom != null ? d.bottom : (lastMapRect && lastMapRect.bottom),
             height: d.height != null ? d.height : (lastMapRect && lastMapRect.height)
         };
+        // The snapshot belongs to one map. The first rect of a session is the
+        // radar's, from before the drawn minimap is ready, and on a screen wider
+        // than 16:9 the drawn one's panel is far narrower: the zone bar stayed
+        // at the radar's width over it. So when the map on screen changes from
+        // one to the other, the snapshot is taken again.
+        if (d.drawn != null) {
+            var drawn = d.drawn === true;
+            if (mapDrawn !== null && drawn !== mapDrawn) panelSnapped = false;
+            mapDrawn = drawn;
+        }
         applyPanelRect(lastMapRect);
 
         // The frame only helps when it sits exactly on the map; off by default.

@@ -34,8 +34,9 @@ const get = (expr) => { run('__v = tostring(' + expr + ')'); lua.lua_getglobal(L
 
 const STUBS = `
 sent, printed, kvp, cbs, cmds, threads = {}, {}, {}, {}, {}, {}
-interior, waypoint, speed = 0, false, 0.0
+interior, waypoint, speed, inVeh, vehClass, safeZone = 0, false, 0.0, 0, 0, 1.0
 clockH, clockM = 12, 0
+wanted, shooting, aimingAt, greyed, gpsLength = 0, false, 0, false, 640
 function GetClockHours() return clockH end
 function GetClockMinutes() return clockM end
 function SendNUIMessage(d) sent[#sent + 1] = d end
@@ -49,7 +50,19 @@ exports = setmetatable({}, { __call = function() end })
 print = function(s) printed[#printed + 1] = s end
 function PlayerPedId() return 1 end
 function GetInteriorFromEntity() return interior end
-function GetVehiclePedIsIn() return 0 end
+function GetVehiclePedIsIn() return inVeh end
+function GetVehicleClass() return vehClass end
+function GetSafeZoneSize() return safeZone end
+screen = { 1920, 1080 }
+function GetActiveScreenResolution() return screen[1], screen[2] end
+function PlayerId() return 1 end
+function GetPlayerWantedLevel() return wanted end
+function IsPedShooting() return shooting end
+function IsPlayerFreeAiming() return aimingAt ~= 0 end
+function GetEntityPlayerIsFreeAimingAt() return aimingAt ~= 0, aimingAt end
+function ArePlayerStarsGreyedOut() return greyed end
+function GetGpsBlipRouteLength() return gpsLength end
+function IsPedInAnyVehicle(e) return ents[e] ~= nil and ents[e].inVehicle == true end
 function GetEntityCoords() return { x = 10.0, y = 20.0, z = 30.0 } end
 function GetFinalRenderedCamRot() return { x = 0.0, y = 0.0, z = 45.0 } end
 function GetEntityHeading() return 90.0 end
@@ -62,8 +75,10 @@ function GetClosestVehicleNode(x, y, z) if streetZ == nil then return false, nil
 function GetGameTimer() return gameMs end
 function IsWaypointActive() return waypoint end
 function GetHudColour(i) return i, 2, 3, 255 end
--- A road running north for 120 m, a 300 m gap, then 40 m more.
+-- The waypoint's: a road running north for 120 m, a 300 m gap, then 40 m
+-- more. A script's: 60 m east.
 function GetPosAlongGpsTypeRoute(fromPlayer, d, slot)
+    if slot == 1 then return true, { x = math.min(d, 60.0), y = 0.0, z = 0.0 } end
     if slot ~= 0 then return false, nil end
     if d <= 120.0 then return true, { x = 0.0, y = d, z = 0.0 } end
     if d <= 160.0 then return true, { x = 0.0, y = d + 300.0, z = 0.0 } end
@@ -94,7 +109,7 @@ function last(action) for i = #sent, 1, -1 do if sent[i].action == action then r
 function count(action) local n = 0 for i = 1, #sent do if sent[i].action == action then n = n + 1 end end return n end
 -- Run thread i until it has slept n times.
 -- Step the blip scan until it has finished a scan that began after now.
-function rescan() local n = count("map3dBlips") while count("map3dBlips") < n + 2 do step(4, 1) end end
+function rescan() local n = count("map3dBlips") while count("map3dBlips") < n + 2 do step(5, 1) end end
 function step(i, n) for _ = 1, n or 1 do if coroutine.status(threads[i]) == 'dead' then return end local okay, err = coroutine.resume(threads[i]) if not okay then error(err) end end end
 `;
 const fresh = (config, before) => run(STUBS + (before || '') + '\nConfig = { Map3D = ' + config + ' }\n' + read('client_map3d.lua'));
@@ -146,6 +161,7 @@ run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function()
 run('step(1, 1)');
 ok(get('last("map3dPos").x') === '10.0' && get('last("map3dPos").c') === '45.0' && get('last("map3dPos").h') === '90.0', 'position, camera heading and facing');
 ok(get('last("map3dPos").s') === '0.0', 'on foot the speed is zero: walking does not pull the view back');
+ok(get('last("map3dPos").v') === 'false' && get('last("map3dPos").air') === 'nil', 'on foot: not in a vehicle, and no height');
 run('n = count("map3dPos"); step(1, 5)');
 ok(get('count("map3dPos") - n') === '0', 'standing still sends nothing more');
 ok(get('last("map3dPos").g') === '0.0' && get('last("map3dPos").a') === '0.0', 'standing in the street: nothing under them but the ground, and level with the road');
@@ -161,18 +177,26 @@ ok(get('last("map3dPos").g') === '30.0', 'and passed on when it is', get('last("
 run('streetZ = nil; gameMs = gameMs + 250; step(1, 1)');
 ok(get('last("map3dPos").a') === 'nil' && get('last("map3dPos").g') === '30.0', 'nowhere near a road: the street is left out, and the page goes without it');
 run('overGround, streetZ = 1.0, 30.0; gameMs = gameMs + 250; step(1, 1)');
+run('inVeh, vehClass, overGround = 7, 15, 120.0; n = count("map3dPos"); gameMs = gameMs + 250; step(1, 1)');
+ok(get('count("map3dPos") - n') === '1' && get('last("map3dPos").v') === 'true' && get('last("map3dPos").air') === '120.0', 'in a helicopter its height above the ground goes too, to pull the view back', get('last("map3dPos").air'));
+run('vehClass = 2; step(1, 1)');
+ok(get('last("map3dPos").air') === 'nil', 'in a car it does not');
+run('inVeh, vehClass, overGround = 0, 0, 1.0; gameMs = gameMs + 250; step(1, 1)');
 
 run('blipsBySprite = { [8] = { 13 } } blipInfo = { [13] = { kind = 4, x = 100.0, y = 200.0 } }');
-run('n = count("map3dRoute"); waypoint = true; step(3, 1)');
+run('n = count("map3dRoute"); waypoint = true; step(4, 1)');
 ok(get('count("map3dRoute") - n') === '1', 'the GPS line is walked in one go, not over several frames');
+ok(get('#last("map3dRoute").routes') === '2' && get('last("map3dRoute").remaining') === '640.0', 'on foot as well as in a vehicle, with the distance left', get('#last("map3dRoute").routes'));
+ok(get('#last("map3dRoute").ends') === '1' && get('last("map3dRoute").ends[1].kind') === 'waypoint' && get('last("map3dRoute").ends[1].x') === '100.0' && get('last("map3dRoute").ends[1].y') === '200.0', 'and where the waypoint is goes with it');
+ok(get('last("map3dRoute").ends[1].icon') === 'nil', 'a waypoint on open ground has no picture');
+run('inVeh = 7; n = count("map3dRoute"); step(4, 1)');
 ok(get('#last("map3dRoute").routes') === '2', 'and split where the route jumps', get('#last("map3dRoute").routes'));
 ok(get('last("map3dRoute").routes[1].pts[2]') === '0.0' && get('last("map3dRoute").routes[1].pts[#last("map3dRoute").routes[1].pts]') === '120.0', 'the first run is the road up to the gap', get('last("map3dRoute").routes[1].pts[#last("map3dRoute").routes[1].pts]'));
-ok(get('last("map3dRoute").routes[1].head') === 'true' && get('last("map3dRoute").routes[2].head') === 'false', 'only the run that starts at the player is marked as starting there');
-ok(get('last("map3dRoute").routes[1].rgb[1]') === '142' && get('last("map3dRoute").routes[1].rim[1]') === '150', 'in the waypoint\'s own colours, which the HUD has already repainted');
-ok(get('#last("map3dRoute").ends') === '1' && get('last("map3dRoute").ends[1].x') === '100.0' && get('last("map3dRoute").ends[1].y') === '200.0', 'where it ends goes with it');
-ok(get('last("map3dRoute").ends[1].rgb[1]') === '142' && get('last("map3dRoute").ends[1].ring[1]') === '150' && get('last("map3dRoute").ends[1].icon') === 'nil', 'a waypoint on open ground: the route\'s colour in a ring of its light, and no picture');
-run('waypoint = false; step(3, 3)');
+ok(get('last("map3dRoute").routes[1].rgb[1]') === '71' && get('last("map3dRoute").routes[1].rim[1]') === '172', 'in single player\'s teal, with its lighter rim');
+ok(get('last("map3dRoute").remaining') === '640.0', 'with the distance left to drive', get('last("map3dRoute").remaining'));
+run('waypoint = false; step(4, 3)');
 ok(get('#last("map3dRoute").routes') === '0' && get('#last("map3dRoute").ends') === '0', 'and both are cleared when the waypoint goes');
+run('inVeh = 0');
 
 run(`
 blipsBySprite = { [1] = { 11, 12, 99 }, [8] = { 13 }, [9] = { 14 }, [52] = { 15, 16, 17 } }
@@ -186,52 +210,49 @@ blipInfo = {
     [16] = { kind = 4, alpha = 0 },                        -- invisible
     [17] = { kind = 4 },
 }
-step(4, 8)
+step(5, 8)
 `);
 ok(get('#last("map3dBlips").list') === '2', 'blips: the two that belong on a minimap', get('#last("map3dBlips").list'));
 ok(get('last("map3dBlips").list[1][1]') === '1.0' && get('last("map3dBlips").list[1][2]') === '2.0', 'a blip set to display 4 is one of them: scripts pass 4 for an ordinary blip, whatever the documentation says');
 ok(get('last("map3dBlips").list[1][3]') === '1' && get('last("map3dBlips").list[1][8]') === '0' && get('last("map3dBlips").list[1][4]') === '3', 'a short-range blip is not pinned to the edge, and carries its colour');
-ok(get('last("map3dBlips").list[2][3]') === '52' && get('last("map3dBlips").list[2][8]') === '1' && get('#last("map3dBlips").list[2]') === '8', 'a blip that is not short-range is pinned, and nothing is sent about turning its icon: icons stay upright');
+ok(get('last("map3dBlips").list[2][3]') === '52' && get('last("map3dBlips").list[2][8]') === '1' && get('#last("map3dBlips").list[2]') === '9', 'a blip that is not short-range is pinned, and nothing is sent about turning its icon: icons stay upright');
+ok(get('last("map3dBlips").list[2][9]') === '17', 'each carries its handle, for the page to follow it by');
 ok(get('last("map3dBlips").list[1][3]') !== '8' && get('last("map3dBlips").list[2][3]') !== '8','the stock waypoint sprite is left out: the page draws the route\'s end itself');
-run('step(5, 2)');
+run('step(6, 2)');
 ok(get('#last("map3dMoving").list') === '1' && get('last("map3dMoving").list[1][1]') === '5.0', 'a blip on a ped is followed separately, and the player\'s own is left out');
+// The waypoint moved onto blip 17 (sprite 52), which the scan above has seen.
+run('blipInfo[13] = { kind = 4, x = 60.0, y = 70.0 } blipInfo[17].x, blipInfo[17].y, blipInfo[17].colour = 60.0, 70.0, 7; rescan(); waypoint = true; step(4, 1)');
+ok(get('last("map3dRoute").ends[1].icon') === '52' && get('last("map3dRoute").ends[1].iconRgb[1]') === '7', 'a waypoint set on a place carries that place\'s picture and colour', get('last("map3dRoute").ends[1].icon'));
+run('blipInfo[13].x, blipInfo[13].y = 40.0, 40.0; step(4, 1)');
+ok(get('last("map3dRoute").ends[1].icon') === 'nil', 'and loses it when moved off the place');
+run('waypoint = false; step(4, 2)');
 
 console.log('\n-- police --');
-// The reference draws no police on its minimap. A station is a place and stays.
+// Single player draws no police on its minimap, stations included.
 run(`
 ents = { [501] = { kind = 6 }, [502] = { vehicle = true, driver = 503 }, [503] = { kind = 27 },
-         [504] = { kind = 6, player = true }, [505] = { vehicle = true, driver = 506 }, [506] = { kind = 4 } }
+         [504] = { kind = 6, player = true }, [505] = { vehicle = true, driver = 506 }, [506] = { kind = 4 },
+         [507] = { kind = 4, inVehicle = true } }
 blipsBySprite[3] = { 30 }      blipInfo[30] = { kind = 2 }                           -- the game's own police-ped blip
-blipsBySprite[1] = { 11, 12, 99, 31, 32 }
+blipsBySprite[1] = { 11, 12, 99, 31, 32, 36 }
 blipInfo[31] = { kind = 2, ent = 501, x = 7.0 }                                      -- a plain dot on an officer
 blipInfo[32] = { kind = 2, ent = 504, x = 8.0 }                                      -- a plain dot on a PLAYER who is police
+blipInfo[36] = { kind = 2, ent = 507, x = 11.0 }                                     -- on someone in a car
 blipsBySprite[225] = { 33, 34 }
 blipInfo[33] = { kind = 1, ent = 502, x = 9.0 }                                      -- a car driven by SWAT
 blipInfo[34] = { kind = 1, ent = 505, x = 10.0 }                                     -- a car driven by anybody else
 blipsBySprite[60] = { 35 }     blipInfo[35] = { kind = 4, x = 300.0, y = 300.0 }     -- a police station
-rescan() step(5, 2)
+rescan() step(6, 2)
 `);
-const riding = [];
-for (let i = 1; i <= Number(get('#last("map3dMoving").list')); i++) riding.push(get('last("map3dMoving").list[' + i + '][1]'));
-ok(riding.sort().join() === '10.0,5.0,8.0', 'officers and the cars they drive are left off; a player who is police, and anyone else\'s car, are not', riding.join());
+const riding = {};
+for (let i = 1; i <= Number(get('#last("map3dMoving").list')); i++) riding[get('last("map3dMoving").list[' + i + '][1]')] = get('last("map3dMoving").list[' + i + '][8]');
+ok(Object.keys(riding).sort().join() === '10.0,11.0,5.0,8.0', 'officers and the cars they drive are left off; a player who is police, and anyone else\'s car, are not', Object.keys(riding).join());
+ok(riding['10.0'] === '3' && riding['11.0'] === '3' && riding['5.0'] === '1', 'a car, and someone in one, are marked as riding: their dots are drawn bigger', JSON.stringify(riding));
 const places = [];
 for (let i = 1; i <= Number(get('#last("map3dBlips").list')); i++) places.push(get('last("map3dBlips").list[' + i + '][3]'));
 ok(places.indexOf('60') >= 0 && places.indexOf('3') < 0, 'the game\'s own police blip is left off by its sprite, and a police station stays', places.join());
-run('ViceMap3D.show(false, true) n = count("map3d") ViceMap3D.police("contact")');
-ok(get('count("map3d") - n') === '0', 'what the police know is not sent to a page that is not drawing');
-run('ViceMap3D.show(true, true)');
-ok(get('last("map3d").police') === 'contact' && get('last("map3d").show') === 'true', 'it goes with the next "draw"');
-run('n = count("map3d") ViceMap3D.police("contact") ViceMap3D.police("contact")');
-ok(get('count("map3d") - n') === '0', 'the same thing is not sent twice');
-run('ViceMap3D.police("searching")');
-ok(get('last("map3d").police') === 'searching', 'losing sight of the player is passed on');
-run('ViceMap3D.police("hollow")');
-ok(get('last("map3d").police') === 'false', 'a crime reported with nobody near is not a flood');
-run('ViceMap3D.police("red") ViceMap3D.police(nil)');
-ok(get('last("map3d").police') === 'false', 'and it ends when the wanted level does');
-fresh('{ enabled = true, police = false, policeBlips = true }');
-run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true) n = count("map3d") ViceMap3D.police("contact")');
-ok(get('count("map3d") - n') === '0', 'police = false switches the flood off');
+run('n = #sent ViceMap3D.police("contact")');
+ok(get('#sent - n') === '0', 'what the police know is kept, not sent: the page is told the colour');
 
 console.log('\n-- stamina --');
 fresh('{ enabled = true, ripple = { every = 0.5 } }');
@@ -253,45 +274,95 @@ fresh('{ enabled = true, ripple = false }');
 run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true) n = count("map3d") ViceMap3D.ripple(true)');
 ok(get('count("map3d") - n') === '0' && get('last("map3d").config.ripple') === 'nil', 'ripple = false switches the rings off');
 
+console.log('\n-- wanted --');
 fresh('{ enabled = true }');
 run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true)');
-run(`
-blipsBySprite = { [1] = { 11, 12, 99 }, [8] = { 13 }, [9] = { 14 }, [52] = { 15, 16, 17 } }
-blipInfo = {
-    [11] = { kind = 2, x = 5.0, y = 6.0 }, [12] = { kind = 4, x = 1.0, y = 2.0, short = true, colour = 3, display = 4 },
-    [99] = { kind = 2 }, [13] = { kind = 4, x = 100.0, y = 200.0 }, [14] = { kind = 7 },
-    [15] = { kind = 4, display = 3 }, [16] = { kind = 4, alpha = 0 }, [17] = { kind = 4 },
-}
-rescan()
-`);
+ok(get('last("map3d").want') === 'false' && get('last("map3d").ping') === 'false', 'the first "draw" says nobody is wanted');
+const want = () => get('last("map3d").want and last("map3d").want.kind or "none"');
+run('wanted, gameMs = 2, 1000; step(3, 1)');
+ok(want() === 'blue' && get('last("map3d").want.age') === '0' && get('last("map3d").ping') === 'true', 'wanted: blue for the first five seconds, from the moment it began, and the chase rings while the stars are lit');
+run('gameMs = 3000; ViceMap3D.police("contact"); shooting = true; n = count("map3d"); step(3, 1); shooting = false');
+ok(get('count("map3d") - n') === '0', 'still blue then, even with the police on them and a shot fired');
+run('gameMs = 6500; step(3, 1)');
+ok(want() === 'red', 'after five seconds, with the police on them: red first');
+run('gameMs = 7600; step(3, 1)');
+ok(want() === 'blue', 'then a second of blue');
+run('gameMs = 8600; step(3, 1)');
+ok(want() === 'red', 'and red again: a second each');
+run('ViceMap3D.police("red"); gameMs = 9000; step(3, 1)');
+ok(get('last("map3d").want') === 'false', 'red stars: no colour');
+run('ViceMap3D.police("hollow"); gameMs = 9100; step(3, 1)');
+ok(want() === 'blue', 'hollow stars: blue');
+run('ents = { [600] = { kind = 4 } } aimingAt = 600; gameMs = 9200; step(3, 1)');
+ok(want() === 'red', 'aiming at someone: red');
+run('aimingAt = 0; gameMs = 10800; step(3, 1)');
+ok(want() === 'blue', 'and a moment and a half later it is over');
+run('greyed = true; gameMs = 10900; step(3, 1)');
+ok(get('last("map3d").ping') === 'false', 'stars greyed out: the police have lost the player, and the rings stop');
+run('wanted = 0; gameMs = 11000; step(3, 1)');
+ok(get('last("map3d").want') === 'false', 'and the colour ends with the wanted level');
+run('ViceMap3D.show(false, true) wanted, greyed = 3, false; gameMs = 12000; n = count("map3d"); step(3, 2)');
+ok(get('count("map3d") - n') === '0', 'nothing is sent to a page that is not drawing');
+fresh('{ enabled = true, police = false }');
+run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true) wanted = 3; n = count("map3d"); step(3, 2)');
+ok(get('count("map3d") - n') === '0', 'police = false: neither the colour nor the rings');
 
-console.log('\n-- a route that ends at a place --');
-// The waypoint is moved onto blip 17 (sprite 52), which the scan above has seen.
-run('blipInfo[13].x, blipInfo[13].y = 60.0, 70.0; blipInfo[17].x, blipInfo[17].y, blipInfo[17].colour = 60.0, 70.0, 7; rescan(); waypoint = true; step(3, 2)');
-ok(get('last("map3dRoute").ends[1].icon') === '52' && get('last("map3dRoute").ends[1].iconRgb[1]') === '7', 'a waypoint set on a place carries that place\'s picture and colour', get('last("map3dRoute").ends[1].icon'));
-run('blipInfo[13].x, blipInfo[13].y = 40.0, 40.0; step(3, 1)');
-ok(get('last("map3dRoute").ends[1].icon') === 'nil', 'and loses it when moved off the place');
-run('blipInfo[12].route = true; rescan(); step(3, 1)');
-ok(get('#last("map3dRoute").ends') === '2' && get('last("map3dRoute").ends[2].icon') === '1' && get('last("map3dRoute").ends[2].x') === '1.0', 'a blip a script gave a route is ringed too, with its own picture');
-run('waypoint = false');
+console.log('\n-- a mission\'s route --');
+fresh('{ enabled = true }');
+run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true)');
+run('blipsBySprite = { [1] = { 12 } } blipInfo = { [12] = { kind = 4, x = 60.0, y = 0.0, route = true } } rescan() inVeh = 7; step(4, 1)');
+ok(get('#last("map3dRoute").ends') === '1' && get('last("map3dRoute").ends[1].kind') === 'mission' && get('last("map3dRoute").ends[1].x') === '60.0', 'a blip a script gave a route ends as a mission\'s');
+ok(get('last("map3dRoute").routes[1].rgb[1]') === '252' && get('last("map3dRoute").routes[1].rim[1]') === '254', 'and its line is pink');
+run('inVeh = 0');
 
-console.log('\n-- day and night --');
+console.log('\n-- day and night, and the clock --');
 run('clockH, clockM = 12, 0; step(2, 1)');
-ok(get('last("map3d").night') === '0.0', 'noon is day');
+ok(get('last("map3d").night') === '0.0' && get('last("map3d").clock[1]') === '12' && get('last("map3d").clock[2]') === '0', 'noon is day, and the time goes with it');
 run('clockH, clockM = 23, 30; step(2, 1)');
 ok(get('last("map3d").night') === '1.0', 'half past eleven is night');
 run('clockH, clockM = 20, 15; step(2, 1)');
 ok(get('last("map3d").night') === '0.5', 'dusk is half way, not a switch', get('last("map3d").night'));
 run('clockH, clockM = 5, 45; step(2, 1)');
 ok(get('last("map3d").night') === '0.5', 'and so is dawn', get('last("map3d").night'));
+run('clockH, clockM = 6, 30; step(2, 1)');
+ok(get('last("map3d").night') === '0.0', 'half past six is day again');
 run('n = count("map3d"); step(2, 3)');
-ok(get('count("map3d") - n') === '0', 'the same hour is not sent twice');
+ok(get('count("map3d") - n') === '0', 'the same minute is not sent twice');
+run('clockM = 31; step(2, 1)');
+ok(get('last("map3d").clock[2]') === '31', 'a new one is');
 fresh('{ enabled = true, night = false }');
 run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true) clockH = 23; step(2, 1)');
 ok(get('last("map3d").night') === '0.0', 'night = false keeps the daytime map');
 fresh('{ enabled = true, night = "always" }');
 run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true) clockH = 12; step(2, 1)');
 ok(get('last("map3d").night') === '1.0', 'and "always" the night one');
+
+console.log('\n-- the panel --');
+fresh('{ enabled = true }');
+ok(get('ViceMap3D.rect()') === 'nil', 'before the page can draw, the map is the radar\'s rect');
+run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end)');
+const panel = () => ['left', 'width', 'bottom', 'height'].map((k) => Number(get('ViceMap3D.rect().' + k)));
+const close = (a, b) => Math.abs(a - b) < 1e-6;
+let P = panel();
+ok(close(P[1], 208 / 720 * 9 / 16 * 100) && close(P[3], 115 / 720 * 100), 'then it is single player\'s panel, 208 by 115 of a 720th of the screen\'s height', P.join());
+ok(close(P[0], 4 / 720 * 9 / 16 * 100) && close(P[2] - P[3], 8.5 / 720 * 100), '4 in from the left and 8.5 up from the bottom, at the full safe zone', P.join());
+run('safeZone = 0.9');
+P = panel();
+ok(close(P[0], 5 + 4 / 720 * 9 / 16 * 100) && close(P[2] - P[3], 5 + 8.5 / 720 * 100), 'and as far inside a smaller safe zone', P.join());
+run('safeZone = 1.0 screen = { 3440, 1440 }');
+P = panel();
+ok(close(P[1] / 100 * 3440, 416) && close(P[3] / 100 * 1440, 230), 'on a 21:9 screen it is single player\'s 416 by 230 pixels at 1440p, not stretched wider', P.join());
+ok(close(P[0] / 100 * 3440, 8) && close((P[2] - P[3]) / 100 * 1440, 17), 'and 8 pixels in, 17 up, as single player places it', P.join());
+run('screen = { 0, 0 }');
+P = panel();
+ok(close(P[1], 208 / 720 * 9 / 16 * 100), 'a screen that gives no size is taken as 16:9', P.join());
+run('screen = { 1920, 1080 }');
+ok(get('drawing == nil and ViceMap3D.rect() ~= nil') === 'true', 'the same while the map is hidden, so what sits on it stays put');
+run('interior = 77');
+ok(get('ViceMap3D.rect()') === 'nil', 'indoors, where the engine\'s radar is the map, it is the radar\'s rect');
+fresh('{ enabled = true, panel = "native" }');
+run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end)');
+ok(get('ViceMap3D.rect()') === 'nil', 'panel = "native" keeps the radar\'s rect');
 
 console.log('\n-- client.lua --');
 const client = read('client.lua');
@@ -301,15 +372,17 @@ ok(/if not pcall\(ViceMap3D\.show, on and drawn, northBlip\) then drawn = false 
 ok(/local engine = on and not drawn\s+radarWanted = engine\s+DisplayRadar\(engine\)/.test(setRadar), 'the engine\'s radar is shown only when the drawn one is not, and held to that');
 ok(/ui\('mapRect', \{ visible = on \}\)/.test(setRadar), 'the frame and badge still follow the HUD\'s own decision');
 ok(/local wstate = wantedState\(ped, wanted\)[\s\S]{0,260}pcall\(ViceMap3D\.police, wstate\)/.test(client), 'the wanted readout tells the drawn map what the police know');
+ok(/local okay, panel = pcall\(ViceMap3D\.rect\)\s+if okay and type\(panel\) == 'table' then rect = panel end\s+end\s+rect\.showFrame/.test(client), 'and the map\'s published rect is the drawn map\'s panel while it can be drawn, over any other');
 ok(/Config\.PoliceSearch = \{[\s\S]{0,420}enable = false,/.test(read('config.lua')), 'the two search rings are off: the reference has none');
 const page = read('html/map3d.js');
-ok(/float w = 1\.0 \+ uT \* g - uCam\.z \* z;/.test(page) && /2\.0 \* \(uCam\.x \* g \+ uCam\.y \* z\) \/ uPanel\.y/.test(page), 'every shader places a point through the one camera: squash, rise and lean');
-ok(/var w = 1 \+ V\.T \* g - V\.lean \* z;/.test(page) && /y: V\.oy - \(V\.squash \* g \+ V\.rise \* z\) \/ w/.test(page), 'and what is drawn over the map goes through the same one');
-ok(/float g = \(q \* \(1\.0 \+ uCam\.z \* uAlt\) \+ uCam\.y \* uAlt\) \/ max\(uCam\.x - uT \* q, 0\.0005\);/.test(page), 'the ground is found by running it backwards, from however high the player is');
-ok(/smoothstep\(0\.0, 0\.12, 1\.0 - vW\) \* smoothstep\(1\.0, 3\.0, vOver\)/.test(page), 'only what is above the player AND nearer the camera is seen through: a roof underfoot stays solid');
+ok(/float w = 1\.0 \+ uT \* g \+ uLeanZ;/.test(page) && /2\.0 \* \(g - uAlt \+ lift \* min\(w, 1\.0\)\) \/ uPanel\.y/.test(page), 'every shader places a point through the one camera, raised by its height no more than at the player, with the ground lowered by the player\'s');
+ok(/var w = 1 \+ V\.T \* g \+ V\.leanZ;/.test(page) && /y: V\.oy - \(g - V\.alt\) \/ w/.test(page), 'and what is drawn over the map goes through the same one');
+ok(/float g = \(q \* \(1\.0 \+ uLeanZ\) \+ uAlt\) \/ max\(1\.0 - uT \* q, 0\.05\);/.test(page), 'the ground is found by running it backwards, from however high the player is');
+ok(/if \(vMine > 0\.5\) \{/.test(page) && /vMine = abs\(aId - uInside\) < 0\.5/.test(page), 'only the building the player is in or on is seen through');
 const manifest = read('fxmanifest.lua');
 ok(manifest.indexOf("'client_map3d.lua'") > 0 && manifest.indexOf("'client_map3d.lua'") < manifest.indexOf("'client.lua'"), 'client_map3d.lua loads before client.lua');
-ok(/'html\/map3d\.js'/.test(manifest) && /'html\/map3d\/\*\.bin'/.test(manifest), 'the manifest ships the script and whatever world has been built');
+ok(/'html\/map3d\.js'/.test(manifest) && /'html\/map3d\/\*\.bin'/.test(manifest) && /'html\/map3d\/\*\.png'/.test(manifest), 'the manifest ships the script, the pictures and whatever world has been built');
+ok(fs.existsSync(path.join(root, 'html', 'map3d', 'sp.png')), 'single player\'s minimap pictures are there');
 
 /* ---- the page ----------------------------------------------------------- */
 console.log('\n-- the page --');
@@ -326,47 +399,94 @@ window.eval(read('html/app.js'));
 window.eval(read('html/map3d.js'));
 const msg = (data) => window.dispatchEvent(new window.MessageEvent('message', { data }));
 const canvas = window.document.getElementById('map3d');
+const M3 = window.ViceMap3D, near = (a, b, e) => Math.abs(a - b) < (e || 1e-6), now = () => window.performance.now();
 ok(!!canvas && canvas.classList.contains('hidden'), 'the canvas is in the page, hidden');
 ok(posts.some((p) => p.name === 'map3dHello'), 'the page says hello');
-ok(window.ViceMap3D.state().booted === false && fetched.length === 0, 'and has fetched nothing and made no WebGL context');
-msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0 });
-msg({ action: 'map3dRoute', routes: [{ pts: [0, 0, 0, 50], rgb: [1, 2, 3] }], ends: [{ x: 0, y: 50, rgb: [1, 2, 3], ring: [4, 5, 6] }, { x: 9, y: 9, rgb: [1, 2, 3], icon: 52, iconRgb: [7, 8, 9] }, { nope: true }] });
-msg({ action: 'map3dBlips', list: [[1, 2, 1, 255, 255, 255, 255, 0, 0]] });
-msg({ action: 'map3dMoving', list: [[3, 4, 1, 255, 255, 255, 255, 0, 0]] });
-ok(window.ViceMap3D.state().booted === false && window.ViceMap3D.state().blips === 2, 'being fed before being asked to draw is harmless');
-const E = window.ViceMap3D.state().ends;
-ok(E.length === 2 && E[0].icon === null && E[0].ring[0] === 4 && E[1].icon === 52 && E[1].iconRgb[0] === 7 && E[1].ring.length === 3, 'route ends: a plain one, one with a place\'s picture, and a malformed one dropped');
+ok(M3.state().booted === false && fetched.length === 0, 'and has fetched nothing and made no WebGL context');
+// The zone bar and the vehicle panel stand on a snapshot of the map's rect:
+// the first one (the radar's), then the drawn map's panel once it takes over.
+const stageEl = window.document.getElementById('stage');
+const pw = () => stageEl.style.getPropertyValue('--panel-width');
+msg({ action: 'mapRect', left: 1.75, width: 15.8, bottom: 17.9, height: 15.4, drawn: false });
+ok(pw() === '15.8cqw', 'the panel stack takes the first rect, the radar\'s', pw());
+msg({ action: 'mapRect', left: 1.75, width: 15, bottom: 17.9, height: 15.4, drawn: false });
+ok(pw() === '15.8cqw', 'and stays put while the radar is resized', pw());
+msg({ action: 'mapRect', left: 0.23, width: 12.09, bottom: 17.15, height: 15.97, drawn: true });
+ok(pw() === '12.09cqw', 'it moves onto the drawn map\'s panel when the drawn map takes over', pw());
+msg({ action: 'mapRect', visible: true });
+ok(pw() === '12.09cqw', 'a message without a rect leaves it there', pw());
+msg({ action: 'mapRect', left: 1.75, width: 15, bottom: 17.9, height: 15.4, drawn: false });
+ok(pw() === '15cqw', 'and back onto the radar\'s rect when the radar does (indoors)', pw());
+msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0, v: true });
+msg({ action: 'map3dRoute', routes: [{ pts: [0, 0, 0, 50], rgb: [1, 2, 3] }], ends: [{ x: 0, y: 50, kind: 'waypoint' }, { x: 9, y: 9, kind: 'mission' }, { x: 5, y: 5, kind: 'waypoint', icon: 52, iconRgb: [7, 8, 9] }, { nope: true }], remaining: 640 });
+msg({ action: 'map3dBlips', list: [[1, 2, 1, 255, 255, 255, 255, 0, 5]] });
+msg({ action: 'map3dMoving', list: [[3, 4, 1, 255, 255, 255, 255, 2, 6]] });
+ok(M3.state().booted === false && M3.state().blips === 2, 'being fed before being asked to draw is harmless');
+const E = M3.state().ends;
+ok(E.length === 3 && E[0].kind === 'waypoint' && E[0].icon === null && E[1].kind === 'mission' && E[2].icon === 52 && E[2].iconRgb[0] === 7 && M3.state().remaining === 640, 'route ends, a waypoint\'s, a mission\'s and one on a place with its picture, a malformed one dropped, and the distance left');
 msg({ action: 'map3dRoute', routes: {}, ends: {} });
-ok(window.ViceMap3D.state().ends.length === 0, 'an empty Lua table for either is no routes and no ends');
-ok(window.ViceMap3D.ink('land')[0] === window.ViceMap3D.PAINT.land[0], 'by day the map is the daytime colours');
+ok(M3.state().ends.length === 0 && M3.state().remaining === -1, 'an empty Lua table for either is no routes and no ends, and no distance');
+ok(M3.miles(2.5 * 1609.344) === '2.50 mi' && M3.miles(12.34 * 1609.344) === '12.3 mi' && M3.miles(150.4 * 1609.344) === '150 mi', 'the distance in miles, as single player writes it');
+
+ok(M3.ink('land')[0] === M3.PAINT.land[0] && M3.PAINT.land.join() === '160,155,149' && M3.PAINT.road.join() === '172,167,161', 'by day the map is single player\'s daytime colours');
+msg({ action: 'map3d', night: 1 });
+ok(M3.ink('land').join() === '34,38,54' && M3.ink('roof').join() === '60,71,99' && M3.ink('road')[0] === M3.PAINT.road[0], 'at night its night ones; the roads and yards keep theirs');
 msg({ action: 'map3d', night: 0.5 });
-ok(Math.abs(window.ViceMap3D.ink('land')[0] - (window.ViceMap3D.PAINT.land[0] + window.ViceMap3D.NIGHT.land[0]) / 2) < 1e-9 && window.ViceMap3D.ink('lane').length === 4, 'at dusk every colour is half way to its night one');
-msg({ action: 'map3d', night: 7 });
-ok(window.ViceMap3D.ink('road')[2] === window.ViceMap3D.NIGHT.road[2] && window.ViceMap3D.ink('route')[0] === window.ViceMap3D.PAINT.route[0], 'at night it is the night ones, and what has no night colour keeps its own');
+ok(near(M3.ink('land')[0], (160 + 34) / 2) && near(M3.ink('haze')[2], (186 + 84) / 2) && M3.ink('lane').length === 4, 'at dusk every colour with a night one is half way to it, the haze and lane lines too');
 msg({ action: 'map3d', night: 0 });
-const F = () => window.ViceMap3D.state().flood;
-ok(F().cover === 0 && F().to === null, 'not wanted: no flood');
-msg({ action: 'map3d', police: 'contact' });
-window.ViceMap3D.stepFlood(0, true);
-ok(F().cover === 1 && F().rgb[0] === window.ViceMap3D.POLICE.contact.rgb[0], 'the police can see the player: the ground floods red');
-msg({ action: 'map3d', police: 'searching' });
-const half = window.ViceMap3D.stepFlood(0.1, false);
-ok(half === true && F().rgb[2] > window.ViceMap3D.POLICE.contact.rgb[2] && F().rgb[2] < window.ViceMap3D.POLICE.searching.rgb[2], 'they lose sight: it turns to blue through the colours between, not in one jump', F().rgb.map(Math.round).join());
-window.ViceMap3D.stepFlood(0, true);
-ok(F().rgb[2] === window.ViceMap3D.POLICE.searching.rgb[2] && window.ViceMap3D.stepFlood(0.1, false) === false, 'and once it is blue there is nothing left to animate');
-msg({ action: 'map3d', police: 'red' });
-window.ViceMap3D.stepFlood(0, true);
-ok(Math.abs(F().cover - window.ViceMap3D.POLICE.red.cover) < 1e-6 && F().cover < 1, 'shaken off but still wanted: a faded red', F().cover);
-msg({ action: 'map3d', police: false });
-window.ViceMap3D.stepFlood(0, true);
-ok(F().cover === 0, 'and it drains away when it is over');
-msg({ action: 'map3d', police: 'nonsense' });
-ok(F().to === null, 'a word it does not know is no flood');
-msg({ action: 'map3d', config: { police: { radius: 150, contact: { rgb: [1, 2, 3] } } } });
-ok(window.ViceMap3D.POLICE.radius === 150 && window.ViceMap3D.POLICE.contact.rgb[0] === 1 && window.ViceMap3D.POLICE.contact.cover === 1, 'its reach and colours come from the config');
-// Stamina: rings out from the marker. Time is handed in, so this runs on the
-// reference's clock and not the test machine's.
-const M3 = window.ViceMap3D, near = (a, b) => Math.abs(a - b) < 1e-6;
+ok(M3.PAINT.lane.slice(0, 3).join() === '120,117,114' && near(M3.PAINT.lane[3], 70 / 255) && M3.VIEW.haze.most === 0.34 && M3.VIEW.haze.to === 0.42, 'lane lines in single player\'s own lane colour, and the haze along the top');
+
+// Wanted: the colour, how much of it, and from when.
+ok(M3.state().want === null && M3.wantNow(now()).c[3] === 0, 'not wanted: no colour');
+msg({ action: 'map3d', want: { kind: 'red', age: 150 } });
+M3.stepWant(0, true);
+let W = M3.wantNow(now());
+ok(M3.state().want.join() === '169,47,56' && W.c[3] > 0.45 && W.c[3] < 0.6 && W.rising === true && near(W.c[0], 169 / 255), 'red, coming up over 300 ms from the moment the player became wanted', W.c[3]);
+msg({ action: 'map3d', want: { kind: 'blue', age: 6000 } });
+const mid = M3.stepWant(0.1, false);
+W = M3.wantNow(now());
+ok(mid === true && W.c[2] > 56 / 255 && W.c[2] < 200 / 255 && W.c[3] === 1, 'red turns to blue through the colours between, not in one jump', W.c.map((v) => Math.round(v * 255)).join());
+M3.stepWant(0, true);
+W = M3.wantNow(now());
+ok(near(W.c[2], 200 / 255) && W.c[3] === 1 && W.rising === false && M3.stepWant(0.1, false) === false, 'and once it is blue there is nothing left to animate');
+msg({ action: 'map3d', want: false });
+ok(M3.state().want === null && M3.stepWant(0.1, false) === true && M3.wantNow(now()).c[3] > 0 && M3.wantNow(now()).c[3] < 1, 'when it is over it drains away');
+M3.stepWant(0, true);
+ok(M3.wantNow(now()).c[3] === 0, 'to nothing');
+msg({ action: 'map3d', want: { kind: 'nonsense' } });
+ok(M3.state().want === null, 'a colour it does not know is none');
+
+// The clock: on the hour and the half hour, for six seconds.
+(function () {
+  const t0 = now();
+  M3.setClock([20, 0]);
+  ok(M3.clockText() === '8:00 pm', 'the time, as single player writes it', M3.clockText());
+  ok(near(M3.clockAlpha(t0 + 250), 0.5, 0.05) && M3.clockAlpha(t0 + 3000) === 1 && near(M3.clockAlpha(t0 + 6750), 0.5, 0.05) && M3.clockAlpha(t0 + 8000) === 0, 'half a second in, six seconds up, half a second out');
+  M3.setClock([20, 29]);
+  ok(M3.clockAlpha(t0 + 8000) === 0, 'not again within the same half hour');
+  M3.setClock([20, 30]);
+  ok(M3.clockAlpha(now() + 3000) === 1, 'and back on the half hour');
+  M3.setClock([0, 5]);
+  const a = M3.clockText();
+  M3.setClock([12, 0]);
+  ok(a === '12:05 am' && M3.clockText() === '12:00 pm', 'midnight and noon are twelve', a + ' ' + M3.clockText());
+})();
+
+// The chase rings. Time is handed in.
+ok(M3.pinging() === false && M3.stepPing(1000) === false && M3.pingRadii(1000).length === 0, 'no chase: no rings, nothing to animate');
+msg({ action: 'map3d', ping: true });
+ok(M3.pinging() === true && M3.stepPing(1000) === true && M3.pingRadii(1000).length === 1 && near(M3.pingRadii(1000)[0], 1.05), 'a chase: the first ring starts at once, just outside the marker');
+M3.stepPing(1600);
+const two = M3.pingRadii(1600);
+ok(two.length === 2 && near(two[0], 1.05) && near(two[1], 1.05 + 1.25 * 0.5), 'the next follows half a cycle later, the first half way out', two.join());
+M3.stepPing(2201);
+ok(M3.pingRadii(2201).every((r) => r < 2.3) && M3.pingRadii(2201).length === 2, 'a ring is let go at 2.3 radii, 1.2 s on, where it has faded to nothing', M3.pingRadii(2201).join());
+msg({ action: 'map3d', ping: false });
+ok(M3.stepPing(2300) === false && M3.pingRadii(2300).length === 0, 'the chase stops: so do its rings, at once');
+msg({ action: 'map3d', ping: 'yes' });
+ok(M3.pinging() === false, 'anything but true is off');
+
+// Stamina: rings out from the marker, on the reference's clock.
 ok(M3.rippling() === false && M3.stepRipple(1000) === false && M3.rippleRadii(1000).length === 0, 'nobody running: no rings, nothing to animate');
 msg({ action: 'map3d', ripple: true });
 ok(M3.rippling() === true && M3.stepRipple(1000) === true && M3.rippleRadii(1000).length === 1 && near(M3.rippleRadii(1000)[0], 1), 'stamina being spent: the first ring starts at once, at the marker\'s rim');
@@ -392,59 +512,57 @@ M3.rings([]);
 msg({ action: 'map3d', config: { ripple: { every: 1, rgb: [1, 2, 3] } } });
 ok(M3.RIPPLE.every === 1 && M3.RIPPLE.rgb[0] === 1 && M3.RIPPLE.speed === 2.65, 'the rings\' settings come from the config, over the defaults');
 msg({ action: 'map3d', config: { ripple: { every: 0.4, rgb: [255, 255, 255] } } });
-msg({ action: 'map3d', load: true, config: { view: { zoom: 4.5 }, paint: { land: [9, 9, 9] } } });
-ok(window.ViceMap3D.VIEW.zoom === 4.5 && window.ViceMap3D.PAINT.land[0] === 9 && window.ViceMap3D.VIEW.camera.pitch === 27, 'config is laid over the defaults, not in place of them');
 
-// The camera. Its four numbers come from where it is, and they are the
-// reference's: a horizon a fifth of a panel above the top edge, the ground
-// seen from 36 degrees at the player.
+msg({ action: 'map3d', load: true, config: { view: { zoom: 4.5 }, paint: { land: [9, 9, 9] } } });
+ok(M3.VIEW.zoom === 4.5 && M3.PAINT.land[0] === 9 && M3.VIEW.anchor === 0.85, 'config is laid over the defaults, not in place of them');
+M3.VIEW.zoom = 2.58; M3.PAINT.land = [160, 155, 149];
+
+// The camera: single player's View.
 (function () {
-  const V = window.ViceMap3D.VIEW, cam = window.ViceMap3D.camera(100, 100 * V.anchor);
-  const pitch = 27 * Math.PI / 180, off = Math.atan((V.anchor - 0.5) / 1.38);
-  ok(V.anchor === 0.71 && V.opacity === 1, 'the player sits 71% of the way down an opaque panel, as in the reference');
-  ok(Math.abs(cam.squash - Math.sin(pitch + off) / Math.cos(off)) < 1e-9 && cam.squash > 0.58 && cam.squash < 0.60, 'a metre ahead of the player is drawn 0.59 of a metre across', cam.squash);
-  ok(cam.horizon < -19 && cam.horizon > -21, 'the horizon is a fifth of the panel above its top edge', cam.horizon);
-  ok(Math.abs(cam.T - cam.squash / (71 - cam.horizon)) < 1e-12, 'which is what sets the perspective: ground without end lands on it');
-  ok(cam.rise > 0.81 && cam.rise < 0.83, 'a metre of height is drawn 0.82 of a metre across', cam.rise);
-  ok(Math.abs(cam.lean - cam.T * Math.tan(pitch)) < 1e-12, 'and what is tall comes toward the viewer as it rises');
-  const steep = (window.ViceMap3D.VIEW.camera.pitch = 60, window.ViceMap3D.camera(100, 71));
-  ok(steep.squash > cam.squash && steep.rise < cam.rise, 'a steeper camera sees more of the ground and less of the walls');
-  window.ViceMap3D.VIEW.camera.pitch = 27;
-  // A helipad's circle in the reference is 0.30 to 0.38 as tall as wide, a
-  // third of the way down the panel. A circle on the ground is squashed by
-  // squash / w there, w being how much further off than the player it is.
-  const q = 71 - 31, w = cam.squash / (cam.squash - cam.T * q);
-  ok(cam.squash / w > 0.30 && cam.squash / w < 0.38, 'a circle on the ground a third of the way down the panel is as flat as the reference\'s helipad', cam.squash / w);
+  const V = M3.VIEW, oy = 115 * V.anchor, T = M3.camera(115, oy).T;
+  ok(V.anchor === 0.85 && near(T, 0.8 / oy), 'the player sits 85% of the way down the panel, and T is 0.8 over that');
+  const g = oy / (1 - T * oy);
+  ok(near(1 / (1 + T * g), 0.2), 'so the panel\'s top edge is drawn at a fifth of the scale at the player');
+  ok(V.opacity === 0.85 && V.roadOpacity === 0.9 && V.lift === 0.3 && V.liftCap === 400, 'the map hides 85% of the game, its roads 90%, and buildings rise 0.3 a pixel, capped at 400');
+  msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0, v: true, air: 5 });
+  ok(M3.airScale() === 1, 'an aircraft near the ground: the view as it is');
+  msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0, v: true, air: 1500 });
+  ok(near(M3.airScale(), 0.01), '1500 m up: a hundredth of it');
+  msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0, v: true, air: 755 });
+  ok(near(M3.airScale(), Math.exp(Math.log(0.01) * Math.pow(0.5, 0.6))), 'and between, eased', M3.airScale());
+  msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0, v: false });
+  ok(M3.airScale() === 1, 'on the ground, none of it');
 })();
 
 // How high the player is. No world is loaded here, so no building is under
 // them: what is beneath them and the street are all there is to go on.
 (function () {
-  const M = window.ViceMap3D, at = (g, a) => { msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0, g: g, a: a }); return M.altitudeWanted(); };
+  const at = (g, a, air) => { msg({ action: 'map3dPos', x: 1, y: 2, c: 0, h: 0, s: 0, g: g, a: a, air: air }); return M3.altitudeWanted(); };
   ok(at(0, 0) === 0, 'on the ground the camera is on the ground');
   ok(at(2, 2) === 0, 'a kerb, a jump, a car\'s own height: under 3 m is still the ground');
   ok(at(150, 150) === 150, 'under a parachute: as high as they are');
   ok(at(0, 40) === 0, 'on a hillside path far above the nearest road, with the ground under their feet: the ground');
-  ok(at(80, 300) === 80, 'flying over hills: over what is beneath them, whatever the road is doing');
+  ok(at(80, 300) === 80, 'over hills: over what is beneath them, whatever the road is doing');
   ok(at(120, undefined) === 120, 'no street to go by: what is beneath them is enough');
-  ok(at(9000, 9000) === M.VIEW.altitude.max, 'and there is a ceiling');
+  ok(at(9000, 9000) === M3.VIEW.altitude.max, 'and there is a ceiling');
+  ok(at(150, 150, 150) === 0, 'in a helicopter or a plane the view pulls back instead, and the camera stays down');
   at(150, 150);
-  ok(M.stepAltitude(0.1, false) === true && M.altitude() > 0 && M.altitude() < 150, 'the camera goes up to them over a moment, not in one jump', M.altitude());
-  M.stepAltitude(0, true);
-  ok(M.altitude() === 150 && M.stepAltitude(0.1, false) === false, 'and once it is there, there is nothing left to animate');
-  M.VIEW.altitude = false;
-  ok(M.altitudeWanted() === 0, 'altitude = false keeps the camera on the ground');
-  M.VIEW.altitude = { ease: 3, floor: 3, max: 500 };
-  at(0, 0); M.stepAltitude(0, true);
+  ok(M3.stepAltitude(0.1, false) === true && M3.altitude() > 0 && M3.altitude() < 150, 'the camera goes up to them over a moment, not in one jump', M3.altitude());
+  M3.stepAltitude(0, true);
+  ok(M3.altitude() === 150 && M3.stepAltitude(0.1, false) === false, 'and once it is there, there is nothing left to animate');
+  M3.VIEW.altitude = false;
+  ok(M3.altitudeWanted() === 0, 'altitude = false keeps the camera on the ground');
+  M3.VIEW.altitude = { ease: 3, floor: 3, max: 500, lean: 0.904 };
+  at(0, 0); M3.stepAltitude(0, true);
 })();
 const ready = posts.find((p) => p.name === 'map3dReady');
 ok(ready && ready.body.ok === false && /WebGL2/.test(ready.body.why), 'a browser that cannot draw it says so, and why', JSON.stringify(ready));
 msg({ action: 'map3d', show: true });
-ok(canvas.classList.contains('hidden'), 'and the canvas stays hidden rather than sitting empty over the radar');
+ok(canvas.classList.contains('hidden') && !window.document.body.classList.contains('map3d-on'), 'and the canvas stays hidden rather than sitting empty over the radar, the HUD\'s own frame left in its place');
 
 console.log('\n-- the route, tidied --');
 (function () {
-  const R = window.ViceMap3D.route;
+  const R = M3.route;
   const turn = (line) => {                       // the sharpest change of direction along it, in degrees
     let worst = 0;
     for (let i = 1; i + 1 < line.length / 2; i++) {
@@ -461,8 +579,8 @@ console.log('\n-- the route, tidied --');
   for (let y = 103; y <= 200; y += 5) jog.push(3.5, y);
   const t = R.tidy(jog);
   ok(t && Math.abs(t.line[0]) < 0.05 && Math.abs(t.line[1]) < 0.05 && Math.abs(t.line[t.line.length - 2] - 3.5) < 0.05, 'the ends stay where the game put them');
-  ok(turn(t.line) < 12, 'a lane\'s sidestep comes out as a curve, not a kink', turn(t.line).toFixed(1) + ' degrees');
-  ok(Math.abs(t.arc[t.arc.length - 1] - 200) < 3 && Math.abs(t.arc[1] - t.arc[0] - 2) < 0.2, 'as points two metres apart, each knowing how far along it is');
+  ok(turn(t.line) < 6, 'a lane\'s sidestep comes out as a curve, not a kink', turn(t.line).toFixed(1) + ' degrees');
+  ok(Math.abs(t.arc[t.arc.length - 1] - 200) < 3 && Math.abs(t.arc[1] - t.arc[0] - 1.5) < 0.2, 'as points a metre and a half apart, each knowing how far along it is', (t.arc[1] - t.arc[0]).toFixed(2));
   // North 100 m, then east 100 m: a real corner.
   const corner = [];
   for (let y = 0; y <= 100; y += 4) corner.push(0, y);
@@ -473,23 +591,25 @@ console.log('\n-- the route, tidied --');
   ok(cut < 2.5, 'a real corner is rounded but not cut off the road', cut.toFixed(2) + ' m from the corner');
 
   const straight = R.tidy([0, 0, 0, 200]);
-  ok(Math.abs(R.startOf(straight, 1, 61) - 61) < 0.2, 'the line starts where the player is along it, not where the game began it', R.startOf(straight, 1, 61).toFixed(2));
-  ok(R.startOf(straight, 0, -30) === 0, 'and at its beginning when the player has not reached it');
-  // Off the road: the game's line runs back to the road, then forward past the player.
-  const hook = R.tidy([8, 30, 2, 22, 0, 16, 0, 22, 0, 30, 0, 60, 0, 150]);
-  const at = R.startOf(hook, 8, 30);
-  let hx = 0, hy = 0;
-  for (let i = 0; i + 1 < hook.arc.length; i++) if (hook.arc[i] <= at && at <= hook.arc[i + 1]) { hx = hook.line[i * 2]; hy = hook.line[i * 2 + 1]; }
-  ok(at > 15 && Math.abs(hy - 30) < 4 && hx < 3, 'off the road, it starts where the road passes the player, not with a hook back to it', at.toFixed(1) + ' m along, at ' + hx.toFixed(1) + ',' + hy.toFixed(1));
-  // Round the block: out 100 m, across, and back past the start. Not a hook.
+  const at61 = R.startOf(straight, 1, 61);
+  ok(Math.abs(at61.s - 61) < 0.2 && Math.abs(at61.y - 61) < 0.2 && Math.abs(at61.x) < 0.01, 'the line starts where the player is along it, not where the game began it', at61.s.toFixed(2));
+  ok(R.startOf(straight, 0, -30).s === 0, 'and at its beginning when the player is more than 22 m from it');
+  ok(R.startOf(straight, 21, 100).s > 99 && R.startOf(straight, 23, 100).s === 0, 'within 22 m it is trimmed, past that it is not');
+  // Round the block: out 100 m, across, and back past the start.
   const loop = R.tidy([0, 0, 0, 100, 10, 100, 10, 0, 10, -100]);
-  ok(R.startOf(loop, 0, 2) < 5, 'a route that comes back past the player later on is not cut short there', R.startOf(loop, 0, 2).toFixed(1));
+  ok(R.startOf(loop, 0, 2).s < 5, 'a route that comes back past the player later on is not cut short there', R.startOf(loop, 0, 2).s.toFixed(1));
+  // Beside two stretches of it, 1 m and 3.5 m away: the first pass within 3 m of the nearest wins.
+  const back = R.tidy([3.5, -50, 3.5, 50, 20, 50, 20, 1, -40, 1]);
+  const first = R.startOf(back, 0, 0);
+  ok(Math.abs(first.x - 3.5) < 0.5 && first.s < 60, 'and of two passes close by, it starts at the first', first.s.toFixed(1) + ' m along at ' + first.x.toFixed(1));
   ok(R.tidy([5, 5]) === null && R.tidy([]) === null, 'a line of one point is no line');
 })();
 
 const css = read('html/style.css');
 const rule = css.slice(css.indexOf('\n#map3d {'), css.indexOf('}', css.indexOf('\n#map3d {')));
 ok(/height:\s*calc\(var\(--map-height[^;]*\* 1\.2\)/.test(rule) && /--m3d:[^;]*\* 0\.1\)/.test(rule) && /OVERHANG = 0\.1;/.test(read('html/map3d.js')), 'the canvas overhangs the frame by the tenth the script expects');
+ok(!/--sc-mapframe|--off-mapframe/.test(rule), 'and takes none of the frame\'s /movehud nudges: it is single player\'s panel');
+ok(/\.map3d-on #map-frame,\s*\.map3d-on #map-badge,\s*\.map3d-on #nav-compass \{\s*display: none !important;/.test(css), 'while it draws, the HUD\'s own frame, badge and distance step aside for its own');
 
 /* ---- the converter ------------------------------------------------------ */
 console.log('\n-- tools/map3d/build.py --');

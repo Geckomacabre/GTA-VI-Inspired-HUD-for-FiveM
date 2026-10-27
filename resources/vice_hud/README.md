@@ -706,12 +706,12 @@ their permission:
 its roads, its 3,589 building outlines and their heights, and its survey of
 where the map is water and where it is sand. The idea of a minimap drawn this
 way, and the week of work that mapped the island for it, are theirs; this is
-that map redrawn on the HUD's page so a server can show it. The camera it is
-seen through and its colours have since been measured off the reference
-footage (see below). Around it everything is still
-this HUD's: the frame and where it sits, the player marker measured off the
-reference, the route in the HUD's accent colour, the distance figure, the
-direction panel, and the game's own blips.
+that map redrawn on the HUD's page so a server can show it. Everything about
+how it is drawn now follows the single-player version of this HUD's minimap
+(loneeps' mod with FBICat's additions), number for number, so both versions
+show the same map: its camera, colours, panel and where it sits, its marker
+and pictures, its blips, route, distance and clock, and how it shows a wanted
+level.
 
 **There is nothing to build.** The map ships with the resource, in
 `html/map3d/`: `world.bin` and `ground.png` are the mod's map, converted, and
@@ -738,24 +738,26 @@ python tools/map3d/blips.py --docs path/to/fivem-docs
 
 What to know about it:
 
-- **It is seen through a real camera, the reference's.** The reference's
-  minimap is a camera behind and above the player, looking down past them at
-  about 27 degrees, and this is that camera: its pitch and lens are read off
-  the footage (a rectangular roof gives two vanishing points and so the
-  horizon; a helipad's circle, drawn a third as tall as it is wide, agrees).
-  A metre ahead of the player is drawn 0.59 of a metre across, buildings
-  stand their own height through the same lens, the far end of the map pales
-  toward the horizon, and the panel is opaque. `Config.Map3D.view.camera`.
-- **The camera rides at your height.** On a roof the city falls away below
-  you; under a parachute or in an aircraft it shrinks, and what is on the
-  ground directly beneath you slides toward the bottom edge. A wall or roof
-  that stands between the camera and you is seen through round your marker;
-  a roof you are standing on is not. `Config.Map3D.altitude = false` keeps
-  it on the ground. The ground itself is flat: the map has no hills.
-- **Its colours are the reference's**, sampled off its opaque panel: pale
-  pinkish paving with the roads a shade lighter, a deep teal sea that is
-  lighter along the shore, and lavender-slate buildings darker than the
-  ground they stand on.
+- **It is single player's camera.** The player sits 85% of the way down the
+  panel; the ground ahead shrinks with distance to a fifth of the scale at
+  the top edge, so the horizon is never in view; buildings rise straight up
+  the screen, 0.3 of a pixel for each pixel of height, tall ones capped. The
+  view pulls back with speed in a vehicle, and with height in a helicopter or
+  a plane (to a hundredth of the scale by 1,500 m).
+- **Out of an aircraft the camera rides at your height.** On a roof the city
+  falls away below you; under a parachute it shrinks. The ground is lowered
+  as a building is raised, so a roof you are standing on stays under your
+  marker. `Config.Map3D.altitude = false` keeps it on the ground. The ground
+  itself is flat: the map has no hills.
+- **It is single player's panel.** 208 by 115 units of a 720th of the
+  screen's height, 4 in from the safe zone's left edge and 8.5 up from its
+  bottom, with 9-unit corners and a thin white outline, 85% opaque (its roads
+  90%). The zone bar and the panels stack on it as they would on the radar.
+  `Config.Map3D.panel = 'native'` keeps the engine radar's rect instead.
+- **Its colours are single player's**: warm grey ground with the roads and
+  yards lighter, blue-grey buildings lit from one side, the building you are
+  in or on seen through round your marker. Lane lines are drawn on the roads,
+  and the far end of the map pales toward the horizon.
 - **It is drawn on the HUD's page, by WebGL.** The mod paints straight onto
   the game's frame from a plugin, which a server cannot give its players, and
   the engine's own radar is a flat picture that cannot stand a building up.
@@ -763,28 +765,40 @@ What to know about it:
   few dozen draw calls over the 256 m squares around the player, and a frame
   is only drawn when the player or the camera moved. A player with it switched
   off downloads none of it.
-- **Indoors the engine's radar comes back**, because it has the floor plan and
-  the drawn map does not (`engineIndoors`).
+- **Indoors it stays**, as single player's does, and the engine's radar never
+  shows. `engineIndoors = true` brings the radar back indoors for its floor
+  plans, which the drawn map has none of.
 - **Blips are read from the game** every two seconds, and the ones riding a
   ped or vehicle are followed in between. A blip that is not short-range stays
-  pinned to the edge, as on the radar. Radius and area blips are not drawn:
-  the game will not say how big they are.
+  pinned to the edge, as on the radar. As in single player, a place is its
+  picture, a person or a vehicle a dot (a vehicle's bigger), short-range
+  ones go past 450-500 m, and a blip hidden behind a building is left out.
+  A place a route ends on is drawn as that end, not twice.
+  Radius and area blips are not drawn: the game will not say how big they are.
 - **The route** is the game's own GPS line, read back from it, for the
-  waypoint and for a blip a script gave a route. The game hands it over with
-  kinks in it and a tail behind the player, so it is smoothed, started where
-  the player is, and brought in gradually just ahead of the marker.
-- **Where a route ends is ringed**: four arcs in the route's colour, as the
-  reference marks a destination. In the ring is a plain disc of that colour,
-  or, when the waypoint was set on a place, that place's own blip.
-- **Wanted, the map says so and nothing else does.** The reference puts no
-  police on its minimap. The ground round the player floods one flat colour,
-  roads and all: red while the police can see you, blue while they have lost
-  sight and are searching, a faded red once they are shaken off but the
-  wanted level has not gone. It is driven by the same state the wanted stars
-  use (fenix-police's contact model when it is running). The blips the game
-  hangs on officers, their cars and helicopters are left off
-  (`policeBlips`), and the two search rings are off by default
-  (`Config.PoliceSearch`). Police stations are places and stay.
+  waypoint (teal) and for a blip a script gave a route (pink), on foot and in
+  a vehicle, over the buildings. It is smoothed as single player smooths it,
+  started where the player is, and faded round that point. The distance left
+  is in the panel's top left in miles; with no route, the logo is there,
+  faint.
+- **Where a route ends is marked** as in single player: in a vehicle a ring
+  with the waypoint pin in it, on foot a bigger pin, a mission's end a pink
+  disc. A waypoint set on a place shows that place's own picture in place of
+  the pin. Off the panel each is pinned to its edge.
+- **Wanted, the map says so and nothing else does.** Single player puts no
+  police on its minimap: the whole map turns blue or red. Blue for the first
+  five seconds and under hollow stars, red for a moment after you shoot or
+  aim at someone, a second of red and a second of blue while the police can
+  see you or are searching, nothing under red stars. One colour turns into
+  the other, and it drains away when it is over. While the stars are not
+  greyed out, two rings pulse out from your marker. It is driven by the same
+  state the wanted stars use (fenix-police's contact model when it is
+  running). The blips for officers, their cars and helicopters are left off
+  (`policeBlips`); police stations are places and stay. The two search rings
+  are off by default (`Config.PoliceSearch`). `Config.Map3D.police = false`
+  switches the colouring and the rings off.
+- **The clock** shows in the top right for six seconds on the hour and the
+  half hour (`clock`).
 - **Spending stamina sends rings out from your marker**, as the reference's
   does while its player runs: thin and light, a new one from the marker's rim
   every 0.4 s, each growing 2.65 marker radii a second and faded out by 4, so
@@ -796,9 +810,8 @@ What to know about it:
   once and faded back to teal a fifth of a second later, as the reference's
   does (`Config.Stamina.boltRedEvery`, `boltRedMs`; `boltRed = 'drain'` holds
   it red steadily instead, `false` leaves it teal).
-- **After dark the map is dark**: slate land with the roads standing out of
-  it, changing over gradually at dusk and dawn by the game's clock
-  (`night`, `nightHours`, `paintNight`).
+- **After dark the map is dark**, by the game's clock: it comes on from 7:30
+  to 9 pm and goes from 5 to 6:30 am (`night`, `nightHours`, `paintNight`).
 - The pause map and the big map are the engine's and are untouched.
 - **It goes when the game's radar would**: a cutscene, a character switch, a
   faded-out screen, as well as the pause menu and the inventory.
@@ -809,8 +822,8 @@ What to know about it:
   when the map does.
 - `/hudmap3d` switches between it and the game's radar for that player.
 
-`Config.Map3D.view` has the zoom, the camera, where the player sits on the panel
-and the opacity; `Config.Map3D.paint` the colours.
+`Config.Map3D.view` has the zoom and the opacity; `Config.Map3D.paint` the
+colours. Everything else is single player's, set in `html/map3d.js`.
 
 ## The player marker on the minimap
 

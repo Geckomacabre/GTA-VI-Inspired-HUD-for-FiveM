@@ -109,10 +109,11 @@ Config.HideSatNav = true
 Config.Map3D = {
     enabled = true,
 
-    -- Inside a building's interior the engine's radar shows its floor plan,
-    -- which the drawn map has no version of. true hands the map back to the
-    -- engine for as long as the player is indoors.
-    engineIndoors = true,
+    -- Indoors the drawn map stays, as single player's does: the engine's
+    -- radar never shows. true hands the map back to the engine for as long as
+    -- the player is in a building's interior, for its floor plan, which the
+    -- drawn map has no version of.
+    engineIndoors = false,
 
     buildings = true,       -- false: footprints only, nothing standing
     blips = true,           -- draw the game's blips (false: none at all)
@@ -125,37 +126,25 @@ Config.Map3D = {
     hiddenBlips = { 52, 71, 72, 73, 75, 93, 100, 110, 121, 135, 361 },
     route = { length = 500.0 },     -- metres of GPS line to draw; false for none
 
+    -- The map follows the single-player HUD's minimap, number for number:
+    -- its camera, colours, panel, blips, route, wanted colouring and clock
+    -- are set in html/map3d.js (VIEW, PAINT, NIGHT) and can be changed here.
+    -- `panel = 'native'` puts it on the engine radar's rect instead of single
+    -- player's.
+    -- panel = 'native',
     view = {
-        zoom = 2.58,        -- map pixels per metre across, at the player, on a panel 115 pixels tall
-        speedZoom = 0.25,   -- how far the view pulls back at speed (0 = never)
-        -- The camera, read off the reference: it looks down past the player
-        -- from behind and above them. `pitch` is degrees below the horizon
-        -- (higher looks more nearly straight down: more ground, less wall),
-        -- `focal` its lens in panel heights (longer flattens the perspective).
-        camera = { pitch = 27, focal = 1.38 },
-        anchor = 0.71,      -- the player marker, as a fraction down the panel
-        opacity = 1.0,      -- of the map itself: the reference's hides what is behind it
         north = true,       -- the N badge (also follows /movehud's north toggle)
-        -- haze = { to = 0.42, most = 0.34 },   -- how far down the panel the horizon's pallor reaches, and how strong
-        -- liftCap = 300,                       -- lower to keep towers shorter
+        -- zoom = 2.58,     -- map pixels per metre across, at the player, on a panel 115 pixels tall
+        -- speedZoom = 0.25, -- how far the view pulls back at speed (0 = never)
+        -- opacity = 0.85, roadOpacity = 0.9,   -- how much of the game it hides
     },
+    clock = true,           -- the time in the top right, on the hour and the half hour
 
-    -- The camera rides at the player's own height, as the reference's does:
-    -- on a roof the city falls away below, and under a parachute or in an
-    -- aircraft it shrinks. false keeps it on the ground whatever the player
-    -- is doing. (The ground itself is drawn flat: the map has no hills.)
-    altitude = true,
-
-    -- Wanted. The reference shows no police on its minimap: the ground round
-    -- the player floods red while they can see you and blue while they are
-    -- searching, and that is the whole of it. false switches the flood off.
-    -- Colours 0-255; `radius` is how far round the player it reaches, metres.
-    police = {
-        -- contact = { rgb = { 178, 54, 68 } }, searching = { rgb = { 32, 96, 206 } },
-        -- radius = 270, buildings = 0.78,
-    },
+    -- Wanted: the whole map turns blue or red with what the police know, and
+    -- rings go out from the player while they are on them. false: neither.
+    police = true,
     -- true draws the game's own blips for officers, police cars and police
-    -- helicopters as well. The reference has none.
+    -- helicopters as well. Police stations are always drawn.
     policeBlips = false,
 
     -- Stamina. While the player is spending it (sprinting; swimming or
@@ -167,23 +156,29 @@ Config.Map3D = {
         -- rgb = { 255, 255, 255 },
     },
 
-    -- A dark map after dark. true follows the game's clock and changes over
-    -- gradually at dusk and dawn; false is the daytime map always; 'always' is
-    -- the night one always.
+    -- A dark map after dark, by the game's clock: night from `night` o'clock
+    -- until `day`, coming on from half an hour before `night` to an hour after
+    -- it, and going from an hour before `day` to half an hour after it. false is
+    -- the daytime map always; 'always' the night one.
     night = true,
-    nightHours = { dusk = 19.5, dark = 21.0, dawn = 5.0, light = 6.5 },
+    nightHours = { day = 6, night = 20 },
+
+    -- The camera rides at the player's height out of an aircraft: on a roof
+    -- the city falls away below, and under a parachute it shrinks. (In a
+    -- helicopter or a plane the view pulls back instead.) false keeps it on
+    -- the ground.
+    altitude = true,
 
     -- Colours, 0-255. Left out, each keeps the value in html/map3d.js.
     -- paintNight is the same list for the night map.
     paintNight = {
-        -- land = { 37, 37, 55 }, road = { 79, 76, 88 }, water = { 24, 31, 51 },
-        -- roof = { 55, 55, 76 }, wall = { 32, 32, 48 }, haze = { 58, 58, 84 },
+        -- land = { 34, 38, 54 }, water = { 18, 28, 46 }, sand = { 62, 60, 66 },
+        -- roof = { 60, 71, 99 }, wall = { 42, 51, 72 },
     },
     paint = {
-        -- land = { 142, 134, 141 }, water = { 70, 124, 142 }, shallow = { 104, 152, 166 },
-        -- sand = { 156, 144, 148 }, road = { 152, 144, 152 }, lot = { 158, 150, 157 },
-        -- rail = { 130, 124, 130 }, roof = { 134, 130, 151 }, wall = { 126, 125, 150 },
-        -- haze = { 170, 166, 186 },
+        -- land = { 160, 155, 149 }, water = { 118, 152, 158 }, sand = { 178, 162, 134 },
+        -- road = { 172, 167, 161 }, lot = { 182, 177, 170 }, rail = { 148, 144, 140 },
+        -- footprint = { 158, 159, 166 }, roof = { 158, 159, 166 }, wall = { 146, 150, 160 },
     },
 }
 
