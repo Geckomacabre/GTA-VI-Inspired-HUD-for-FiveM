@@ -139,7 +139,8 @@ included here.
 - **`qbx_vehiclekeys`**: Qbox's own vehicle keys, carjacking and hotwire
   resource, with a Slim Jim and Smash Window addition on top. Third-eye a
   locked car's driver door for either option: Smash Window costs time, noise
-  and honor rather than a tool, Slim Jim needs a lockpick and plays out on
+  and honor rather than a tool, Slim Jim needs a slim jim (the `slimjim` or
+  `slimjim_pro` item, which can break on a failed pick) and plays out on
   vice_hud's own lockpick ring instead of a plain skill check: keep the key
   held and drag (or push the stick) left to 100% to open it, while right to
   100% is the trap that sets the car's alarm off. While the ring runs he steps up to the door and works a slim

@@ -49,7 +49,7 @@ Config.ExtraPrices = {
 --   'streetkings'  sk_streetkings' nitrous: the Nitrous category sells its tiers, and it does the
 --                  boosting, refilling, storing and HUD reporting itself
 --   'auto'         'streetkings' when sk_streetkings is installed, otherwise 'builtin'
-Config.NitrousSystem = 'streetkings' -- this server: sk_streetkings is the nitrous system
+Config.NitrousSystem = 'auto'
 if Config.NitrousSystem == 'auto' then
 	Config.NitrousSystem = GetResourceState('sk_streetkings') ~= 'missing' and 'streetkings' or 'builtin'
 end

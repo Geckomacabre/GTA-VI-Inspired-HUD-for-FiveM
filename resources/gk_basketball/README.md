@@ -16,8 +16,21 @@ Built for Qbox (`qbx_core`), using `ox_lib`, `ox_target` and `ox_inventory`.
    ensure gk_basketball
    ```
 
-3. The `basketball` item is already added to `[ox]/ox_inventory/data/items.lua`, and
-   `basketball.png` is in `[ox]/ox_inventory/web/images/`. Nothing else to do there.
+3. Register the `basketball` item in your `ox_inventory`:
+   - Copy `ox_inventory-item/basketball.png` into `ox_inventory/web/images/`.
+   - Add this entry to `ox_inventory/data/items.lua`:
+     ```lua
+     ['basketball'] = {
+         label       = 'Basketball',
+         description = 'Use it to start dribbling. Find a court and put it through the hoop.',
+         weight      = 600,
+         stack       = true,
+         close       = true,
+         client      = {
+             export = 'gk_basketball.useBasketball',
+         },
+     },
+     ```
 
 4. Grant yourself hoop-placement rights in `permissions.cfg`:
 
@@ -325,7 +338,7 @@ draw the rims and re-place it with `/bball_place`.
 ### Animations
 
 **With an animation pack.** If a resource named in `Config.Anims.pack`
-(`nba2k18_assets` by default) is running, its clips replace the stand-ins
+(`basketball_assets` by default) is running, its clips replace the stand-ins
 described below, and the animation is in charge of the ball rather than the other
 way round:
 

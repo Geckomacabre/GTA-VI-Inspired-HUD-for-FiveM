@@ -970,10 +970,6 @@ Config.Reputation = {
 -- Paints a soft red/blue pulse on the screen edge nearest an active siren, so
 -- you can feel which direction the police are coming from without looking at
 -- the minimap.
--- Wanted inside a building lights the camera tell (the building has CCTV),
--- and it stays lit until the stars are gone. false leaves the camera tell to
--- resources that report it (exports.vice_hud:ReportWantedTellSighting).
-Config.WantedIndoorCameras = true
 
 Config.PoliceLights = {
     enable      = true,

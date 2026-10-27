@@ -1127,5 +1127,11 @@
 <script src="app.js"></script>
 <script src="map3d.js"></script>
 
+<!-- Targeting's screen-space page: the /targetadmin panel, /targetui
+     preferences and the rail's sounds. It was osm-target's own ui_page; a
+     resource has one, so it lives here as a frame and app.js passes its
+     messages through (see onTargetNui). Clicks reach it only while one of its
+     panels is open. -->
+<iframe id="target-ui" src="../target/html/index.html" title="targeting" tabindex="-1"></iframe>
 </body>
 </html>

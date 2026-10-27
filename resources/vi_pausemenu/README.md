@@ -61,7 +61,7 @@ Each row reads and writes the resource it belongs to, so `/hudminimap`, `/mapmod
 | Row | Resource | Through |
 | --- | --- | --- |
 | Crash Camera | `vi_crashcam` | `SetCrashCamEnabled`; remembered here (KVP `vi_pausemenu:crashcam`) and set again whenever vi_crashcam starts |
-| Map Day/Night | `gen7_map` | `GetMapMode` / `SetMapMode` (auto, day, night) |
+| Map Day/Night | `gen7_map` | `GetMapMode` / `SetMapMode` (auto, day, night); a map resource not in this bundle |
 | Map in Vehicle Only | `vice_hud` | `GetMinimapOnFoot` / `SetMinimapOnFoot` |
 | Radio | `vi_radio` | `IsMuted` / `SetMuted` |
 | Pause Menu | here | GTA VI or Classic (the game's own); `/pausemenu` switches back |
@@ -77,7 +77,7 @@ line at their right; `$location`, `$job`, `$players` and `$recording` are filled
 
 ## How it takes over the game's menu
 
-As `_Retired/gk_pausemenu` did: the game's menu is kept shut with `SetPauseMenuActive(false)` every frame, and the key
+As `gk_pausemenu` (in this bundle) does, so run one of the two, not both: the game's menu is kept shut with `SetPauseMenuActive(false)` every frame, and the key
 is caught as a control press (`IsControlJustPressed` 199/200), not by watching the pause flag. The map and the game's
 settings are the game's own screens (`ActivateFrontendMenu`), entered with the page's NUI focus dropped first and the
 pause flag raised; when the player backs out (`IsFrontendReadyForControl` goes false) the page takes focus again and
