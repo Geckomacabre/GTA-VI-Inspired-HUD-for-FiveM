@@ -49,28 +49,10 @@
         </div>
     </div>
 
-    <!-- over the game's own map: GTA VI's bars above and below it -->
-    <div id="map">
-        <div class="bar top">
-            <div class="mframe">
-                <div class="m-head">
-                    <div class="m-title">Map</div>
-                    <div class="m-loc" id="map-loc"></div>
-                </div>
-                <div class="m-who">
-                    <div class="m-mode" id="map-mode"></div>
-                    <div class="m-name" id="map-name"></div>
-                </div>
-                <div id="map-mug" class="mug"><span class="initials"></span><img alt="" hidden></div>
-            </div>
-        </div>
-        <div class="bar bottom">
-            <div class="mframe">
-                <div class="prompts" id="map-prompts"></div>
-            </div>
-        </div>
-    </div>
+    <!-- the map: single player's pause map, drawn by app.js (its pictures and their atlas in img/map) -->
+    <div id="pmap"><canvas id="pmap-canvas"></canvas></div>
 
+    <script src="img/map/atlas.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

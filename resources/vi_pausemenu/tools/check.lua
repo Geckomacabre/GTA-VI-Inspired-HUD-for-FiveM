@@ -1,4 +1,4 @@
--- vi_pausemenu on the mock: what the page is sent, what the settings do, the hand-off to the game's own screens.
+-- vi_pausemenu on the mock: what the page is sent, what the settings do, the map's data, the hand-off to the game's own screens, a pad.
 local fails, passes = 0, 0
 local function check(cond, what)
     if cond then passes = passes + 1 else fails = fails + 1 io.write('FAIL: ' .. what .. '\n') end
@@ -162,50 +162,113 @@ eq(LastMessage('title'), nil, 'no title message when the name has not changed')
 Convars.sv_projectName = 'Upstate Mafia'
 TriggerServerEvent('vi_pausemenu:server:requestPlayers')
 
--- the map: the game's own, with the header plain and the bars on
+-- the map: single player's, on the page; the game's own menu stays shut
+local function has(list, v) for _, x in ipairs(list) do if x == v then return true end end return false end
+check(MapSprites[1] == 1 and MapSprites[2] == 40 and MapSprites[3] == 374, "sprites in single player's order")
+check(not has(MapSprites, 2), 'sprite 2 has no picture, so it is not looked for')
+Blips = {
+    [1] = { { 100.2, 200.7, 2, 3 }, { 110, 210, 5, 5 } },      -- a dot the big map shows, a minimap-only one
+    [52] = { { 25.7, -1347.3, 4 }, { -48, -1757, 4 }, { 1163, -323, 4 } },
+    [110] = { { 20, -1106, 3 } },
+    [361] = {},
+    [6] = { { 0, 0, 4 } },                                      -- the player's own arrow
+    [2] = { { 5, 5, 4 } },                                      -- a sprite without a picture
+}
+for i = 1, 301 do Blips[361][i] = { i, -i, 4 } end
 Nui.messages = {}
-Header = {}
-NuiCall('tile', { id = 'map' })
-eq(LastMessage('hide') ~= nil, true, 'page hidden for the map')
-eq(Nui.focus, false, 'focus dropped before the native menu')
-eq(Pause.active, true, 'pause flag raised for the native menu')
-eq(Frontend.menu, 'hash:FE_MENU_VERSION_MP_PAUSE', 'map menu')
-Frames(3)
-eq(Pause.active, true, 'not held shut while the map is up')
-local m = LastMessage('map')
-check(m and m.show == true and m.location == 'Vespucci Beach', 'map bars shown with the area')
-eq(m and m.name, 'Lucia Caminos', "map bar has the character's name")
-local shown = {}
-for _, h in ipairs(Header) do shown[h[1]] = h end
-check(shown.SHOW_MENU and shown.SHOW_MENU[2] == false, 'tabs hidden')
-check(shown.SHOW_HEADING_DETAILS and shown.SHOW_HEADING_DETAILS[2] == false, 'player details hidden')
-check(shown.SET_HEADER_TITLE and shown.SET_HEADER_TITLE[2] == '', 'header title blanked')
-local n = #Header
-Run(300)
-check(#Header > n, 'header kept plain while the map is up')
+local reply = NuiCall('tile', { id = 'map' })
+local m = reply and reply.map
+check(m ~= nil, 'the map comes up with what it needs')
+eq(Nui.focus, true, "the page keeps the focus: the map is the page's own")
+eq(LastMessage('hide'), nil, 'the page is not hidden for it')
+eq(Frontend.menu, nil, "no game menu for the map")
+Frames(2)
+eq(Pause.active, false, "the game's own pause menu still held shut")
+eq(reply.mode, 'ONLINE', 'map mode line from the config')
+eq(reply.name, 'Lucia Caminos', "map has the character's name")
+eq(reply.safezone, 0.95, "the game's safe zone, for the map's frame")
+check(m.me.x == -1200.0 and m.me.y == -1500.0 and m.me.h == 90.0, 'where the player is and which way they face')
+eq(m.wp, false, 'no waypoint yet')
+local bl = m.blips
+eq(#bl, 4 * (1 + 3 + 1 + 300), 'blips the big map shows, 300 of a sprite at most')
+check(bl[1] == 100 and bl[2] == 201 and bl[3] == 1 and bl[4] == 93 * 65536 + 182 * 256 + 229,
+    'a plain dot to the metre, in its own colour')
+local sprites = {}
+for i = 3, #bl, 4 do sprites[#sprites + 1] = bl[i] end
+check(sprites[2] == 52 and sprites[5] == 361 and sprites[#sprites] == 110,
+    "then the legend's kinds in single player's order (stores, gas stations, ..., Ammu-Nation)")
+eq(bl[8], 0, 'other sprites carry no colour')
+check(not has(sprites, 6) and not has(sprites, 2) and not has(sprites, 8), "never the player's arrow or a sprite without a picture")
+
+-- every 100 ms the player and the waypoint, every 400 ms the blips too
+Nui.messages = {}
+Run(1000)
+local withBlips, without = 0, 0
+for _, msg in ipairs(Nui.messages) do
+    if msg.type == 'mapdata' then
+        if msg.map.blips then withBlips = withBlips + 1 else without = without + 1 end
+    end
+end
+check(withBlips >= 2 and withBlips <= 3, 'blips about every 400 ms (' .. withBlips .. ')')
+check(withBlips + without >= 7 and withBlips + without <= 10, 'the player about every 100 ms (' .. (withBlips + without) .. ')')
 Press(200)
 Frames(1)
-eq(LastMessage('open'), nil, 'ESC on the map is the map\'s')
--- backing out of the map
-Frontend.ready = false
+eq(LastMessage('open'), nil, "ESC on the map is the page's")
+
+-- the waypoint, set and taken off from the page
+NuiCall('waypoint', { x = 250.5, y = -800.25 })
+check(Waypoint and Waypoint[1] == 250.5 and Waypoint[2] == -800.25, 'waypoint set where the page asked')
+eq(Sounds[#Sounds], 'WAYPOINT_SET', 'with the waypoint sound')
+Run(150)
+local d = LastMessage('mapdata')
+check(d and d.map.wp and d.map.wp.x == 250.5 and d.map.wp.y == -800.25, 'the waypoint goes back to the page')
+Nui.messages = {}
+Run(500)
+local scanned, eights = 0, 0
+for _, msg in ipairs(Nui.messages) do
+    if msg.type == 'mapdata' and msg.map.blips then
+        scanned = scanned + 1
+        for i = 3, #msg.map.blips, 4 do if msg.map.blips[i] == 8 then eights = eights + 1 end end
+    end
+end
+check(scanned > 0 and eights == 0, 'the waypoint is not one of the blips')
+NuiCall('waypoint', { off = true })
+eq(Waypoint, false, 'waypoint taken off')
+eq(Sounds[#Sounds], 'BACK', 'with the back sound')
+NuiCall('waypoint', { x = 'here' })
+eq(Waypoint, false, 'no waypoint from nonsense')
+
+-- the area under the cursor
+eq(NuiCall('mapzone', { x = 100, y = 200 }).zone, 'Vespucci Beach', 'the area under the cursor')
+eq(ZoneAsked[3], 40.0, "asked at single player's height")
+eq(NuiCall('mapzone', { x = -3500, y = 0 }).zone, '', 'no name out at sea')
+eq(NuiCall('mapzone', {}).zone, '', 'nothing asked, nothing named')
+
+-- back to the tiles: the map's data stops
+NuiCall('screen', { screen = 'home' })
 Frames(2)
-eq(Frontend.kicked, 1, 'PauseMenuceptionTheKick on the way out')
-eq(Pause.active, false, 'pause flag down again')
-eq(LastMessage('map').show, false, 'map bars off')
-eq(Nui.focus, true, 'focus back to the page')
-open = LastMessage('open')
-check(open and open.fresh == false and open.screen == 'home', 'page back at home, not fresh')
+Nui.messages = {}
+Run(500)
+eq(LastMessage('mapdata'), nil, 'no map data once it is down')
+Blips = {}
 
 -- game settings from the settings screen: back to the settings screen
 NuiCall('screen', { screen = 'settings' })
 Nui.messages = {}
 NuiCall('setting', { id = 'gamesettings' })
 eq(Frontend.menu, 'hash:FE_MENU_VERSION_LANDING_MENU', 'game settings menu')
-Frames(2)
+eq(LastMessage('hide') ~= nil, true, "page hidden for the game's menu")
+eq(Nui.focus, false, "focus dropped before the game's menu")
+eq(Pause.active, true, "pause flag raised for the game's menu")
+Frames(3)
+eq(Pause.active, true, "not held shut while the game's menu is up")
 Frontend.ready = false
 Frames(2)
+eq(Nui.focus, true, 'focus back to the page')
+eq(Frontend.kicked, 1, 'PauseMenuceptionTheKick on the way out')
+eq(Pause.active, false, 'pause flag down again')
 open = LastMessage('open')
-check(open and open.screen == 'settings', 'back on the settings screen')
+check(open and open.fresh == false and open.screen == 'settings', 'back on the settings screen, not fresh')
 local list = LastMessage('list')
 check(list and list.screen == 'settings' and #list.rows == 7, 'settings rows sent again')
 NuiCall('setting', { id = 'keybinds' })
@@ -349,6 +412,99 @@ Frames(3)
 eq(LastMessage('mugshot'), nil, 'no face sent when the game refuses one')
 eq(Headshot.held, false, 'a refused headshot let go at once')
 eq(Headshot.registered, Headshot.unregistered, 'every headshot let go')
+
+-- a pad: its presses reach the page as the keys it knows, not the press that opened it
+local function Pads()
+    local out = {}
+    for i = 1, #Nui.messages do
+        if Nui.messages[i].type == 'pad' then out[#out + 1] = Nui.messages[i].button end
+    end
+    return table.concat(out, ',')
+end
+NuiCall('close')
+Run(400)
+UsingPad = true
+Nui.messages = {}
+Press(199)
+Frames(2)
+eq(Nui.focus, true, 'Start opens it')
+eq(Pads(), '', 'and the press that opened it is not also a press in it')
+Run(400)
+Nui.messages = {}
+Press(201)
+Frames(1)
+Press(173)
+Frames(1)
+eq(Pads(), 'accept,down', 'cross and the D-pad reach the page')
+Nui.messages = {}
+for _ = 1, 40 do PadHeld[175] = true Tick(16) end
+local held = Pads()
+eq(held:sub(1, 5), 'right', 'a held direction is a press at once')
+eq(select(2, held:gsub('right', '')) >= 3, true, 'and repeats while it is held')
+Nui.messages = {}
+Stick.y = -0.9
+Frames(1)
+Stick.y = 0.0
+eq(Pads(), 'up', 'the left stick moves too')
+Nui.messages = {}
+UsingPad = false
+Press(201)
+Frames(1)
+eq(Pads(), '', 'nothing from the pad thread while the keyboard is in use')
+UsingPad = true
+Press(202)
+Frames(1)
+eq(Pads(), 'back', 'circle goes back')
+
+-- on the map: square, triangle, LB and RB too, and the stick and the triggers as they stand
+local function Axes()
+    for i = #Nui.messages, 1, -1 do
+        local msg = Nui.messages[i]
+        if msg.type == 'padaxes' then return ('%g %g %g %g'):format(msg.x, msg.y, msg.lt, msg.rt) end
+    end
+end
+NuiCall('tile', { id = 'map' })
+Nui.messages = {}
+for _, c in ipairs({ 203, 204, 205, 206, 201 }) do
+    Press(c)
+    Frames(1)
+end
+eq(Pads(), 'alt,center,lb,rb,accept', 'square, triangle, LB, RB and cross reach the map')
+Nui.messages = {}
+Stick.x, Stick.y = 0.8, -0.333
+for _ = 1, 30 do Tick(16) end
+eq(Pads(), '', 'the stick is not a direction on the map')
+eq(Axes(), '0.8 -0.33 0 0', 'the stick goes to the map as it stands')
+local sent = 0
+for _, msg in ipairs(Nui.messages) do if msg.type == 'padaxes' then sent = sent + 1 end end
+eq(sent, 1, 'and only when it changes')
+Stick.x, Stick.y = 0.1, 0.12
+Frames(1)
+eq(Axes(), '0 0 0 0', "inside single player's dead zone it is nothing")
+Stick.rt = 0.6
+Frames(1)
+eq(Axes(), '0 0 0 0.6', 'RT zooms in')
+Stick.lt, Stick.rt = 0.05, 0.08
+Frames(1)
+eq(Axes(), '0 0 0 0', 'both triggers barely pressed is nothing')
+Stick.x, Stick.y, Stick.lt, Stick.rt = -1.0, 0.0, 0.0, 0.0
+Frames(1)
+eq(Axes(), '-1 0 0 0', 'the stick again')
+UsingPad = false
+Frames(1)
+eq(Axes(), '0 0 0 0', 'let go when the keyboard takes over')
+UsingPad = true
+Stick.x = 0.0
+NuiCall('screen', { screen = 'home' })
+Nui.messages = {}
+Press(205)
+Frames(1)
+Stick.y = 0.9
+Frames(1)
+Stick.y = 0.0
+eq(Pads(), 'down', 'back at the tiles: no LB, and the stick is a direction again')
+UsingPad = false
+NuiCall('close')
 
 eq(#Errors, 0, 'no thread errors')
 io.write(('%d passed, %d failed\n'):format(passes, fails))

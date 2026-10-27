@@ -10,18 +10,19 @@
     How it takes over the game's own menu is gk_pausemenu's (_Retired/gk_pausemenu, which ran on this server): the
     game's menu is kept shut with SetPauseMenuActive(false) every frame - except while one of its own screens is
     handed the stage - and the key is caught as a control press, not by watching that flag (the two fight over the
-    same flag every frame and the watcher loses). The map, the game's settings and the key bindings are the game's own
-    screens (ActivateFrontendMenu), entered with this page's focus dropped and left back to it when the player backs
-    out. On the map, the game's header loses its tabs and its player details and this page lays GTA VI's two bars
-    over it.
+    same flag every frame and the watcher loses). The game's settings and the key bindings are the game's own screens
+    (ActivateFrontendMenu), entered with this page's focus dropped and left back to it when the player backs out.
+
+    The map is single player's (FBICat's GTA6Hud pause map), drawn by the page with its art: this side tells the page
+    where the player is, the waypoint and the blips, names the area under its cursor and sets the waypoint.
 
     LocalPlayer.state.pauseMenuOpen is true while it is up: vice_hud hides its minimap frame then.
 ]]
 
 local open = false          -- this page is up
-local screen = 'home'       -- what it shows: home, or a list (settings, brief, stats, players, report)
-local nativeOpen = false    -- one of the game's own screens has taken over (map, settings, key bindings)
-local mapOpen = false
+local openedAt = 0          -- when it last came up, or came back from one of the game's own screens
+local screen = 'home'       -- what it shows: home, the map, or a list (settings, brief, stats, players, report)
+local nativeOpen = false    -- one of the game's own screens has taken over (settings, key bindings)
 local closedAt = 0
 local style = GetResourceKvpString(Config.StyleKvp) or 'vi'
 local players = {}          -- the server's list: { id, name }
@@ -44,11 +45,16 @@ local function Money(n)
     return '$' .. out:gsub('^,', '')
 end
 
--- where the player is, as the game names the area ("Vespucci Beach")
+-- a place as the game names its area ("Vespucci Beach"); empty where it has no name
+local function Zone(x, y, z)
+    local zone = GetLabelText(GetNameOfZone(x, y, z))
+    return (zone == 'NULL' or zone == nil) and '' or zone
+end
+
+-- where the player is
 local function Location()
     local c = GetEntityCoords(PlayerPedId())
-    local zone = GetLabelText(GetNameOfZone(c.x, c.y, c.z))
-    return (zone == 'NULL' or zone == nil) and '' or zone
+    return Zone(c.x, c.y, c.z)
 end
 
 -- a native by whichever name this build has it, else by its hash
@@ -372,6 +378,7 @@ local function OpenMenu()
         return
     end
     open = true
+    openedAt = GetGameTimer()
     screen = 'home'
     LocalPlayer.state:set('pauseMenuOpen', true, false)
     TriggerServerEvent('vi_pausemenu:server:requestPlayers')
@@ -393,32 +400,11 @@ local function CloseMenu()
 end
 
 -- =============================================================================
--- The game's own screens: the map, its settings, the key bindings
+-- The game's own screens: its settings, the key bindings
 -- =============================================================================
--- the map's header without its tabs and player details, under this page's bars (the header's own movie:
--- pause_menu_header.gfx's SHOW_MENU, SHOW_HEADING_DETAILS and SET_HEADER_TITLE)
-local function PlainMapHeader()
-    if BeginScaleformMovieMethodOnFrontendHeader('SHOW_MENU') then
-        ScaleformMovieMethodAddParamBool(false)
-        EndScaleformMovieMethod()
-    end
-    if BeginScaleformMovieMethodOnFrontendHeader('SHOW_HEADING_DETAILS') then
-        ScaleformMovieMethodAddParamBool(false)
-        EndScaleformMovieMethod()
-    end
-    if BeginScaleformMovieMethodOnFrontendHeader('SET_HEADER_TITLE') then
-        ScaleformMovieMethodAddParamTextureNameString('')
-        ScaleformMovieMethodAddParamBool(false)
-        ScaleformMovieMethodAddParamTextureNameString('')
-        ScaleformMovieMethodAddParamBool(false)
-        EndScaleformMovieMethod()
-    end
-end
-
-local function OpenNative(menu, isMap)
+local function OpenNative(menu)
     if nativeOpen then return end
     nativeOpen = true
-    mapOpen = isMap == true
 
     -- (this page's focus off first: a native menu up under an NUI with focus is what locked gk_pausemenu up)
     SendNUIMessage({ type = 'hide' })
@@ -429,7 +415,7 @@ local function OpenNative(menu, isMap)
     local ok, err = pcall(ActivateFrontendMenu, GetHashKey(menu), false, -1)
     if not ok then
         print(('[vi_pausemenu] ActivateFrontendMenu %s failed: %s'):format(menu, err))
-        nativeOpen, mapOpen = false, false
+        nativeOpen = false
         SetPauseMenuActive(false)
         if open then
             SetNuiFocus(true, true)
@@ -443,33 +429,117 @@ local function OpenNative(menu, isMap)
         while not IsFrontendReadyForControl() and GetGameTimer() - start < 5000 do
             Wait(0)
         end
-        if mapOpen then
-            SendNUIMessage({ type = 'map', show = true, location = Location(), mode = Config.Mode, name = CharacterName() })
-        end
-        local nextHeader = 0
         while IsFrontendReadyForControl() do
-            if mapOpen and GetGameTimer() >= nextHeader then
-                PlainMapHeader()
-                nextHeader = GetGameTimer() + 250
-            end
             Wait(0)
         end
 
         pcall(PauseMenuceptionTheKick)
         pcall(SetFrontendActive, false)
         SetPauseMenuActive(false)
-        if mapOpen then
-            SendNUIMessage({ type = 'map', show = false })
-        end
-        nativeOpen, mapOpen = false, false
+        nativeOpen = false
 
         if open then
             SetNuiFocus(true, true)
             SetNuiFocusKeepInput(false)
+            openedAt = GetGameTimer()
             Show(screen)
         end
     end)
 end
+
+-- =============================================================================
+-- The map: single player's, drawn by the page
+-- =============================================================================
+-- The page draws it as GTA6Hud's DrawPauseMap does and takes its keys, its mouse and (through the pad thread below)
+-- a pad. From here it gets the player's place and heading and the waypoint every MAP_EVERY ms, and the blips every
+-- MAP_BLIPS_EVERY, scanned as GTA6Hud's RefreshMapBlips scans them: each sprite the map has a picture for
+-- (client/mapsprites.lua, in its order), up to 300 of each, only those the big map shows (display 2, 3, 4, 6, 8 or
+-- 9), never the player's own arrow (6) or the waypoint (8), which it draws itself; a plain dot (1) keeps its colour.
+local MAP_EVERY = 100
+local MAP_BLIPS_EVERY = 400
+local MAP_DISPLAYS = { [2] = true, [3] = true, [4] = true, [6] = true, [8] = true, [9] = true }
+
+local function MapMe()
+    local ped = PlayerPedId()
+    local c = GetEntityCoords(ped)
+    return { x = c.x, y = c.y, h = GetEntityHeading(ped) }
+end
+
+local function MapWaypoint()
+    if not IsWaypointActive() then return false end
+    local blip = GetFirstBlipInfoId(8)
+    if blip == 0 or not DoesBlipExist(blip) then return false end
+    local c = GetBlipInfoIdCoord(blip)
+    return { x = c.x, y = c.y }
+end
+
+-- four numbers a blip, flat: x, y (to the metre), sprite, and a plain dot's colour as 0xRRGGBB (0 for the rest)
+local function MapBlips()
+    local out = {}
+    for _, sprite in ipairs(MapSprites) do
+        if sprite ~= 6 and sprite ~= 8 then
+            local blip = GetFirstBlipInfoId(sprite)
+            for _ = 1, 300 do
+                if blip == 0 or not DoesBlipExist(blip) then break end
+                if MAP_DISPLAYS[GetBlipInfoIdDisplay(blip)] then
+                    local c = GetBlipInfoIdCoord(blip)
+                    local colour = 0
+                    if sprite == 1 then
+                        local r, g, b = GetHudColour(GetBlipHudColour(blip))
+                        colour = (r or 0) * 65536 + (g or 0) * 256 + (b or 0)
+                    end
+                    out[#out + 1] = math.floor(c.x + 0.5)
+                    out[#out + 1] = math.floor(c.y + 0.5)
+                    out[#out + 1] = sprite
+                    out[#out + 1] = colour
+                end
+                blip = GetNextBlipInfoId(sprite)
+            end
+        end
+    end
+    return out
+end
+
+local function MapData(withBlips)
+    return { me = MapMe(), wp = MapWaypoint(), blips = withBlips and MapBlips() or nil }
+end
+
+CreateThread(function()
+    local blipsAt = 0
+    while true do
+        if open and not nativeOpen and screen == 'map' then
+            local now = GetGameTimer()
+            local withBlips = now >= blipsAt
+            if withBlips then blipsAt = now + MAP_BLIPS_EVERY end
+            SendNUIMessage({ type = 'mapdata', map = MapData(withBlips) })
+            Wait(MAP_EVERY)
+        else
+            blipsAt = 0
+            Wait(open and 50 or 250)
+        end
+    end
+end)
+
+-- the page's waypoint: set where it was asked, or taken off, with single player's sounds
+RegisterNUICallback('waypoint', function(data, cb)
+    cb(1)
+    if type(data) ~= 'table' then return end
+    local x, y = tonumber(data.x), tonumber(data.y)
+    if data.off == true then
+        SetWaypointOff()
+        PlaySoundFrontend(-1, 'BACK', 'HUD_FRONTEND_DEFAULT_SOUNDSET', true)
+    elseif x and y then
+        SetNewWaypoint(x + 0.0, y + 0.0)
+        PlaySoundFrontend(-1, 'WAYPOINT_SET', 'HUD_FRONTEND_DEFAULT_SOUNDSET', true)
+    end
+end)
+
+-- the area under the page's cursor, as single player asks for it (at a height of 40)
+RegisterNUICallback('mapzone', function(data, cb)
+    local x = type(data) == 'table' and tonumber(data.x)
+    local y = type(data) == 'table' and tonumber(data.y)
+    cb({ zone = (x and y) and Zone(x + 0.0, y + 0.0, 40.0) or '' })
+end)
 
 -- =============================================================================
 -- The page's calls
@@ -489,11 +559,14 @@ RegisterNUICallback('screen', function(data, cb)
 end)
 
 RegisterNUICallback('tile', function(data, cb)
-    cb(1)
     local id = type(data) == 'table' and data.id
     if id == 'map' then
-        OpenNative('FE_MENU_VERSION_MP_PAUSE', true)
-    elseif id == 'game' then
+        -- the map comes up on the page with everything it needs to start: the player, the waypoint, the blips
+        screen = 'map'
+        return cb({ map = MapData(true), mode = Config.Mode, name = CharacterName(), safezone = GetSafeZoneSize() })
+    end
+    cb(1)
+    if id == 'game' then
         OpenNative('FE_MENU_VERSION_LANDING_MENU')
     elseif id == 'editor' then
         if Recording() then
@@ -596,6 +669,94 @@ CreateThread(function()
         else
             if open then CloseMenu() end
             Wait(250)
+        end
+    end
+end)
+
+-- =============================================================================
+-- A pad
+-- =============================================================================
+-- The page holds the focus while it is up, and a page only hears the keyboard and
+-- the mouse. A pad is read here instead, off the game's own frontend controls
+-- (which go on reporting as disabled controls while the page has the focus), and
+-- handed to the page as the keys it already knows: the D-pad or the left stick
+-- moves, cross selects, circle goes back, Start closes. Held, a direction
+-- repeats as the game's own menus do. Only while a pad is what the player is
+-- using, so the keyboard is never heard twice.
+--
+-- On the map the pad is single player's instead: square, triangle, LB and RB
+-- are presses too, and the left stick and the triggers are handed over as they
+-- stand (when they change), for the page to pan and zoom with as GTA6Hud's
+-- PauseMapInput does with controls 30/31 (218/219: the same stick) and 207/208.
+local PAD_BUTTONS = { { 201, 'accept' }, { 202, 'back' }, { 199, 'close' } }
+local PAD_MAP_BUTTONS = {
+    { 201, 'accept' }, { 202, 'back' }, { 199, 'close' },
+    { 203, 'alt' }, { 204, 'center' }, { 205, 'lb' }, { 206, 'rb' },
+}
+local PAD_DIRS = { { 172, 'up' }, { 173, 'down' }, { 174, 'left' }, { 175, 'right' } }
+local PAD_GRACE = 300       -- ms after it comes up: the press that opened it is not also a press in it
+local PAD_REPEAT = { first = 400, every = 110 }
+local STICK = 0.5
+local MAP_STICK, MAP_TRIGGER = 0.15, 0.1    -- below these on both, single player leaves the map alone
+
+local function Hundredths(v) return math.floor((tonumber(v) or 0) * 100 + 0.5) / 100 end
+
+-- the map's stick and triggers, nothing at all while both are in their dead zones
+local function PadAxes()
+    local x, y = Hundredths(GetDisabledControlNormal(0, 218)), Hundredths(GetDisabledControlNormal(0, 219))
+    local lt, rt = Hundredths(GetDisabledControlNormal(0, 207)), Hundredths(GetDisabledControlNormal(0, 208))
+    if math.abs(x) <= MAP_STICK and math.abs(y) <= MAP_STICK then x, y = 0, 0 end
+    if lt <= MAP_TRIGGER and rt <= MAP_TRIGGER then lt, rt = 0, 0 end
+    return x, y, lt, rt
+end
+
+CreateThread(function()
+    local held, heldAt, nextAt = nil, 0, 0
+    local axes = { 0, 0, 0, 0 }     -- what the page was last told
+    local function SendAxes(x, y, lt, rt)
+        if x == axes[1] and y == axes[2] and lt == axes[3] and rt == axes[4] then return end
+        axes = { x, y, lt, rt }
+        SendNUIMessage({ type = 'padaxes', x = x, y = y, lt = lt, rt = rt })
+    end
+    while true do
+        if not open or nativeOpen or IsUsingKeyboard(2) then
+            held = nil
+            SendAxes(0, 0, 0, 0)
+            Wait(open and 0 or 250)
+        else
+            local now = GetGameTimer()
+            local onMap = screen == 'map'
+            if now - openedAt >= PAD_GRACE then
+                for _, b in ipairs(onMap and PAD_MAP_BUTTONS or PAD_BUTTONS) do
+                    if IsDisabledControlJustPressed(0, b[1]) then
+                        SendNUIMessage({ type = 'pad', button = b[2] })
+                    end
+                end
+            end
+            if onMap then
+                held = nil
+                SendAxes(PadAxes())
+            elseif now - openedAt >= PAD_GRACE then
+                SendAxes(0, 0, 0, 0)
+                -- the direction held: the D-pad, else the left stick
+                local dir = nil
+                for _, d in ipairs(PAD_DIRS) do
+                    if IsDisabledControlPressed(0, d[1]) then dir = d[2] end
+                end
+                if not dir then
+                    local x, y = GetDisabledControlNormal(0, 218), GetDisabledControlNormal(0, 219)
+                    if math.abs(x) >= STICK and math.abs(x) >= math.abs(y) then dir = x > 0 and 'right' or 'left'
+                    elseif math.abs(y) >= STICK then dir = y > 0 and 'down' or 'up' end
+                end
+                if dir ~= held then
+                    held, heldAt, nextAt = dir, now, now + PAD_REPEAT.first
+                    if dir then SendNUIMessage({ type = 'pad', button = dir }) end
+                elseif dir and now >= nextAt then
+                    nextAt = now + PAD_REPEAT.every
+                    SendNUIMessage({ type = 'pad', button = dir })
+                end
+            end
+            Wait(0)
         end
     end
 end)

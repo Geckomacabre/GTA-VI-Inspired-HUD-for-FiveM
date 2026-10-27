@@ -9,7 +9,7 @@ at the bottom right.
 
 | Tile | What it does |
 | --- | --- |
-| Map | The game's own map, with GTA VI's dark blue bars over its top and bottom (the area's name, the character) |
+| Map | Single player's pause map (FBICat's GTA6Hud): the blips, the waypoint, a legend of places; below |
 | Brief | Name, job and grade, duty, cash, bank, hunger, thirst, citizen ID, server ID |
 | Stats | vice_hud's skills, each 0..100, with how far to the next level (needs `vice_hud`) |
 | Rockstar Editor | Records a clip (the menu closes); while recording, choosing it again saves the clip |
@@ -26,18 +26,17 @@ about the chosen row on the right.
 | | |
 | --- | --- |
 | ![Settings](docs/settings.jpg) | ![Stats](docs/stats.jpg) |
-| ![Report](docs/report.jpg) | ![The bars over the map](docs/map.jpg) |
+| ![Report](docs/report.jpg) | ![The map](docs/map.jpg) |
 
-(Pictured in the browser preview, `tools/serve.py`, over a blurred still standing in for the game; the map picture
-shows where the bars sit, with a still where the game's own map goes.)
+(Pictured in the browser preview, `tools/serve.py`, over a blurred still standing in for the game; the map with the
+preview's own blips.)
 
 ## The character's face
 
 A transparent pedheadshot of the player's own ped, taken each time the menu opens, on a portrait card like the
-character switcher's (`qbx_relog`) and the honor panel's; the same face is on the map's top bar. The game has one slot
-for these pictures, so the slot is borrowed, never held: the page copies the picture out of `nui-img` and the slot is
-let go at once (after five seconds at most, whatever happens). The character's initials show until the picture comes,
-or if the game refuses one.
+character switcher's (`qbx_relog`) and the honor panel's. The game has one slot for these pictures, so the slot is
+borrowed, never held: the page copies the picture out of `nui-img` and the slot is let go at once (after five seconds
+at most, whatever happens). The character's initials show until the picture comes, or if the game refuses one.
 
 ## Install
 
@@ -52,7 +51,37 @@ appear only while the resource they belong to is running.
 
 Arrows (or WASD) move, Enter chooses, left/right change a setting, Esc or Backspace goes back and at home closes, P
 closes, the right mouse button goes back. The mouse works throughout. In the report's subject and message, Tab moves
-on.
+on. A pad: the D-pad or the left stick moves, cross chooses, circle goes back, Start closes. The map has its own keys,
+below.
+
+## The map
+
+The Map tile opens single player's pause map, the one in FBICat's GTA6Hud, on this page (the game's own map no longer
+opens from this menu): its tiles over the sea, the blips the big map shows (up to 300 on screen, a plain dot in its
+own colour), the waypoint pulsing over its place, the player's arrow, dark bars above and below, MAP and the area under
+the cursor at the top left, the mode line and the character's name at the top right, the keys along the bottom, and
+the legend on the right: the kinds of place on the map, with how many of each.
+
+| | Keyboard and mouse | Pad |
+| --- | --- | --- |
+| Pan | Drag, arrows or WASD | Left stick |
+| Zoom | Wheel, Page Up / Page Down | RT / LT |
+| Set / remove the waypoint | Click (on the waypoint: off), Enter | Cross, at the ring in the middle |
+| Back on the player | C | Triangle |
+| The legend's kinds | E / Q, or click a row | RB / LB |
+| The kind's next place | Delete, or click the row again | Square |
+| Take the waypoint off | Delete (no kind chosen) | Square (no kind chosen) |
+| Back to the tiles | Esc, Backspace, right click | Circle |
+| Close the menu | P | Start |
+
+A kind from the legend goes to its nearest place, ringed, zoomed in at least to street level, with the area's name and
+the distance under the legend; again on the same kind, the next nearest. The client sends the player and the waypoint
+ten times a second and the blips every 0.4 s while the map is up, scanned as single player scans them; it sets the
+waypoint (`SetNewWaypoint`) and names the area under the cursor.
+
+The map's art (its tiles, its blip, key and button icons, the Staatliches sprite font it writes with) and its design
+are FBICat's, from his GTA6Hud for single player, converted from its `vipause` and `vifont` texture dictionaries into
+`html/img/map`; `client/mapsprites.lua` lists the blip sprites it has pictures for. Thank you, FBICat.
 
 ## Settings
 
@@ -78,12 +107,10 @@ line at their right; `$location`, `$job`, `$players` and `$recording` are filled
 ## How it takes over the game's menu
 
 As `gk_pausemenu` (in this bundle) does, so run one of the two, not both: the game's menu is kept shut with `SetPauseMenuActive(false)` every frame, and the key
-is caught as a control press (`IsControlJustPressed` 199/200), not by watching the pause flag. The map and the game's
-settings are the game's own screens (`ActivateFrontendMenu`), entered with the page's NUI focus dropped first and the
-pause flag raised; when the player backs out (`IsFrontendReadyForControl` goes false) the page takes focus again and
-shows the screen it was on. On the map, the frontend header's own methods (`SHOW_MENU`, `SHOW_HEADING_DETAILS`,
-`SET_HEADER_TITLE` in `pause_menu_header.gfx`) take its tabs and player details away every quarter second, and the page
-lays its two bars over it.
+is caught as a control press (`IsControlJustPressed` 199/200), not by watching the pause flag. The game's settings and
+key bindings are the game's own screens (`ActivateFrontendMenu`), entered with the page's NUI focus dropped first and
+the pause flag raised; when the player backs out (`IsFrontendReadyForControl` goes false) the page takes focus again
+and shows the screen it was on. The map stays on the page, with its focus.
 
 A UI that disables control 200 while it is up (the ATM, the phone's games, the casino) keeps this menu shut too.
 `LocalPlayer.state.pauseMenuOpen` is true while it is up; vice_hud hides its minimap frame then.
@@ -93,18 +120,20 @@ A UI that disables control 200 while it is up (the ATM, the phone's games, the c
 In game the menu sits over the live game, blurred by the game's own screen blur; nothing is drawn behind it but a
 dark tint. The tile and setting pictures (`html/img`) are stills from Rockstar's GTA VI footage. The type is
 GTA Art Deco throughout, the same three cuts vice_hud ships (`html/fonts`): bold for titles, labels and values, medium
-for the lines under them, regular for typed text.
+for the lines under them, regular for typed text. The map writes as single player's does: Staatliches (from its
+sprite sheet, `html/img/map/font.webp`) for MAP, the names and the legend, Art Deco Medium for the rest.
 
 ## tools
 
 - `node tools/run.js` — the client and server on a small FiveM (`tools/mock.lua`, `tools/check.lua`): opening and
   closing, the reopen cooldown, the tiles, every settings row against its export, the brief, stats and players, the
-  map and settings hand-offs, the face's headshot slot, the editor, reports (rate limit, webhook), disconnect, classic mode. Uses vice_hud's
-  fengari (`npm i jsdom fengari` in `vice_hud`, as its README says).
-- `python tools/mutate.py` — breaks the code in 29 ways; each must make the checks fail.
+  map's data (blips as single player scans them), waypoint and area names, a pad on the menu and on the map, the
+  settings hand-offs, the face's headshot slot, the editor, reports (rate limit, webhook), disconnect, classic mode.
+  Uses vice_hud's fengari (`npm i jsdom fengari` in `vice_hud`, as its README says).
+- `python tools/mutate.py` — breaks the code in 38 ways; each must make the checks fail.
 - `python tools/serve.py` — the page in a browser with `tools/stub.js` standing in for the client
-  (`?screen=settings|brief|stats|players|report`, `?map=1`).
+  (`?screen=settings|brief|stats|players|report`; `?map=1` the map, `&pad=1` with a pad, `&h=` the player's heading).
 - `python tools/shots.py` — the pictures in `docs/`, from `serve.py`'s page (Python Playwright).
 
-Not yet seen in game: whether the page shows over the game's own map (the bars), and whether the map's header methods
-take, are checked only headless.
+Not yet seen in game: the map, checked only in the browser preview and on the mock; a pad's sticks and triggers on it
+especially.

@@ -23,6 +23,7 @@ run('strict', `local maybe = { IsReplayRecording = true, StartReplayRecording = 
   setmetatable(_G, { __index = function(_, k) if maybe[k] then return nil end error("undefined global " .. tostring(k), 2) end,
   __newindex = function(t, k, v) rawset(t, k, v) end })`);
 run('server/main.lua', file(path.join(res, 'server/main.lua')));
+run('client/mapsprites.lua', file(path.join(res, 'client/mapsprites.lua')));
 run('client/main.lua', file(path.join(res, 'client/main.lua')));
 run('check.lua', file(path.join(__dirname, 'check.lua')));
 lua.lua_getglobal(L, to_luastring('Result'));

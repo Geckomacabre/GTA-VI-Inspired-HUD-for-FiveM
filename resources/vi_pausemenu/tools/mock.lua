@@ -34,6 +34,7 @@ function Tick(ms)
     end
     -- controls are "just pressed" for one frame
     JustPressed = {}
+    PadHeld = {}
     Now = Now + (ms or 16)
 end
 function Frames(n) for _ = 1, n or 1 do Tick(16) end end
@@ -51,8 +52,38 @@ function GetPlayerServerId() return 7 end
 function GetPlayerName(id) return id == 0 and 'GeckoClient' or ('Player' .. tostring(id)) end
 function GetActivePlayers() return { 0, 1 } end
 function GetEntityCoords() return vector3(-1200.0, -1500.0, 4.0) end
-function GetNameOfZone() return 'BEACH' end
+function GetEntityHeading() return 90.0 end
+-- the zone: Vespucci Beach, but for the ocean far to the west (no name there, as in the game)
+ZoneAsked = false
+function GetNameOfZone(x, y, z) ZoneAsked = { x, y, z } return x < -3000 and 'OCEANA' or 'BEACH' end
 function GetLabelText(l) return l == 'BEACH' and 'Vespucci Beach' or 'NULL' end
+function GetSafeZoneSize() return 0.95 end
+
+-- blips, by sprite: { x, y, display, hud colour }; GetFirstBlipInfoId / GetNextBlipInfoId walk one sprite's list
+Blips = {}
+HudColours = { [3] = { 93, 182, 229 }, [5] = { 114, 204, 114 } }
+local blipWalk = {}
+local function blipId(sprite, i) return sprite * 1000 + i end
+local function blipOf(id) local list = Blips[id // 1000] return list and list[id % 1000] end
+function GetFirstBlipInfoId(sprite)
+    blipWalk[sprite] = 1
+    return Blips[sprite] and Blips[sprite][1] and blipId(sprite, 1) or 0
+end
+function GetNextBlipInfoId(sprite)
+    blipWalk[sprite] = (blipWalk[sprite] or 0) + 1
+    local i = blipWalk[sprite]
+    return Blips[sprite] and Blips[sprite][i] and blipId(sprite, i) or 0
+end
+function DoesBlipExist(id) return blipOf(id) ~= nil end
+function GetBlipInfoIdDisplay(id) return blipOf(id)[3] end
+function GetBlipInfoIdCoord(id) local b = blipOf(id) return vector3(b[1], b[2], 30.0) end
+function GetBlipHudColour(id) return blipOf(id)[4] or 0 end
+function GetHudColour(c) local t = HudColours[c] or { 255, 255, 255 } return t[1], t[2], t[3], 255 end
+-- the waypoint: a sprite 8 blip of its own
+Waypoint = false
+function IsWaypointActive() return Waypoint ~= false end
+function SetNewWaypoint(x, y) Waypoint = { x, y } Blips[8] = { { x, y, 4 } } end
+function SetWaypointOff() Waypoint = false Blips[8] = nil end
 function GetClockDayOfWeek() return 6 end
 function GetClockHours() return 9 end
 function GetClockMinutes() return 5 end
@@ -144,6 +175,18 @@ Disabled = {}
 function IsControlJustPressed(_, c) return JustPressed[c] == true end
 function DisableControlAction(_, c) Disabled[c] = Now end
 function Press(c) JustPressed[c] = true end
+-- a pad: the keyboard unless UsingPad is set; a held control stays held for the frame it is set in
+UsingPad = false
+PadHeld = {}
+Stick = { x = 0.0, y = 0.0, lt = 0.0, rt = 0.0 }
+function IsUsingKeyboard() return not UsingPad end
+function IsDisabledControlJustPressed(_, c) return JustPressed[c] == true end
+function IsDisabledControlPressed(_, c) return PadHeld[c] == true or JustPressed[c] == true end
+function GetDisabledControlNormal(_, c)
+    if c == 218 then return Stick.x elseif c == 219 then return Stick.y
+    elseif c == 207 then return Stick.lt elseif c == 208 then return Stick.rt end
+    return 0.0
+end
 
 -- the game's own menu
 Pause = { active = false, setTrueCount = 0 }

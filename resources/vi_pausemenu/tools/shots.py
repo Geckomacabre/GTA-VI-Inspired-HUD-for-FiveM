@@ -51,12 +51,12 @@ def report(page):
     page.wait_for_timeout(800)
 
 
-def map_bars(page):
-    page.goto(BASE + '?map=1&bg=map')
+def map_page(page):
+    page.goto(BASE + '?map=1&pad=1')
     settle(page)
 
 
-SHOTS = {'home': home, 'settings': settings, 'stats': stats, 'report': report, 'map': map_bars}
+SHOTS = {'home': home, 'settings': settings, 'stats': stats, 'report': report, 'map': map_page}
 
 with tempfile.TemporaryDirectory() as tmp, sync_playwright() as p:
     browser = p.chromium.launch()

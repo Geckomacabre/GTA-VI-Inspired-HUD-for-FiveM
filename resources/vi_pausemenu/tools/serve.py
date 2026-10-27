@@ -1,5 +1,5 @@
 """serve.py [port]: the pause menu's page with stub.js put in before app.js, for looking at it in a browser
-(http://127.0.0.1:8767/; ?screen=settings|brief|stats|players|report, ?map=1, ?bg=<picture>)."""
+(http://127.0.0.1:8767/; ?screen=settings|brief|stats|players|report, ?map=1 (&pad=1, &h=<heading>), ?bg=<picture>)."""
 import http.server
 import os
 import sys

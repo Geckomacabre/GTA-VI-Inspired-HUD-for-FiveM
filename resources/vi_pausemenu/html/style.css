@@ -491,7 +491,6 @@ html, body {
 .g-face { fill: var(--ink); }
 .g-ink { fill: none; stroke: #1f2126; stroke-width: 2.7; stroke-linecap: round; stroke-linejoin: round; }
 .g-ink.g-t { stroke-width: 1.9; }
-.g-solid { fill: #1f2126; }
 .g-text {
     fill: #1f2126;
     font-family: 'Bahnschrift', 'Segoe UI', Arial, sans-serif;
@@ -547,88 +546,21 @@ html, body {
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
 
 /* -----------------------------------------------------------------------------
-   The map: the game's own, with GTA VI's dark blue bars over its top and bottom
+   The map: single player's pause map, drawn on a canvas over the whole screen (app.js); the menu's frame steps aside
+   for it, the shade stays under it while it fades in
    -------------------------------------------------------------------------- */
-#map {
+#pmap {
     position: fixed;
     inset: 0;
     display: none;
-    pointer-events: none;
+    cursor: grab;
 }
-#map.on { display: block; }
-#map .bar {
+#pmap.on { display: block; }
+#pmap canvas {
     position: absolute;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: center;
-}
-#map .bar.top {
-    top: 0;
-    height: min(17vh, 9.56vw);
-    background: linear-gradient(to bottom, rgba(12, 28, 44, 0.94), rgba(14, 32, 50, 0.86));
-}
-#map .bar.bottom {
-    bottom: 0;
-    height: min(12vh, 6.75vw);
-    background: linear-gradient(to top, rgba(12, 28, 44, 0.95), rgba(14, 32, 50, 0.88));
-}
-.mframe {
-    position: relative;
-    width: min(100vw, 177.78vh);
+    inset: 0;
+    width: 100%;
     height: 100%;
-    container-type: size;
+    display: block;
 }
-.m-head {
-    position: absolute;
-    left: 5cqw;
-    top: 50%;
-    transform: translateY(-46%);
-}
-.m-title {
-    font: 700 31cqh/1 var(--head);
-    text-transform: uppercase;
-    letter-spacing: 0.01em;
-}
-.m-loc {
-    margin-top: 6cqh;
-    font: 700 14cqh/1 var(--head);
-    color: var(--dim);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-.m-who {
-    position: absolute;
-    right: calc(5cqw + 47cqh);
-    top: 50%;
-    transform: translateY(-50%);
-    text-align: right;
-}
-.m-mode {
-    font: 700 9cqh/1 var(--head);
-    letter-spacing: 0.14em;
-    color: var(--dim);
-    text-transform: uppercase;
-}
-.m-name {
-    margin-top: 2cqh;
-    font: 700 18cqh/1 var(--head);
-}
-#map-mug {
-    position: absolute;
-    right: 5cqw;
-    top: 50%;
-    width: 39cqh;
-    height: 44cqh;
-    transform: translateY(-50%);
-}
-#map-mug .initials { font-size: 14cqh; }
-#map-prompts {
-    position: absolute;
-    right: 5cqw;
-    top: 50%;
-    transform: translateY(-50%);
-    gap: 22cqh;
-}
-#map .pr { font-size: 17cqh; gap: 7cqh; }
-#map .glyph { width: 25cqh; height: 25cqh; }
+#root.map #frame { visibility: hidden; }
