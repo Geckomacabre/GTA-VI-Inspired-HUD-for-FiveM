@@ -10,7 +10,7 @@ version '2.2.0'
 -- are published. server_update.lua compares them with GitHub's latest release
 -- on start and says in the console when there is a newer one. Bump `release`
 -- to the new tag whenever one is cut.
-release '1.8.1'
+release '1.8.2'
 repository 'https://github.com/Geckomacabre/GTA-VI-Inspired-HUD-for-FiveM'
 
 shared_scripts {
