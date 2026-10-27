@@ -50,7 +50,11 @@ if Config.Crosshair.enable then
             Wait(0)
             local ped = cache.ped or PlayerPedId()
             local playerId = PlayerId()
-            local armedGun = IsPedArmed(ped, 2)
+            -- IS_PED_ARMED's flags: 1 melee, 2 thrown, 4 guns. This asked for 2,
+            -- so a gun never brought the crosshair up and the game's own reticle
+            -- stayed (found putting it side by side with the single-player
+            -- port, which asks for 4).
+            local armedGun = IsPedArmed(ped, Config.Crosshair.armedWith or 4)
             -- A sniper rifle's scope IS the game's reticle, so hiding it for
             -- our crosshair left nothing to aim through. Those keep the game's.
             local sniper = armedGun and GetWeapontypeGroup(GetSelectedPedWeapon(ped)) == SNIPER_GROUP

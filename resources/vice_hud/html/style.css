@@ -1598,10 +1598,12 @@ html, body {
 /* -----------------------------------------------------------------------------
    Wanted notification (middle-left)
    -------------------------------------------------------------------------- */
-/* GTA VI's box, rebuilt from a GTA VI frame (the single-player HUD 2.6.2's
-   measurements, at 1080p: 430x110, 1px = var(--w) / 19.2). A dark tint that
-   fades towards the right, a faint top edge, light spaced-out capitals, and a
-   dark red star and tell discs. */
+/* GTA VI's box, rebuilt from a GTA VI frame (the single-player HUD's
+   measurements, tools/render/wanted.py there, at 1080p: 430x110, 1px =
+   var(--w) / 19.2). A dark tint that fades towards the right, a faint top
+   edge, light text in sentence case (Segoe UI Variable Display 380, capitals
+   16 px tall, so a 22.86 px font, baselines 31 apart, capitals 17.5 px below
+   the top), and a dark red star and tell discs. */
 #wanted {
     position: absolute;
     left: 1.5cqw;
@@ -1612,16 +1614,15 @@ html, body {
     background: linear-gradient(90deg, rgba(22, 20, 24, 0.88), rgba(40, 34, 44, 0.45));
     border-radius: calc((0.156 * var(--w)) * var(--rad-wanted, 1));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    padding: calc(0.4 * var(--w)) calc(3 * var(--w)) 0 calc(0.859 * var(--w));
+    padding: calc(0.452 * var(--w)) calc(3 * var(--w)) 0 calc(0.859 * var(--w));
 }
 #wanted-copy {
     display: block;
-    font-size: calc((0.833 * var(--w)) * var(--fs-wanted, 1));
+    font-size: calc((1.1905 * var(--w)) * var(--fs-wanted, 1));
     font-weight: var(--fw-wanted, 380);
     color: rgb(215, 205, 210);
-    line-height: 1.9375;
+    line-height: 1.35625;
     letter-spacing: var(--ls-wanted, 0.065em);
-    text-transform: uppercase;
     white-space: nowrap;
 }
 #wanted .star {
@@ -3283,7 +3284,7 @@ html, body {
 #zone      { -webkit-font-smoothing: var(--sm-zone, inherit); }
 #vehicle   { -webkit-font-smoothing: var(--sm-vehicle, inherit); }
 #veh-pips  { font-family: var(--ff-vehpips, inherit);   -webkit-font-smoothing: var(--sm-vehpips, inherit); }
-#wanted    { font-family: var(--ff-wanted, inherit);    -webkit-font-smoothing: var(--sm-wanted, antialiased); }
+#wanted    { font-family: var(--ff-wanted, 'Segoe UI Variable Display', 'Segoe UI', sans-serif);    -webkit-font-smoothing: var(--sm-wanted, antialiased); }
 #honor     { font-family: var(--ff-honor, inherit);     -webkit-font-smoothing: var(--sm-honor, antialiased); }
 #honor-pop { font-family: var(--ff-honorpop, inherit);  -webkit-font-smoothing: var(--sm-honorpop, antialiased); }
 #money-pop { -webkit-font-smoothing: var(--sm-moneypop, antialiased); }

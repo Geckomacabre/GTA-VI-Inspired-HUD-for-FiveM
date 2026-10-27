@@ -797,6 +797,10 @@ Config.Crosshair = {
     -- number to recheck first.
     reticleComponent = 14,
 
+    -- Which weapons bring it up, as IS_PED_ARMED's flags added together:
+    -- 1 melee, 2 thrown, 4 guns (the single-player HUD's ArmedWith).
+    armedWith = 4,
+
     -- CEventNetworkEntityDamage's own headshot flag is exactly the kind of
     -- payload-by-position guess client_skills.lua already warns is not safe
     -- across builds -- so this asks GET_PED_LAST_DAMAGE_BONE instead and
