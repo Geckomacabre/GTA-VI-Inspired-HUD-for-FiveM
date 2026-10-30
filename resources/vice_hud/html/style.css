@@ -680,6 +680,9 @@ html, body {
    distinguishable up close, for stars the wanted level has earned while
    police still don't know who did it. */
 .star.hollow path { stroke: #f2f2f0; stroke-width: 8; }
+/* No state: an earned star, solid white and still, for a player with HUD
+   OPTIONS' VI WANTED STARS off. The box's star takes the same class. */
+.star.plain path { fill: #f2f2f0; stroke: #f2f2f0; }
 
 /* Measured: plate 18.5px = 0.98% wide, ~24px = 2.2% tall, 31.5px = 1.64%
    centre-to-centre => gap 0.66%. Right margin is 1.09%, NOT the 1.87% the
@@ -1641,8 +1644,8 @@ html, body {
     margin-left: 0.45em;
     vertical-align: calc(0.35em - (0.729 * var(--w)) * var(--ic-wanted, 1));
 }
-/* One dark red in every search state, outlined near-black, as in GTA VI. */
-#wanted .star path { fill: rgb(110, 36, 33); stroke: rgb(8, 2, 4); stroke-width: 5.7; opacity: 1; animation: none; }
+/* The box's star is the corner row's star: no colours of its own, so it shows
+   the same state (contact, searching, hollow or red) as the stars above it. */
 #wanted-tells {
     display: flex;
     gap: calc(0.469 * var(--w));

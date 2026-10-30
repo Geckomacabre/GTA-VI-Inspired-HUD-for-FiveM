@@ -17,13 +17,16 @@
  * frame is a few dozen draw calls over the 256 m squares around the player,
  * and a frame is only drawn when client_map3d.lua says something moved.
  *
- *   map3d       { load, show, config, night, clock, want, ping, ripple }
+ *   map3d       { load, show, config, night, clock, want, ping, ripple, search }
  *               fetch the world; on or off; Config.Map3D's view and paints;
  *               night, 0 or 1; the game's clock as [hour, minute]; the
  *               wanted colouring, { kind: 'red' | 'blue', age } or false
  *               (age: ms since the player became wanted); whether the
  *               police are chasing, and whether the player is spending
- *               stamina, each of which sends rings out from the marker
+ *               stamina, each of which sends rings out from the marker;
+ *               where the police are looking, { chase: true, r, age } round
+ *               the player or { x, y, r, rate, lo, hi, age } (r metres,
+ *               changing `rate` a second within lo..hi), or false
  *   map3dPos    { x, y, c, h, s, v, air, g, a }
  *                                           position, camera and ped heading
  *                                           (degrees), speed (m/s), in a
@@ -230,6 +233,52 @@
         return out;
     }
 
+    // Where the police are looking: single player's search circle (ViMinimap's
+    // DrawSearchAreaOnMap). client_map3d.lua says where and how big; this
+    // paints it into the map under the buildings, so the haze and the map's
+    // see-through take it as they take the ground. It is a circle on the
+    // panel, not laid flat on the ground: its radius in metres at the scale
+    // its centre is drawn at, and not drawn at all with its centre past the
+    // horizon or its radius under `least` pixels. The fill first, then a rim
+    // `width` panel pixels wide astride its edge, in the same colour.
+    //
+    // While the police are on the player it is round them: blue for the
+    // first two seconds of being wanted, then red and blue 0.75 s each (red
+    // first) until the fifth, then red, its fill 205/255 and its rim 120.
+    // While they search it goes from red to blue and back with
+    // sin(0.0045 t), t in ms, at 0.7 of a fill of 150 and a rim of 120.
+    var SEARCH = {
+        chaseBlue: [38, 88, 204], chaseRed: [206, 54, 74], blueMs: 2000, flashMs: 5000, flashEvery: 750,
+        chaseFill: 205, red: [226, 52, 52], blue: [52, 120, 226], pulse: 0.0045,
+        fill: 150, rim: 120, dim: 0.7, width: 1.1, least: 2
+    };
+    var search = null;          // what client_map3d.lua last said, and when (ms)
+    function setSearch(s) {
+        var t = performance.now(), age = Math.max(0, Number(s && s.age) || 0);
+        if (!s || typeof s !== 'object' || !(s.r > 0)) search = null;
+        else if (s.chase === true) search = { chase: true, since: t - age, r: s.r };
+        else if (typeof s.x !== 'number' || typeof s.y !== 'number') search = null;
+        else search = { chase: false, since: t - age, got: t, x: s.x, y: s.y, r: s.r, rate: Number(s.rate) || 0,
+                        lo: typeof s.lo === 'number' ? s.lo : 0, hi: typeof s.hi === 'number' ? s.hi : s.r };
+    }
+    // The circle at `now`: its centre (world x, y), radius (metres), colour,
+    // and its fill's and rim's alpha out of 255; null for none. `moving`
+    // while it changes on its own.
+    function searchAt(now) {
+        if (!search) return null;
+        var S = SEARCH, ms = now - search.since, i;
+        if (search.chase) {
+            var blue = ms < S.blueMs || (ms < S.flashMs && Math.floor((ms - S.blueMs) / S.flashEvery) % 2 === 1);
+            return { x: pos.x, y: pos.y, r: search.r, rgb: blue ? S.chaseBlue : S.chaseRed,
+                     fill: S.chaseFill, rim: S.rim, moving: ms < S.flashMs };
+        }
+        var t = 0.5 + 0.5 * Math.sin(now * S.pulse), rgb = [];
+        for (i = 0; i < 3; i++) rgb.push(Math.floor(S.red[i] + (S.blue[i] - S.red[i]) * t));
+        var r = Math.max(search.lo, Math.min(search.hi, search.r + search.rate * (now - search.got) / 1000));
+        // 105 and 84, as single player's (int) of them comes out.
+        return { x: search.x, y: search.y, r: r, rgb: rgb, fill: Math.round(S.fill * S.dim), rim: Math.round(S.rim * S.dim), moving: true };
+    }
+
     // The clock in the panel's top right corner: shown for six seconds on the
     // hour and the half hour, with half a second to come and half to go.
     var CLOCK = { fade: 500, hold: 6000 };
@@ -332,6 +381,20 @@
         flat: {
             vs: PLACE + '\nlayout(location = 0) in vec2 aPos; void main() { gl_Position = place(aPos, 0.0); }',
             fs: WANTED + PANEL + HAZE + 'uniform vec4 uColour; out vec4 o; void main() { o = vec4(hazed(wanted(uColour.rgb)), uColour.a); }'
+        },
+        // The search circle: uR pixels round uAt (panel pixels from its top
+        // left), filled at uAlpha.x, and a rim uRim wide astride its edge at
+        // uAlpha.y laid over the fill. Each edge is smoothed over a pixel.
+        search: {
+            vs: 'layout(location = 0) in vec2 aPos; void main() { gl_Position = vec4(aPos, 0.0, 1.0); }',
+            fs: WANTED + PANEL + HAZE +
+                'uniform vec2 uAt; uniform float uR; uniform float uRim; uniform vec3 uColour; uniform vec2 uAlpha; out vec4 o;' +
+                'void main() { vec2 p = vec2(gl_FragCoord.x - uMargin.x, uPanel.y - (gl_FragCoord.y - uMargin.y));' +
+                ' float d = length(p - uAt);' +
+                ' float fill = clamp(uR - d + 0.5, 0.0, 1.0) * uAlpha.x;' +
+                ' float rim = clamp(uRim * 0.5 + 0.5 - abs(d - uR), 0.0, 1.0) * uAlpha.y;' +
+                ' float a = rim + fill * (1.0 - rim); if (a <= 0.0) discard;' +
+                ' o = vec4(hazed(wanted(uColour)), a); }'
         },
         // The ground is one sheet over the whole panel: each pixel is taken
         // back through the camera to the spot on the ground it shows (which is
@@ -1004,6 +1067,37 @@
         if (any) awaitProbes(10);
     }
 
+    // The search circle on the panel at `now`: { x, y, R } in panel pixels
+    // with its colour and alphas, or only { moving } when there is nothing to
+    // draw, or null when there is no circle at all.
+    function searchOnPanel(V, now) {
+        var c = searchAt(now);
+        if (!c) return null;
+        var p = project(V, c.x, c.y);
+        if (p.w < 0.25) return { moving: c.moving };
+        var R = c.r * V.s / p.w;
+        if (R < SEARCH.least) return { moving: c.moving };
+        return { x: p.x, y: p.y, R: R, width: SEARCH.width * V.unit, rgb: c.rgb, fill: c.fill, rim: c.rim, moving: c.moving };
+    }
+    // Painted into the map, leaving its alpha alone: a road under the
+    // circle is still a road to the see-through. True while it animates.
+    function drawSearch(V, now) {
+        var c = searchOnPanel(V, now);
+        if (!c) return false;
+        if (c.R == null) return c.moving;
+        var u = shared(progs.search, V);
+        gl.uniform2f(u.uAt, c.x, c.y);
+        gl.uniform1f(u.uR, c.R);
+        gl.uniform1f(u.uRim, c.width);
+        gl.uniform3f(u.uColour, c.rgb[0] / 255, c.rgb[1] / 255, c.rgb[2] / 255);
+        gl.uniform2f(u.uAlpha, c.fill / 255, c.rim / 255);
+        gl.colorMask(true, true, true, false);
+        gl.bindVertexArray(progs.quad);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.colorMask(true, true, true, true);
+        return c.moving;
+    }
+
     function frame(now) {
         queued = false;
         if (!shown || !loaded || !dirty) return;
@@ -1062,6 +1156,10 @@
             drawChunks(layers[name], R);
         });
         gl.colorMask(true, true, true, true);
+
+        // Where the police are looking, after the lane lines and before the
+        // buildings, as single player paints it.
+        var searching = drawSearch(V, now);
 
         if (bld && VIEW.buildings !== false) {
             var cap = VIEW.liftCap * V.unit;
@@ -1174,8 +1272,9 @@
         var timing = drawSprites(V, now);
         gl.bindVertexArray(null);
         // Carried on without being asked while anything is still on its way:
-        // the zoom, the wanted colour coming up, the rings, the clock.
-        if (V.easing || w.rising || turning || climbing || rippling || timing) invalidate();
+        // the zoom, the wanted colour coming up, the rings, the clock, the
+        // search circle's colours and size.
+        if (V.easing || w.rising || turning || climbing || rippling || timing || searching) invalidate();
     }
 
     /* --- what sits on top: blips, the route's end, north, the player ------ */
@@ -1579,6 +1678,7 @@
             if (d.clock !== undefined) setClock(d.clock);
             if (d.want !== undefined) setWant(d.want);
             if (d.ping !== undefined) setPing(d.ping);
+            if (d.search !== undefined) setSearch(d.search);
             if (d.load || d.show) boot();
             if (d.show != null) { wanted = d.show === true; setShown(wanted); }
         } else if (d.action === 'map3dRoute') {
@@ -1618,6 +1718,9 @@
         rings: function (ages, now) { ripple.rings = ages.map(function (a) { return (now == null ? performance.now() : now) - a * 1000; }).sort(function (a, b) { return a - b; }); },
         PING: PING, stepPing: function (now) { return stepRings(ping, now); }, pingRadii: function (now) { return ringRadii(ping, now); },
         pinging: function () { return ping.on; },
+        // The search circle at `now`, in the world and on the panel.
+        SEARCH: SEARCH, searchAt: searchAt,
+        searchOnPanel: function (now) { return searchOnPanel(view(canvas.width, canvas.height, 0), now == null ? performance.now() : now); },
         route: { tidy: tidy, startOf: startOf },
         VIEW: VIEW, PAINT: PAINT, NIGHT: NIGHT, ink: ink
     };

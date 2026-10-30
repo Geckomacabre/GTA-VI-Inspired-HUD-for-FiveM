@@ -366,6 +366,12 @@ Config.ConductWatcher = {
     -- antagonize_npc's cooldown/cap.
     interactionDistance = 2.5,
 
+    -- Whether players get the Greet / Antagonize options at all, until they
+    -- choose for themselves: HUD OPTIONS' GREET / ANTAGONIZE (vi_extras), or
+    -- exports.vice_hud:SetGreetEnabled (exports.qbx_honor: too), kept per
+    -- player. Off, the two options are not on peds.
+    greetAntagonize = true,
+
     -- Pointing a gun at a civilian. Off by default: it fires on a very common
     -- action and gets noisy fast. Turn it on for a stricter, more RDR2-ish server.
     penaliseAiming = false,

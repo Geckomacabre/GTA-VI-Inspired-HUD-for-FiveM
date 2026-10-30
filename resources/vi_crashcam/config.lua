@@ -1,5 +1,8 @@
 Config = {}
 
+-- Whether players get the crash cam, until they choose for themselves: HUD
+-- OPTIONS' CRASH CAMERA (vi_extras), the pause menu's Crash Camera, or
+-- exports.vi_crashcam:SetCrashCamEnabled, kept per player.
 Config.Enabled = true
 
 -- ---- what counts as a bad crash ---------------------------------------------

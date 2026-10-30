@@ -122,6 +122,57 @@ TriggerEvent('onClientResourceStart', 'vi_crashcam')
 Run(600)
 eq(CrashCam, false, 'crash camera off re-applied on restart')
 
+-- HUD OPTIONS (vi_extras): its rows lead the page and stand in for this page's copies
+local stepped = {}
+local hud = {}
+hud.GetHudOptions = function(self)
+    assert(self == hud)
+    return {
+        { id = 'crashcam', label = 'CRASH CAMERA', value = 'ON', desc = 'A slow replay from outside the car when you crash.' },
+        { id = 'mapvehicleonly', label = 'MAP IN VEHICLE ONLY', value = 'OFF', desc = 'The minimap only while you are in a vehicle.' },
+        { id = 'radiowheel', label = 'VI RADIO WHEEL', value = 'ON' },
+        { id = 'policelights', label = 'POLICE LIGHTS', value = '60%' },
+        { id = 'mapdaynight', label = 'MAP DAY/NIGHT', value = 'NIGHT' },
+    }
+end
+hud.StepHudOption = function(self, id, dir) assert(self == hud) stepped[#stepped + 1] = id .. ':' .. dir end
+exports.vi_extras = hud
+ResourceStates.vi_extras = 'started'
+s = NuiCall('screen', { screen = 'settings' })
+eq(ids(s.rows), 'hud:crashcam,hud:mapvehicleonly,hud:radiowheel,hud:policelights,hud:mapdaynight,radio,style,keybinds,gamesettings',
+   "HUD OPTIONS rows first, this page's copies of them gone")
+eq(find(s.rows, 'id', 'hud:mapvehicleonly').label, 'Map in Vehicle Only', 'labels as this page writes them')
+eq(find(s.rows, 'id', 'hud:radiowheel').label, 'VI Radio Wheel', 'VI stays VI')
+eq(find(s.rows, 'id', 'hud:mapdaynight').label, 'Map Day/Night', 'day/night')
+eq(find(s.rows, 'id', 'hud:policelights').value, '60%', 'a percent as it is')
+eq(find(s.rows, 'id', 'hud:mapdaynight').value, 'Night', "values in this page's case")
+eq(find(s.rows, 'id', 'hud:crashcam').value, 'On', 'on')
+eq(find(s.rows, 'id', 'hud:crashcam').image, 'crashcam', 'a row with a picture of its own keeps it')
+eq(find(s.rows, 'id', 'hud:policelights').image, 'settings', 'the settings picture otherwise')
+NuiCall('setting', { id = 'hud:policelights', dir = -1 })
+eq(stepped[1], 'policelights:-1', 'a change goes to vi_extras')
+ResourceStates.vi_extras = nil
+exports.vi_extras = nil
+s = NuiCall('screen', { screen = 'settings' })
+eq(ids(s.rows), 'crashcam,mapmode,minimap,radio,style,keybinds,gamesettings', 'without vi_extras, the page as before')
+
+-- a vi_crashcam that keeps its own setting: this page shows it, and hands an old "off" over once
+exports.vi_crashcam.IsCrashCamEnabled = function(self) assert(self == exports.vi_crashcam) return CrashCam ~= false end
+Kvp['vi_pausemenu:crashcam'] = 'off'
+CrashCam = 'untouched'
+TriggerEvent('onClientResourceStart', 'vi_crashcam')
+Run(600)
+eq(CrashCam, false, 'an old off handed to vi_crashcam')
+check(Kvp['vi_pausemenu:crashcam'] == nil, 'and forgotten here')
+CrashCam = true
+s = NuiCall('screen', { screen = 'settings' })
+eq(find(s.rows, 'id', 'crashcam').value, 'On', "vi_crashcam's own setting shown")
+NuiCall('setting', { id = 'crashcam', dir = 1 })
+eq(CrashCam, false, 'switched there')
+check(Kvp['vi_pausemenu:crashcam'] == nil, 'and not kept here')
+exports.vi_crashcam.IsCrashCamEnabled = nil
+CrashCam = 'untouched'
+
 -- brief, stats, players
 local b = NuiCall('screen', { screen = 'brief' })
 eq(find(b.rows, 'label', 'Name').value, 'Lucia Caminos', 'brief name')

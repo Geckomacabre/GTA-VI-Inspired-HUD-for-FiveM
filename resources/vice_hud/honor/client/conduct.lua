@@ -344,30 +344,65 @@ local function antagonize(target)
     report('antagonize_npc')
 end
 
+-- On or off per player: HUD OPTIONS' GREET / ANTAGONIZE (vi_extras, hold V),
+-- as single player's [Memory] Interact. Off, the two options are taken off
+-- peds altogether, so targeting neither offers nor checks them; on, they are
+-- put back. Kept in this resource's KVP (vice_hud's, or qbx_honor's when
+-- honor runs on its own), Config.ConductWatcher.greetAntagonize until the
+-- player chooses. HonorExport answers under both names.
+local GREET_KVP = 'qbx_honor:greet'
+local GREET_NAMES = { 'qbx_honor:greet', 'qbx_honor:antagonize' }
+local greetOn = watcher.greetAntagonize ~= false
+local greetReady, greetAdded = false, false  -- targeting is up; the two options are on peds
+
+do
+    local saved = GetResourceKvpString(GREET_KVP)
+    if saved == 'on' then greetOn = true elseif saved == 'off' then greetOn = false end
+end
+
+local function applyGreet()
+    if not greetReady or greetOn == greetAdded then return end
+    greetAdded = greetOn
+    if not greetOn then
+        exports.ox_target:removeGlobalPed(GREET_NAMES)
+        return
+    end
+
+    exports.ox_target:addGlobalPed({
+        {
+            name = GREET_NAMES[1],
+            icon = 'fa-solid fa-hand',
+            label = 'Greet',
+            distance = watcher.interactionDistance,
+            canInteract = function(entity) return greetOn and isGreetable(entity) end,
+            onSelect = function(data) greet(data.entity) end,
+        },
+        {
+            name = GREET_NAMES[2],
+            icon = 'fa-solid fa-face-angry',
+            label = 'Antagonize',
+            distance = watcher.interactionDistance,
+            canInteract = function(entity) return greetOn and isGreetable(entity) end,
+            onSelect = function(data) antagonize(data.entity) end,
+        },
+    })
+end
+
+HonorExport('GetGreetEnabled', function() return greetOn end)
+HonorExport('SetGreetEnabled', function(on)
+    greetOn = on == true
+    SetResourceKvp(GREET_KVP, greetOn and 'on' or 'off')
+    applyGreet()
+end)
+
 CreateThread(function()
     -- Targeting is part of this resource now; wait for the resource itself.
     while GetResourceState(GetCurrentResourceName()) ~= 'started' do
         Wait(1000)
     end
 
-    exports.ox_target:addGlobalPed({
-        {
-            name = 'qbx_honor:greet',
-            icon = 'fa-solid fa-hand',
-            label = 'Greet',
-            distance = watcher.interactionDistance,
-            canInteract = function(entity) return isGreetable(entity) end,
-            onSelect = function(data) greet(data.entity) end,
-        },
-        {
-            name = 'qbx_honor:antagonize',
-            icon = 'fa-solid fa-face-angry',
-            label = 'Antagonize',
-            distance = watcher.interactionDistance,
-            canInteract = function(entity) return isGreetable(entity) end,
-            onSelect = function(data) antagonize(data.entity) end,
-        },
-    })
+    greetReady = true
+    applyGreet()
 end)
 
 -- ============================================================================

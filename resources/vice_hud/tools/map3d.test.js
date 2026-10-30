@@ -56,6 +56,9 @@ function GetSafeZoneSize() return safeZone end
 screen = { 1920, 1080 }
 function GetActiveScreenResolution() return screen[1], screen[2] end
 function PlayerId() return 1 end
+function GetPlayerServerId() return 7 end
+bags = {}
+function AddStateBagChangeHandler(key, _, f) bags[key] = f end
 function GetPlayerWantedLevel() return wanted end
 function IsPedShooting() return shooting end
 function IsPlayerFreeAiming() return aimingAt ~= 0 end
@@ -131,6 +134,15 @@ run('n = #sent; ViceMap3D.show(true, true)');
 ok(get('#sent - n') === '0', 'saying the same thing again sends nothing');
 run('ViceMap3D.show(true, false)');
 ok(get('last("map3d").config.view.north') === 'false', 'the north toggle is passed on when it changes');
+run('ViceMap3D.show(true, false)');
+run('bags["vi_radio:open"]("player:7", "vi_radio:open", true)');
+ok(get('last("map3d").show') === 'false', "vi_radio's wheel open: the drawn map goes, as single player's does");
+run('n = #sent; ViceMap3D.show(true, false)');
+ok(get('#sent - n') === '0' && get('last("map3d").show') === 'false', 'and stays gone while client.lua keeps asking for it');
+run('bags["vi_radio:open"]("player:9", "vi_radio:open", false)');
+ok(get('last("map3d").show') === 'false', "someone else's wheel closing changes nothing");
+run('bags["vi_radio:open"]("player:7", "vi_radio:open", false)');
+ok(get('last("map3d").show') === 'true', 'the wheel shut: it comes back');
 run('ViceMap3D.show(false, false)');
 ok(get('last("map3d").show') === 'false', 'no minimap wanted: the drawn one goes too');
 
@@ -306,6 +318,85 @@ ok(get('count("map3d") - n') === '0', 'nothing is sent to a page that is not dra
 fresh('{ enabled = true, police = false }');
 run('cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true) wanted = 3; n = count("map3d"); step(3, 2)');
 ok(get('count("map3d") - n') === '0', 'police = false: neither the colour nor the rings');
+
+console.log('\n-- the search circle --');
+// fenix-police, while it is running, and the exports the file makes. The
+// circle's feed is the seventh thread.
+const SEARCH_STUBS = `
+resState, exported = {}, {}
+function GetResourceState(r) return resState[r] or 'missing' end
+fx = { contact = false, centre = nil, radius = 0.0 }
+exports = setmetatable({ ['fenix-police'] = {
+    HasContact = function() return fx.contact end,
+    SearchCentre = function() return fx.centre end,
+    SearchRadius = function() return fx.radius end,
+    SearchRadiusBounds = function() return { start = 40.0, max = 180.0 } end,
+} }, { __call = function(_, name, fn) exported[name] = fn end })
+me = { x = 10.0, y = 20.0, z = 30.0 }
+function GetEntityCoords() return me end
+function lastSearch() for i = #sent, 1, -1 do if sent[i].action == 'map3d' and sent[i].search ~= nil then return sent[i].search end end end
+function searches() local n = 0 for i = 1, #sent do if sent[i].search ~= nil then n = n + 1 end end return n end
+`;
+const up = 'cbs.map3dHello({}, function() end) cbs.map3dReady({ ok = true }, function() end) ViceMap3D.show(true, true)';
+const ls = (k) => get('lastSearch().' + k);
+fresh('{ enabled = true }', SEARCH_STUBS);
+run(up);
+ok(get('lastSearch()') === 'false' && get('exported.GetSearchCircle()') === 'true', 'the first "draw" says there is no circle, and the switch is on, as single player\'s is');
+run('wanted, greyed, gameMs = 2, true, 1000; n = searches(); step(7, 3)');
+ok(get('searches() - n') === '0', 'under the wanted colouring the circle stands aside, as single player\'s does under GTA VI\'s colours');
+
+fresh('{ enabled = true, police = false }', SEARCH_STUBS);
+run(up + '; n = searches(); step(7, 2)');
+ok(get('searches() - n') === '0', 'police = false, nobody wanted: no circle');
+run('wanted, gameMs = 2, 1000; step(7, 1)');
+ok(ls('chase') === 'true' && ls('r') === '180.0' && ls('age') === '0', 'wanted, the stars lit: 180 m round the player, timed from the moment it began');
+run('gameMs = 1500; n = searches(); step(7, 3)');
+ok(get('searches() - n') === '0', 'and nothing more while it stays so: the page keeps it round the player');
+run('me = { x = 50.0, y = 60.0, z = 0.0 } greyed, gameMs = true, 3000; step(7, 1)');
+ok(ls('x') === '50.0' && ls('y') === '60.0' && ls('r') === '180.0' && ls('rate') === '-4.0' && ls('lo') === '60.0' && ls('hi') === '180.0' && ls('age') === '2000',
+   'the stars grey out: where the player was then, closing in from 180 m at 4 m a second to 60', ['x', 'y', 'r', 'rate', 'lo', 'hi', 'age'].map(ls).join());
+run('me = { x = 90.0, y = 90.0, z = 0.0 } gameMs = 13000; n = searches(); step(7, 2)');
+ok(get('searches() - n') === '0', 'it stays there as the player moves on, and closes in on the page without being sent again');
+run('gameMs = 60000; step(7, 1)');
+ok(get('searches() - n') === '0', 'nor once it is down to 60 m');
+run('greyed, gameMs = false, 61000; step(7, 1)');
+ok(ls('chase') === 'true', 'seen again: round the player');
+run('greyed, gameMs = true, 62000; step(7, 1)');
+ok(ls('x') === '90.0' && ls('r') === '180.0', 'lost again: a new circle where they were lost this time, from 180 m');
+run('n = searches(); was = exported.SetSearchCircle(false)');
+ok(get('lastSearch()') === 'false' && get('searches() - n') === '1' && get('was') === 'false' && get('kvp["vice_hud:map3d:search"]') === 'off' && get('exported.GetSearchCircle()') === 'false',
+   'SetSearchCircle(false) takes it off at once, and is remembered');
+run('gameMs = 63000; n = searches(); step(7, 2)');
+ok(get('searches() - n') === '0', 'and it stays off');
+run('exported.SetSearchCircle(true)');
+ok(ls('x') === '90.0' && get('kvp["vice_hud:map3d:search"]') === 'on' && get('exported.GetSearchCircle()') === 'true', 'back on: at once, where it was');
+run('wanted, gameMs = 0, 64000; step(7, 1)');
+ok(get('lastSearch()') === 'false', 'the wanted level gone: so is the circle');
+run('wanted, greyed, gameMs = 1, false, 65000; step(7, 1); ViceMap3D.show(false, true); n = searches(); step(7, 2)');
+ok(get('searches() - n') === '0', 'nothing is sent to a page that is not drawing');
+run('ViceMap3D.show(true, true)');
+ok(get('last("map3d").show') === 'true' && get('last("map3d").search.chase') === 'true', 'the next "draw" carries it, worked out afresh');
+
+fresh('{ enabled = true, police = false }', SEARCH_STUBS + 'kvp["vice_hud:map3d:search"] = "off"');
+ok(get('exported.GetSearchCircle()') === 'false', 'a player who switched it off keeps it off across restarts');
+fresh('{ enabled = true, police = false, searchCircle = false }', SEARCH_STUBS);
+ok(get('exported.GetSearchCircle()') === 'false', 'Config.Map3D.searchCircle = false is the default');
+fresh('{ enabled = true, police = false, searchCircle = false }', SEARCH_STUBS + 'kvp["vice_hud:map3d:search"] = "on"');
+ok(get('exported.GetSearchCircle()') === 'true', 'and a player\'s own choice beats it');
+
+fresh('{ enabled = true, police = false }', SEARCH_STUBS + 'resState["fenix-police"] = "started"');
+run(up + '; wanted, greyed, gameMs = 2, true, 1000; fx.contact = true; step(7, 1)');
+ok(ls('chase') === 'true', 'with fenix-police: round the player while a unit can see them, whatever the stars say');
+run('fx.contact = false; gameMs = 1100; step(7, 1)');
+ok(get('lastSearch()') === 'false', 'nobody sees them and nobody is searching (not seen yet, or given up): none');
+run('fx.centre, fx.radius = { x = 100.0, y = 200.0, z = 0.0 }, 40.0; gameMs = 2000; step(7, 1)');
+ok(ls('x') === '100.0' && ls('y') === '200.0' && ls('r') === '40.0' && ls('hi') === '180.0', 'searching: its search area, round where they were last seen, growing to its cap', ['x', 'y', 'r', 'hi'].map(ls).join());
+run('fx.radius = 40.4; gameMs = 2100; step(7, 1)');
+ok(ls('rate') === '4.0', 'how fast it grows is taken from two readings', ls('rate'));
+run('fx.radius = 40.8; gameMs = 2200; n = searches(); step(7, 1)');
+ok(get('searches() - n') === '0', 'and from then the page grows it itself');
+run('fx.centre, fx.radius = { x = 130.0, y = 200.0, z = 0.0 }, 41.2; gameMs = 2300; step(7, 1)');
+ok(ls('x') === '130.0', 'a new last sighting moves it');
 
 console.log('\n-- a mission\'s route --');
 fresh('{ enabled = true }');
@@ -554,6 +645,55 @@ M3.VIEW.zoom = 2.58; M3.PAINT.land = [160, 155, 149];
   ok(M3.altitudeWanted() === 0, 'altitude = false keeps the camera on the ground');
   M3.VIEW.altitude = { ease: 3, floor: 3, max: 500, lean: 0.904 };
   at(0, 0); M3.stepAltitude(0, true);
+})();
+
+// The search circle, as single player draws it. Time is handed in.
+(function () {
+  const S = M3.SEARCH;
+  msg({ action: 'map3dPos', x: 0, y: 0, c: 0, h: 0, s: 0, v: false });
+  ok(M3.searchAt(now()) === null && M3.searchOnPanel() === null, 'no circle until one is sent');
+  msg({ action: 'map3d', search: { chase: true, r: 180, age: 0 } });
+  const t = now(), at = (ms) => M3.searchAt(t + ms);
+  ok(at(0).x === 0 && at(0).r === 180 && at(1000).rgb.join() === '38,88,204' && at(1000).fill === 205 && at(1000).rim === 120,
+     'the police on the player: 180 m round them, blue, its fill 205/255 and its rim 120');
+  ok(at(2300).rgb.join() === '206,54,74' && at(3100).rgb.join() === '38,88,204' && at(3800).rgb.join() === '206,54,74' && at(4600).rgb.join() === '38,88,204',
+     'from the second second, red and blue 0.75 s each, red first');
+  ok(at(5100).rgb.join() === '206,54,74' && at(5100).moving === false && at(4900).moving === true, 'and from the fifth, red and still');
+  msg({ action: 'map3dPos', x: 5, y: 7, c: 0, h: 0, s: 0, v: false });
+  ok(at(6000).x === 5 && at(6000).y === 7, 'it goes where the player goes');
+
+  msg({ action: 'map3d', search: { x: 50, y: 60, r: 180, rate: -4, lo: 60, hi: 180, age: 3000 } });
+  const g = now(), A = M3.searchAt(g + 1000);
+  ok(A.x === 50 && A.y === 60 && near(A.r, 176, 0.05) && A.fill === 105 && A.rim === 84 && A.moving === true,
+     'the police searching: where they are looking, closing in at 4 m a second, at 0.7 of 150 and 120', JSON.stringify(A));
+  ok(M3.searchAt(g + 40000).r === 60, 'down to 60 m and no further');
+  const T = 2 * Math.PI / S.pulse, base = Math.ceil(g / T) * T, col = (phase) => M3.searchAt(base + phase * T).rgb;
+  const like = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 1);
+  ok(like(col(0.75), [226, 52, 52]) && like(col(0.25), [52, 120, 226]) && near(T, 1396, 1), 'its colour from red to blue and back every 1.4 s', col(0.75).join() + ' / ' + col(0.25).join());
+
+  // On the panel: its radius at the scale its centre is drawn at.
+  msg({ action: 'map3dPos', x: 0, y: 0, c: 0, h: 0, s: 0, v: false });
+  msg({ action: 'map3d', search: { x: 0, y: 0, r: 100, rate: 0, lo: 0, hi: 100, age: 0 } });
+  const s = M3.project(1, 0).x - M3.project(0, 0).x;          // pixels a metre at the player
+  const Hc = canvas.height, mm = Math.round(Hc * 0.1 / 1.2), unit = (Hc - 2 * mm) / 115;
+  let P = M3.searchOnPanel();
+  ok(near(P.R, 100 * s) && near(P.x, M3.project(0, 0).x) && near(P.y, M3.project(0, 0).y) && near(P.width, 1.1 * unit), 'on the panel: round where its centre is drawn, 100 m at the scale there, its rim 1.1 panel pixels', P.R + ' ' + 100 * s);
+  msg({ action: 'map3d', search: { x: 0, y: 80, r: 100, rate: 0, lo: 0, hi: 100, age: 0 } });
+  P = M3.searchOnPanel();
+  ok(near(P.R, 100 * s / M3.project(0, 80).w) && P.R < 100 * s * 0.9, 'further off, smaller: a circle on the panel, not laid on the ground', P.R);
+  msg({ action: 'map3d', search: { x: 0, y: -100000, r: 100, rate: 0, lo: 0, hi: 100, age: 0 } });
+  ok(M3.searchOnPanel().R === undefined, 'its centre past the horizon: not drawn');
+  msg({ action: 'map3d', search: { x: 0, y: 0, r: 0.2, rate: 0, lo: 0, hi: 0.2, age: 0 } });
+  ok(M3.searchOnPanel().R === undefined, 'under 2 pixels: not drawn');
+  msg({ action: 'map3d', search: { x: 'here', y: 0, r: 5 } });
+  ok(M3.searchAt(now()) === null, 'a circle it cannot place is none');
+  msg({ action: 'map3d', search: { x: 0, y: 0, r: 100, rate: 0, lo: 0, hi: 100, age: 0 } });
+  msg({ action: 'map3d', search: false });
+  ok(M3.searchAt(now()) === null && M3.searchOnPanel() === null, 'and false is none');
+  const page = read('html/map3d.js');
+  const lanes = page.indexOf("['footprint', 'rail', 'road', 'bridge', 'lot', 'lane']"), drawn = page.indexOf('var searching = drawSearch(V, now);');
+  ok(lanes > 0 && drawn > lanes && drawn < page.indexOf('if (bld && VIEW.buildings !== false) {'), 'it is painted after the lane lines and under the buildings, as single player paints it');
+  ok(/gl\.colorMask\(true, true, true, false\);\s+gl\.bindVertexArray\(progs\.quad\);\s+gl\.drawArrays/.test(page.slice(page.indexOf('function drawSearch'))), 'and leaves a road under it a road to the see-through');
 })();
 const ready = posts.find((p) => p.name === 'map3dReady');
 ok(ready && ready.body.ok === false && /WebGL2/.test(ready.body.why), 'a browser that cannot draw it says so, and why', JSON.stringify(ready));

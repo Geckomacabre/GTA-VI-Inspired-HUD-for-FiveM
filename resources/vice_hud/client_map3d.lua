@@ -60,6 +60,8 @@ local rippling = false      -- the player is spending stamina, as client.lua las
 local north = true
 local configSent = false
 local routeDirty = true
+local searchSent = nil      -- the search circle the page was last told of
+local searchNews            -- what to tell it now (the search circle, below)
 
 local function say(action, data)
     data = data or {}
@@ -78,10 +80,16 @@ function ViceMap3D.owns()
     return true
 end
 
+-- vi_radio's wheel is up: single player's 3D minimap goes while its radio
+-- wheel is open (Radio.cs, [Radio] HideRadar), and so does this one.
+local requested = false     -- what client.lua last asked for
+local radioOpen = false
+
 --- `on` is "draw it": client.lua has already asked owns(), so this does not
 --- ask again (and cannot disagree with what the engine's radar was told).
 function ViceMap3D.show(on, showNorth)
-    local want = on and true or false
+    requested = on and true or false
+    local want = requested and not radioOpen
     if showNorth ~= nil and (showNorth and true or false) ~= north then
         north = showNorth and true or false
         configSent = false
@@ -107,10 +115,19 @@ function ViceMap3D.show(on, showNorth)
         msg.want = wantSent or false
         msg.ping = pinging
         msg.ripple = rippling
+        -- Worked out afresh: the page times the circle from when it hears.
+        searchSent = nil
+        msg.search = searchNews(GetGameTimer()) or false
     end
     say('map3d', msg)
     if drawing then routeDirty = true end
 end
+
+AddStateBagChangeHandler('vi_radio:open', nil, function(bagName, _, value)
+    if bagName ~= ('player:%s'):format(GetPlayerServerId(PlayerId())) then return end
+    radioOpen = value == true
+    ViceMap3D.show(requested)
+end)
 
 --- The single-player minimap's panel, which the drawn map stands in: 208
 --- by 115 of its units (a 720th of the screen's height), 4 in from the safe
@@ -638,6 +655,169 @@ feed('moving blip', function()
                 say('map3dMoving', { list = list })
             end
             Wait(120)
+        end
+    end
+end)
+
+-- ---- the search circle -------------------------------------------------------
+-- Single player's SEARCH CIRCLE (ViMinimap's UpdateSearchArea, drawn by its
+-- DrawSearchAreaOnMap): where the police are looking, decided here and drawn
+-- by the page on the ground under the buildings. Single player works it out
+-- from the game alone:
+--
+--   while the police are on the player (the stars are lit), a circle round
+--   them, SearchStartRadius = 180 m;
+--   once the stars grey out, a circle where the player was at that moment,
+--   closing in from 180 m at SearchShrinkPerSec = 4 m a second to
+--   SearchMinRadius = 60 m, and staying until the wanted level is gone.
+--
+-- With fenix-police running (Config.PoliceSearch.resource) its contact model
+-- says instead, as it does for the wanted stars: round the player while a
+-- unit can see them, its SearchCentre (where they were last seen) and its
+-- SearchRadius (which grows) while units search, and nothing before anyone
+-- has seen the player or once the search is called off.
+--
+-- Single player's circle stands aside while its minimap wears GTA VI's wanted
+-- colours (ViHideSearch: WantedTint and ChaseFlash, both on in the
+-- MiniMap.settings it ships), so here it is drawn only with the wanted
+-- colouring off, Config.Map3D.police = false. Each player can switch it,
+-- exports.vice_hud:SetSearchCircle(true or false), and the choice is kept;
+-- Config.Map3D.searchCircle is the default, on as single player's is.
+local SEARCH_KVP = 'vice_hud:map3d:search'
+local SEARCH = { start = 180.0, min = 60.0, shrink = 4.0 }
+local FENIX = (type(Config.PoliceSearch) == 'table' and Config.PoliceSearch.resource) or 'fenix-police'
+
+local searchOn = C.searchCircle ~= false
+do
+    local saved = GetResourceKvpString(SEARCH_KVP)
+    if saved == 'on' then searchOn = true elseif saved == 'off' then searchOn = false end
+end
+
+--- The wanted colouring is on, and the circle stands aside for it.
+local function searchStandsAside() return C.police ~= false end
+
+-- since: when the player became wanted (the chase colours go by it).
+-- hidden, x, y, at: single player's circle once the stars greyed, and when.
+-- fr, fat, rate: fenix-police's last radius, when it was read, and how fast
+-- it is growing. fenixMax: the most it grows to, asked once.
+local hunt = { since = 0, hidden = false, x = 0.0, y = 0.0, at = 0, fr = nil, fat = 0, rate = 0.0 }
+local fenixMax = nil
+
+--- Where the police are looking, or nil: { chase = true, r } round the
+--- player, or a centre and a radius in metres changing `rate` a second
+--- within lo..hi, which is how the page carries it on between messages.
+local function searchNow(ped, pid, now)
+    if GetPlayerWantedLevel(pid) <= 0 then
+        hunt.since, hunt.hidden, hunt.fr = 0, false, nil
+        return nil
+    end
+    if hunt.since == 0 then hunt.since = now end
+
+    if GetResourceState(FENIX) == 'started' then
+        local ok, contact = pcall(function() return exports[FENIX]:HasContact() end)
+        if ok and contact then
+            hunt.hidden, hunt.fr = false, nil
+            return { chase = true, r = SEARCH.start }
+        end
+        local okC, centre = pcall(function() return exports[FENIX]:SearchCentre() end)
+        local okR, radius = pcall(function() return exports[FENIX]:SearchRadius() end)
+        if not okC or type(centre) ~= 'table' or not okR or type(radius) ~= 'number' or radius <= 0 then
+            hunt.fr = nil
+            return nil
+        end
+        if fenixMax == nil then
+            local okB, b = pcall(function() return exports[FENIX]:SearchRadiusBounds() end)
+            fenixMax = okB and type(b) == 'table' and tonumber(b.max) or false
+        end
+        -- It does not say how fast it grows: two readings do.
+        if hunt.fr and now > hunt.fat then hunt.rate = (radius - hunt.fr) * 1000.0 / (now - hunt.fat)
+        elseif not hunt.fr then hunt.rate = 0.0 end
+        hunt.fr, hunt.fat = radius, now
+        return { x = centre.x, y = centre.y, r = radius, rate = hunt.rate, lo = 0.0, hi = math.max(radius, fenixMax or radius) }
+    end
+    fenixMax = nil
+
+    -- Single player's own: Wanted.TimeHiddenEvasionStarted, the game's
+    -- greyed-out stars.
+    if not ArePlayerStarsGreyedOut(pid) then
+        hunt.hidden = false
+        return { chase = true, r = SEARCH.start }
+    end
+    if not hunt.hidden then
+        local p = GetEntityCoords(ped)
+        hunt.hidden, hunt.x, hunt.y, hunt.at = true, p.x, p.y, now
+    end
+    local r = math.max(SEARCH.min, SEARCH.start - SEARCH.shrink * (now - hunt.at) / 1000.0)
+    return { x = hunt.x, y = hunt.y, r = r, rate = -SEARCH.shrink, lo = SEARCH.min, hi = SEARCH.start }
+end
+
+--- The radius the page has now, from what it was last told.
+local function searchOnPage(now)
+    local s = searchSent
+    return math.max(s.lo, math.min(s.hi, s.r + s.rate * (now - s.at) / 1000.0))
+end
+
+--- What the page should be told now: the circle, false for none, or nil
+--- when it already knows. A circle that only shrinks or grows as the page
+--- expects it to is not sent again.
+searchNews = function(now)
+    local s = nil
+    if not searchStandsAside() then s = searchNow(PlayerPedId(), PlayerId(), now) end
+    if not searchOn then s = nil end
+    local was = searchSent
+    if not s then
+        searchSent = nil
+        if was then return false end
+        return nil
+    end
+    if was and (s.chase == true) == (was.chase == true) then
+        if s.chase then
+            if math.abs(s.r - was.r) < 0.5 then return nil end
+        elseif math.abs(s.x - was.x) + math.abs(s.y - was.y) < 0.5 and math.abs(searchOnPage(now) - s.r) < 0.5
+            and math.abs(s.rate - was.rate) < 0.05 and s.lo == was.lo and s.hi == was.hi then
+            return nil
+        end
+    end
+    local msg
+    if s.chase then
+        msg = { chase = true, r = s.r }
+    else
+        msg = { x = round(s.x, 1), y = round(s.y, 1), r = round(s.r, 1), rate = round(s.rate, 2),
+                lo = round(s.lo, 1), hi = round(s.hi, 1) }
+    end
+    msg.age = now - hunt.since
+    searchSent = { chase = msg.chase == true, x = msg.x, y = msg.y, r = msg.r, rate = msg.rate, lo = msg.lo, hi = msg.hi, at = now }
+    return msg
+end
+
+local function setSearchCircle(on)
+    searchOn = on == true
+    SetResourceKvp(SEARCH_KVP, searchOn and 'on' or 'off')
+    if drawing then
+        local news = searchNews(GetGameTimer())
+        if news ~= nil then say('map3d', { search = news }) end
+    end
+    return searchOn
+end
+
+exports('GetSearchCircle', function() return searchOn end)
+exports('SetSearchCircle', setSearchCircle)
+
+feed('search', function()
+    while true do
+        if searchStandsAside() then
+            searchSent = nil
+            Wait(1000)
+        elseif not drawing then
+            -- Nothing to draw on, but single player's circle still has to
+            -- know where the stars greyed.
+            searchSent = nil
+            searchNow(PlayerPedId(), PlayerId(), GetGameTimer())
+            Wait(250)
+        else
+            local news = searchNews(GetGameTimer())
+            if news ~= nil then say('map3d', { search = news }) end
+            Wait(hunt.since ~= 0 and 100 or 250)
         end
     end
 end)

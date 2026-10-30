@@ -146,6 +146,14 @@ Config.Map3D = {
     -- true draws the game's own blips for officers, police cars and police
     -- helicopters as well. Police stations are always drawn.
     policeBlips = false,
+    -- Single player's search circle: where the police are looking, on the
+    -- ground under the buildings (round the player while they are on them,
+    -- closing in on where they were lost once the stars grey out, or
+    -- fenix-police's own search area while it runs). Like single player's it
+    -- stands aside for the wanted colouring, so it shows only with
+    -- police = false. Players switch it with exports.vice_hud:SetSearchCircle
+    -- (HUD OPTIONS' SEARCH CIRCLE).
+    searchCircle = true,
 
     -- Stamina. While the player is spending it (sprinting; swimming or
     -- pedalling flat out) their marker sends out thin rings, as the
@@ -780,7 +788,16 @@ Config.Nav = {
 }
 
 Config.Crosshair = {
+    -- The server's default. Each player can switch it off and on for
+    -- themselves (HUD OPTIONS' CROSSHAIR, exports.vice_hud:
+    -- SetCrosshairEnabled); this is what they have until they do. Off, GTA's
+    -- own reticle is left alone.
     enable = true,
+
+    -- The kill mark over the crosshair (red headshot, yellow took more than
+    -- one hit, white otherwise). Only ever with the crosshair. The server's
+    -- default again: HUD OPTIONS' KILL MARKS (SetKillMarksEnabled) per player.
+    killMarks = true,
 
     -- GTA's own reticle, hidden only while ours is up so anything this
     -- feature doesn't cover (thrown weapons, aiming unarmed, whatever else)
@@ -816,6 +833,21 @@ Config.Crosshair = {
 Config.WantedTells = {
     weaponMemoryMs = 12000,
 }
+
+-- The wanted stars in GTA VI's four states: white while the police can see
+-- you, flashing while they are searching, hollow when a crime was reported
+-- but nobody has seen you, red once you have shaken them off. false: the
+-- stars the level has earned, plain white, with no state (the wanted box's
+-- star the same). The server's default; each player can change it for
+-- themselves (HUD OPTIONS' VI WANTED STARS, exports.vice_hud:
+-- SetWantedStarsEnabled).
+Config.WantedStarStates = true
+
+-- GTA VI's wanted box, "The cops are searching for you / and they have your
+-- description" with the tells under it. false: no box (the tells under the
+-- stars stay). The server's default; HUD OPTIONS' WANTED BOX
+-- (SetWantedBoxEnabled) per player.
+Config.WantedBox = true
 
 -- The game's own help messages (GTA V's black box, top left) shown in
 -- vice_hud's help box instead, from the single-player GTA6Hud. The game
@@ -971,7 +1003,16 @@ Config.Reputation = {
 -- the minimap.
 
 Config.PoliceLights = {
+    -- The server's default. false starts every player with no lights and no
+    -- arrow; each player can still turn them on for themselves (HUD OPTIONS'
+    -- POLICE LIGHTS, or /hudpolice edit).
     enable      = true,
+
+    -- How big the lights are, in % (0 for none, else 40-200), until a player
+    -- picks their own: HUD OPTIONS' POLICE LIGHTS steps 0 / 60 / 80 / 100 /
+    -- 120 / 140 (exports.vice_hud:SetPoliceLightsSize), and /hudpolice edit
+    -- has it as Size. The arrow has its own switch in that panel.
+    size        = 100,
 
     -- How often to scan for sirens, in ms. This walks the vehicle pool, so it
     -- is deliberately not per-frame.

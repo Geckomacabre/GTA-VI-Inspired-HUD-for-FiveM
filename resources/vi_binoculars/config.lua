@@ -1,5 +1,11 @@
 Config = {}
 
+-- Whether players have binoculars at all, until they choose for themselves:
+-- HUD OPTIONS' BINOCULARS (vi_extras, hold V), or
+-- exports.vi_binoculars:SetBinocularsEnabled, kept per player. Off, nothing
+-- raises them (command, key, item or export).
+Config.Enabled = true
+
 -- ---- how you get them out ---------------------------------------------------
 -- /binoculars toggles them. Set to false to register no command.
 Config.Command = 'binoculars'

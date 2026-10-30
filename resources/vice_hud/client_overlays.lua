@@ -40,52 +40,71 @@ end
 -- --spread). Only the two native calls that must run every frame regardless
 -- (HideHudComponentThisFrame, and reading whether a shot fired this frame)
 -- are actually in the tight loop.
-if Config.Crosshair.enable then
-    local crossActive, crossMode = false, 'foot'
-    local crossWasShooting = false
-    local SNIPER_GROUP = `GROUP_SNIPER`
+--
+-- On or off per player: HUD OPTIONS' CROSSHAIR (client_options.lua),
+-- Config.Crosshair.enable until they choose. Off, the loop is not running at
+-- all, so nothing hides GTA's own reticle, and #crosshair is down.
+local crossActive, crossMode = false, 'foot'
+local crossWasShooting = false
+local crossRunning = false
+local SNIPER_GROUP = `GROUP_SNIPER`
 
-    CreateThread(function()
-        while true do
-            Wait(0)
-            local ped = cache.ped or PlayerPedId()
-            local playerId = PlayerId()
-            -- IS_PED_ARMED's flags: 1 melee, 2 thrown, 4 guns. This asked for 2,
-            -- so a gun never brought the crosshair up and the game's own reticle
-            -- stayed (found putting it side by side with the single-player
-            -- port, which asks for 4).
-            local armedGun = IsPedArmed(ped, Config.Crosshair.armedWith or 4)
-            -- A sniper rifle's scope IS the game's reticle, so hiding it for
-            -- our crosshair left nothing to aim through. Those keep the game's.
-            local sniper = armedGun and GetWeapontypeGroup(GetSelectedPedWeapon(ped)) == SNIPER_GROUP
-            -- Targetting covers Assisted Aim / Traditional lock-on, which is
-            -- never "free aiming": without it the crosshair only came up on
-            -- the first shot.
-            local aiming = armedGun and not sniper
-                and (IsPlayerFreeAiming(playerId) or IsPlayerTargettingAnything(playerId) or IsPedShooting(ped))
-            local mode = IsPedInAnyVehicle(ped, false) and 'vehicle' or 'foot'
+local function crosshairLoop()
+    while true do
+        Wait(0)
+        if not ViceOptions.CrosshairEnabled then break end
+        local ped = cache.ped or PlayerPedId()
+        local playerId = PlayerId()
+        -- IS_PED_ARMED's flags: 1 melee, 2 thrown, 4 guns. This asked for 2,
+        -- so a gun never brought the crosshair up and the game's own reticle
+        -- stayed (found putting it side by side with the single-player
+        -- port, which asks for 4).
+        local armedGun = IsPedArmed(ped, Config.Crosshair.armedWith or 4)
+        -- A sniper rifle's scope IS the game's reticle, so hiding it for
+        -- our crosshair left nothing to aim through. Those keep the game's.
+        local sniper = armedGun and GetWeapontypeGroup(GetSelectedPedWeapon(ped)) == SNIPER_GROUP
+        -- Targetting covers Assisted Aim / Traditional lock-on, which is
+        -- never "free aiming": without it the crosshair only came up on
+        -- the first shot.
+        local aiming = armedGun and not sniper
+            and (IsPlayerFreeAiming(playerId) or IsPlayerTargettingAnything(playerId) or IsPedShooting(ped))
+        local mode = IsPedInAnyVehicle(ped, false) and 'vehicle' or 'foot'
 
-            if aiming then
-                HideHudComponentThisFrame(Config.Crosshair.reticleComponent)
-                if not crossActive or mode ~= crossMode then
-                    crossActive, crossMode = true, mode
-                    ui('crosshair', { active = true, mode = mode })
-                end
-            elseif crossActive then
-                crossActive = false
-                ui('crosshair', { active = false })
+        if aiming then
+            HideHudComponentThisFrame(Config.Crosshair.reticleComponent)
+            if not crossActive or mode ~= crossMode then
+                crossActive, crossMode = true, mode
+                ui('crosshair', { active = true, mode = mode })
             end
-
-            -- Foot reticle only — the vehicle ring doesn't spread in the
-            -- reference, so there's nothing to fire an event for there.
-            local shooting = aiming and mode == 'foot' and IsPedShooting(ped)
-            if shooting and not crossWasShooting then
-                ui('crossFire', {})
-            end
-            crossWasShooting = shooting
+        elseif crossActive then
+            crossActive = false
+            ui('crosshair', { active = false })
         end
-    end)
+
+        -- Foot reticle only — the vehicle ring doesn't spread in the
+        -- reference, so there's nothing to fire an event for there.
+        local shooting = aiming and mode == 'foot' and IsPedShooting(ped)
+        if shooting and not crossWasShooting then
+            ui('crossFire', {})
+        end
+        crossWasShooting = shooting
+    end
+
+    -- Switched off: down, kill mark and all.
+    crossRunning, crossActive, crossWasShooting = false, false, false
+    ui('crosshair', { active = false })
 end
+
+local function startCrosshair()
+    if crossRunning then return end
+    crossRunning = true
+    CreateThread(crosshairLoop)
+end
+
+ViceOption('CrosshairEnabled', 'vice_hud:crosshair', Config.Crosshair.enable ~= false, function(on)
+    if on then startCrosshair() else killHits = {} end
+end)
+if ViceOptions.CrosshairEnabled then startCrosshair() end
 
 -- =============================================================================
 -- Kill mark — the coloured cross that flashes on a kill
@@ -115,9 +134,15 @@ HEAD_BONE = 31086
 -- Not `local` — same reasoning as HEAD_BONE above.
 killHits = {}
 
+-- HUD OPTIONS' KILL MARKS, per player; Config.Crosshair.killMarks until they
+-- choose. Only ever with the crosshair: off either way, nothing is counted.
+ViceOption('KillMarksEnabled', 'vice_hud:killMarks', Config.Crosshair.killMarks ~= false, function(on)
+    if not on then killHits = {} end
+end)
+
 AddEventHandler('gameEventTriggered', function(name, args)
     if name ~= 'CEventNetworkEntityDamage' then return end
-    if not Config.Crosshair.enable then return end
+    if not (ViceOptions.CrosshairEnabled and ViceOptions.KillMarksEnabled) then return end
     local victim, attacker = args[1], args[2]
     local ped = cache.ped or PlayerPedId()
     if attacker ~= ped or victim == ped then return end

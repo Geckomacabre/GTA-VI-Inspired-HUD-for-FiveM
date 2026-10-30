@@ -45,8 +45,11 @@ client_scripts {
     -- from refusing to load, which takes the entire HUD down, not one feature.
     -- Neither file reaches back into client.lua: see their headers for the
     -- exact surface that crosses.
-    -- First of all: the button resolver the two files below both draw on
-    -- (which button a control is on, for the device in hand).
+    -- First of all: the player's own switches (HUD OPTIONS' CROSSHAIR, KILL
+    -- MARKS, VI WANTED STARS, WANTED BOX), which the files below define.
+    'client_options.lua',
+    -- Then the button resolver the two files below both draw on (which
+    -- button a control is on, for the device in hand).
     'client_glyphs.lua',
     'client_vitals.lua',
     'client_overlays.lua',

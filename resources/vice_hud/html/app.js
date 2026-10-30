@@ -442,6 +442,8 @@
          hollow    outline only, static, brighter than an unearned star but
                    never filled, reported, nobody's found you yet.
          red       solid red fill, static, shaken them, still in the zone.
+       And `plain`, which is no state at all: solid white, static, for a
+       player who has HUD OPTIONS' VI WANTED STARS off.
        `filled` is how many stars the level has earned; `state` decides how
        those earned stars render. None of this is the pink/teal character
        accent, that's the waypoint/nav bar's own thing, not the stars'. */
@@ -485,8 +487,8 @@
        / and they have your description" (it's in index.html) -- and only
        while that is true: you are wanted AND the police have at least one
        tell on you. The other three messages this box used to cycle through
-       were never in GTA VI. The box's own star keeps the corner row's class,
-       but style.css paints it GTA VI's dark red in every state. */
+       were never in GTA VI. The box's own star takes the corner row's class
+       and has no colours of its own, so it is the same star as theirs. */
 
     // A notification, not a standing readout: it pops up when a NEW tell
     // lights or the stars go up, holds WANTED_HOLD_MS, and goes. A tell going
@@ -513,6 +515,23 @@
         show($('tells'), stars > 0 && tells.length > 0);
         renderTells($('tells'), tells);
         renderTells($('wanted-tells'), tells);
+
+        // HUD OPTIONS' WANTED BOX off: the box stays down, and nothing it
+        // has seen is remembered, so turning it back on mid-chase pops it.
+        // The tells above are the stars' column, not the box, and stay.
+        // Down at once, not after setVisible's anti-flicker hold: a switch
+        // does not flicker. The editor's sample box is left up, so it can
+        // still be placed.
+        if (d.box === false) {
+            if (wantedHideTimer) { clearTimeout(wantedHideTimer); wantedHideTimer = null; }
+            wantedLastStars = 0;
+            wantedLastTells = {};
+            if (!editorOpen) {
+                if (hideTimers.wanted) { clearTimeout(hideTimers.wanted); delete hideTimers.wanted; }
+                show($('wanted'), false);
+            }
+            return;
+        }
 
         var wanted = !!d.active && stars > 0;
         var fresh = wanted && stars > wantedLastStars;

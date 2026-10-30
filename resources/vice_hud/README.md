@@ -215,6 +215,11 @@ exports.vice_hud:ShowHonorDeed(delta, severity, broken)  -- centre +/- indicator
 exports.vice_hud:ShowHonorChange(delta, mugshot, severity)
 exports.vice_hud:SetHonorStanding(honor, broken)   -- seeds the value, draws nothing
 
+exports.vice_hud:SetMoneyShown(on, source)
+-- Keep the cash and bank rows up while something of yours matters to them, as
+-- the weapon wheel and an ATM do (vi_extras' MONEY IN STORES, in a store).
+-- Each source holds its own; a resource that stops lets go of its holds.
+
 exports.vice_hud:ReportWantedTellSighting(id, source)
 -- Something of yours has SEEN the player. One shot, nothing to turn off: the
 -- tell stays lit until the police lose them. See "The camera tell" below.
@@ -233,6 +238,21 @@ exports.vice_hud:GetHudOffset(element)             -- returns x, y, scale, hidde
 exports.vice_hud:IsHudElementHidden(element)       -- 'speedlimit' / 'seatbelt' taken off the HUD by the player
 exports.vice_hud:GetMinimapOnFoot()                -- /hudminimap's choice: true = the map on foot too
 exports.vice_hud:SetMinimapOnFoot(state)           -- set it (saved, as /hudminimap does)
+
+-- The player's own switches (HUD OPTIONS; see "The player's switches" below).
+-- Each Set is saved for that player and takes at once.
+exports.vice_hud:GetCrosshairEnabled()             -- bool
+exports.vice_hud:SetCrosshairEnabled(on)
+exports.vice_hud:GetKillMarksEnabled()             -- bool
+exports.vice_hud:SetKillMarksEnabled(on)
+exports.vice_hud:GetWantedStarsEnabled()           -- bool: the four-state stars
+exports.vice_hud:SetWantedStarsEnabled(on)
+exports.vice_hud:GetWantedBoxEnabled()             -- bool
+exports.vice_hud:SetWantedBoxEnabled(on)
+exports.vice_hud:GetPoliceLightsSize()             -- number, %: 0 for none
+exports.vice_hud:SetPoliceLightsSize(percent)      -- 0, or 40-200
+exports.vice_hud:GetGreetEnabled()                 -- bool (also exports.qbx_honor:)
+exports.vice_hud:SetGreetEnabled(on)
 
 exports.vice_hud:AddSkillXp(id, amount, opts)
 -- opts (optional): { card = true } shows the gain card bottom right ("Focus +2%")
@@ -258,6 +278,35 @@ exports.vice_hud:HideNitrousHint()
 
 exports.vice_hud:SetLapTimer(data)                 -- the race HUD; see below
 ```
+
+### The player's switches
+
+Single player's HUD OPTIONS menu (hold V) switches these features for each
+player; on FiveM, `vi_extras` lists them in the same menu and calls the exports
+above. Each is the server's config value until the player changes it, then
+theirs, kept in this resource's KVP, so it is there again the next time they
+join, with or without `vi_extras`. A change takes at once.
+
+| Row | KVP key | Server's default | Off |
+| --- | --- | --- | --- |
+| CROSSHAIR | `vice_hud:crosshair` | `Config.Crosshair.enable` | No crosshair, its loop stopped, and GTA's own reticle back |
+| KILL MARKS | `vice_hud:killMarks` | `Config.Crosshair.killMarks` | No mark on a kill, and no hits counted. Only ever with the crosshair |
+| VI WANTED STARS | `vice_hud:wantedStars` | `Config.WantedStarStates` | The stars the level has earned, plain white, with no state; the wanted box's star the same |
+| WANTED BOX | `vice_hud:wantedBox` | `Config.WantedBox` | No "The cops are searching for you" box. The tells under the stars stay |
+| POLICE LIGHTS | `vice_hud:policeSize` | `Config.PoliceLights.size` (0 when `enable = false`) | At 0, no lights at the screen's edge, classic lamps included. The arrow keeps its own switch in `/hudpolice edit`; with that off too nothing is scanned |
+| GREET / ANTAGONIZE | `qbx_honor:greet` | `Config.ConductWatcher.greetAntagonize` | The two options are taken off peds |
+
+VI WANTED STARS off is not GTA's own stars: single player's off is the HUD's
+own stars without the four states, and this is the same here. The state is
+still worked out, since the tells, the drawn minimap's colours and the
+vehicle panel's tracker pip run on it; only the stars stop showing it.
+
+POLICE LIGHTS is the Size row of `/hudpolice edit` too. It is kept on its own
+key rather than with the rest of that panel, so a player who has tuned the
+lights but never their size still follows the server's size. GREET /
+ANTAGONIZE is kept by `honor/` itself, which also runs on its own as
+`qbx_honor`: there its key is in `qbx_honor`'s KVP, and its exports are
+`exports.qbx_honor:GetGreetEnabled` / `SetGreetEnabled`.
 
 ### Buttons: controller, keyboard and mouse
 
@@ -758,6 +807,17 @@ What to know about it:
   yards lighter, blue-grey buildings lit from one side, the building you are
   in or on seen through round your marker. Lane lines are drawn on the roads,
   and the far end of the map pales toward the horizon.
+- **The search circle** (single player's SEARCH CIRCLE): where the police are
+  looking, on the ground under the buildings. While they are on you it is
+  180 m round you, blue for two seconds, then red and blue, then red. Once the
+  stars grey out it stays where you were lost and closes in from 180 m to
+  60 m at 4 m a second, going between red and blue. With fenix-police running
+  it is fenix-police's own search area, and nothing before anyone has seen you
+  or once they give up. Like single player's, it stands aside for the wanted
+  colouring, so it shows only with `Config.Map3D.police = false`.
+  `searchCircle` is the default; `exports.vice_hud:SetSearchCircle(true/false)`
+  / `GetSearchCircle()` switch it per player (HUD OPTIONS), and the choice is
+  kept.
 - **It is drawn on the HUD's page, by WebGL.** The mod paints straight onto
   the game's frame from a plugin, which a server cannot give its players, and
   the engine's own radar is a flat picture that cannot stand a building up.

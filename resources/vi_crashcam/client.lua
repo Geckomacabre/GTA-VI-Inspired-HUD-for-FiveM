@@ -14,13 +14,22 @@
 
      Public API:
          exports.vi_crashcam:PlayCrashCam()            -- on the current vehicle
-         exports.vi_crashcam:SetCrashCamEnabled(bool)  -- e.g. off during a race
+         exports.vi_crashcam:IsCrashCamEnabled()       -- the player's switch
+         exports.vi_crashcam:SetCrashCamEnabled(bool)  -- set it (saved)
          exports.vi_crashcam:IsCrashCamPlaying()
      ========================================================================= ]]
 
 local KMH = 3.6                 -- GetEntitySpeed is m/s
 
+-- The player's own switch (HUD OPTIONS' CRASH CAMERA, vi_pausemenu's Crash
+-- Camera): Config.Enabled until they choose, then theirs, kept in this
+-- resource's KVP so it is there again on the next join.
+local ENABLED_KVP = 'vi_crashcam:enabled'
 local enabled = Config.Enabled ~= false
+do
+    local saved = GetResourceKvpString(ENABLED_KVP)
+    if saved == 'on' then enabled = true elseif saved == 'off' then enabled = false end
+end
 local playing = false
 local readyAt = 0               -- GetGameTimer() before which nothing triggers
 local activeCam = nil
@@ -136,9 +145,17 @@ local function hold(ms, each)
     end
 end
 
+-- vi_extras' kill camera has the screen: the two shots never overlap
+local function killCamPlaying()
+    if GetResourceState('vi_extras') ~= 'started' then return false end
+    local ok, on = pcall(function() return exports.vi_extras:IsKillCamPlaying() end)
+    return ok and on == true
+end
+
 local function play(veh, dir)
     if playing or not DoesEntityExist(veh) then return end
     if IsScreenFadedOut() or IsScreenFadingOut() or IsPauseMenuActive() then return end
+    if killCamPlaying() then return end
     playing = true
 
     local ok, err = pcall(function()
@@ -173,10 +190,13 @@ local function play(veh, dir)
         setHud(false)
         if Config.BlackFlashMs > 0 then DoScreenFadeIn(0) end
 
+        -- Switched off mid-shot: cut back now. (Off from the start, this is
+        -- PlayCrashCam or /crashcam asking for it, and it plays out.)
+        local wasOn = enabled
         hold(Config.DurationMs, function()
             HideHudAndRadarThisFrame()
             drawBars()
-            return DoesEntityExist(veh)
+            return DoesEntityExist(veh) and not (wasOn and not enabled)
         end)
 
         -- 3. Back to the view the player had.
@@ -266,7 +286,11 @@ end
 
 exports('PlayCrashCam', playOnCurrent)
 exports('IsCrashCamPlaying', function() return playing end)
-exports('SetCrashCamEnabled', function(state) enabled = state ~= false end)
+exports('IsCrashCamEnabled', function() return enabled end)
+exports('SetCrashCamEnabled', function(state)
+    enabled = state ~= false
+    SetResourceKvp(ENABLED_KVP, enabled and 'on' or 'off')
+end)
 
 if Config.TestCommand then
     RegisterCommand(Config.TestCommand, function()

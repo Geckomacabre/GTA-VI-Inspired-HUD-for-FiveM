@@ -16,33 +16,45 @@ html, body {
 }
 
 /* Declared on :root only - repeating them on `body` would shadow the scale
-   value app.js writes to the root element. */
+   value app.js writes to the root element.
+
+   The defaults below are the single-player HUD's numbers (ViExtras RadioHud,
+   tools/render/radio.py), which config.lua's Config.Hud sends again. --ink is
+   the one exception: unset it stays white, the original's text, because the
+   single-player render (radio.py) captures this page white and tints it
+   itself. config.lua sets it to the grey. */
 :root {
     /* --s is the 1080p -> actual resolution scale, set from app.js */
     --s: 1;
     --icon: 103px;
-    --spacing: 112px;
+    --spacing: 118px;
     --top: 32px;
-    --border: 3.5px;
+    --border: 2.5px;
+    --border-px: 2px;   /* --border at this scale, snapped to device pixels (app.js) */
     --box: rgba(0, 0, 0, 0.667);
-    --box-active: rgba(45, 45, 45, 0.863);
-    --outline: rgba(255, 255, 255, 0.353);
-    --outline-active: rgba(255, 255, 255, 1);
+    --box-active: rgba(0, 0, 0, 0.667);
+    --outline: rgba(255, 255, 255, 0);
+    --outline-active: rgba(192, 194, 200, 1);
+    --ink: #ffffff;
+    --tile-scale-on: 1.03;
+    --tile-scale-off: 1;
+    --tile-opacity-off: 1;
+    --text-shadow: none;
     --slide: 110ms;
     --side-gap: 37px;
     --left-icon-h: 55px;
     --right-icon-h: 24px;
     --mute-color: #ffffff;
     --muted-color: #ff3b30;
-    --line-y: 24px;
+    --line-y: 20px;
     --line-w: 189px;
-    --line-h: 6.5px;
-    --station-y: 34px;
-    --station-size: 36px;
-    --title-y: 68px;
-    --title-size: 31px;
-    --artist-y: 95px;
-    --artist-size: 28px;
+    --line-h: 4.8px;
+    --station-y: 34.7px;
+    --station-size: 25.3px;
+    --title-y: 70.6px;
+    --title-size: 20.6px;
+    --artist-y: 97.2px;
+    --artist-size: 20.6px;
 }
 
 #radio {
@@ -57,16 +69,19 @@ html, body {
     transition: opacity 160ms ease;
 }
 
-#radio.hidden {
+#radio.hidden,
+#radio.held {
     opacity: 0;
     pointer-events: none;
 }
 
 /* --- carousel ------------------------------------------------------------ */
 
-/* Five slots wide, so neighbours fade out at the edges instead of popping.
-   The side icons are absolutely positioned so they cannot push the carousel
-   off centre - the info block below is centred on the same axis. */
+/* Five slots wide. The side icons are absolutely positioned so they cannot
+   push the carousel off centre - the info block below is centred on the same
+   axis. Nothing is clipped: app.js places every tile and fades the ones past
+   two slots out, as the single-player wheel draws them (whole out to two
+   either side, gone by three). */
 #carousel {
     position: relative;
     width: calc(var(--spacing) * 5 * var(--s));
@@ -77,37 +92,49 @@ html, body {
     position: relative;
     width: 100%;
     height: calc(var(--icon) * var(--s));
-    overflow: hidden;
-    -webkit-mask-image: linear-gradient(to right,
-        transparent 0%, #000 18%, #000 82%, transparent 100%);
-    mask-image: linear-gradient(to right,
-        transparent 0%, #000 18%, #000 82%, transparent 100%);
 }
 
+/* A point on the carousel's centre; each .slot is placed off it by app.js. */
 #track {
     position: absolute;
-    top: 0;
+    top: 50%;
     left: 50%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    transition: transform var(--slide) cubic-bezier(0.22, 0.61, 0.36, 1);
+    width: 0;
+    height: 0;
 }
 
+.slot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+}
+
+/* The logo fills the tile, the box colour only shows behind its transparent
+   corners. The outline is the tile's border, outside its 103px, drawn only
+   round the highlighted one (border-box would eat into the logo). The
+   browser draws borders in whole device pixels, so app.js hands over the
+   width already snapped (--border-px) and the transform moves the tile back
+   by exactly that. (In the transform, not in left/top: the single-player
+   repo's tools/render/radio.py renders this page with the tiles' border and
+   transform off, and its tiles then sit where they always have.) */
 .tile {
-    position: relative;
-    flex: 0 0 auto;
+    position: absolute;
+    box-sizing: content-box;
+    left: calc(var(--icon) / -2 * var(--s));
+    top: calc(var(--icon) / -2 * var(--s));
     width: calc(var(--icon) * var(--s));
     height: calc(var(--icon) * var(--s));
-    margin: 0 calc((var(--spacing) - var(--icon)) / 2 * var(--s));
     background: var(--box);
-    border: calc(var(--border) * var(--s)) solid var(--outline);
+    background-clip: padding-box;
+    border: var(--border-px) solid var(--outline);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    opacity: 0.55;
-    transform: scale(0.9);
+    opacity: var(--tile-opacity-off);
+    transform: translate(calc(-1 * var(--border-px)), calc(-1 * var(--border-px))) scale(var(--tile-scale-off));
     transition: background var(--slide) ease,
                 border-color var(--slide) ease,
                 opacity var(--slide) ease,
@@ -116,15 +143,16 @@ html, body {
 
 .tile.active {
     background: var(--box-active);
+    background-clip: padding-box;
     border-color: var(--outline-active);
     opacity: 1;
-    transform: scale(1);
+    transform: translate(calc(-1 * var(--border-px)), calc(-1 * var(--border-px))) scale(var(--tile-scale-on));
 }
 
 .tile img {
-    width: 88%;
-    height: 88%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     image-rendering: auto;
 }
 
@@ -174,6 +202,10 @@ html, body {
     align-items: stretch;
     gap: calc(var(--left-icon-h) * 0.26 * var(--s));
 }
+
+/* display: flex above would otherwise beat the hidden attribute, and with On
+   Demand off the switch showed beside the static artwork, twice over. */
+#od-switch-graphic[hidden] { display: none; }
 
 .sw-labels {
     display: flex;
@@ -289,7 +321,7 @@ html, body {
     transform: translateX(-50%);
     width: calc(var(--line-w) * var(--s));
     height: calc(var(--line-h) * var(--s));
-    background: #fff;
+    background: var(--ink);
 }
 
 #station, #title, #artist {
@@ -299,12 +331,12 @@ html, body {
     text-align: center;
     font-family: 'Anton', Impact, sans-serif;
     text-transform: uppercase;
-    color: #fff;
+    color: var(--ink);
     letter-spacing: 0.01em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-shadow: 0 calc(2px * var(--s)) calc(6px * var(--s)) rgba(0, 0, 0, 0.75);
+    text-shadow: var(--text-shadow);
 }
 
 #station {
@@ -317,15 +349,17 @@ html, body {
     top: calc(var(--title-y) * var(--s));
     font-size: calc(var(--title-size) * var(--s));
     line-height: 1.05;
-    opacity: 0.92;
 }
 
 #artist {
     top: calc(var(--artist-y) * var(--s));
     font-size: calc(var(--artist-size) * var(--s));
     line-height: 1.05;
-    opacity: 0.62;
 }
+
+/* The original's softer lines, with Config.Hud.textShadow on. */
+#radio.shadowed #title  { opacity: 0.92; }
+#radio.shadowed #artist { opacity: 0.62; }
 
 #title:empty, #artist:empty { display: none; }
 
@@ -361,7 +395,7 @@ html, body {
     gap: calc(14px * var(--s));
     padding: calc(26px * var(--s)) calc(28px * var(--s)) calc(22px * var(--s));
     background: rgba(12, 12, 14, 0.94);
-    border: calc(var(--border) * var(--s)) solid var(--outline-active);
+    border: calc(3.5px * var(--s)) solid #fff;
     color: #fff;
     font-family: system-ui, 'Segoe UI', Arial, sans-serif;
     font-size: calc(15px * var(--s));
@@ -383,7 +417,7 @@ html, body {
     gap: calc(9px * var(--s));
     padding: calc(6px * var(--s)) calc(10px * var(--s)) calc(6px * var(--s)) calc(6px * var(--s));
     background: none;
-    border-color: var(--outline);
+    border-color: var(--od-line);
 }
 
 .switch-track {
@@ -464,24 +498,28 @@ html, body {
     gap: calc(8px * var(--s));
 }
 
+/* The panel keeps the original's white lines: the HUD's outline colours above
+   are the carousel's, and an invisible inactive outline is no use here. */
+#od { --od-line: rgba(255, 255, 255, 0.353); }
+
 #od-url {
     flex: 1 1 auto;
     min-width: 0;
     padding: calc(10px * var(--s)) calc(12px * var(--s));
     background: rgba(255, 255, 255, 0.07);
-    border: calc(2px * var(--s)) solid var(--outline);
+    border: calc(2px * var(--s)) solid var(--od-line);
     color: #fff;
     font: inherit;
     outline: none;
 }
 
-#od-url:focus { border-color: var(--outline-active); }
+#od-url:focus { border-color: #fff; }
 #od-url::placeholder { color: rgba(255, 255, 255, 0.35); }
 
 #od button {
     padding: calc(10px * var(--s)) calc(14px * var(--s));
     background: rgba(255, 255, 255, 0.09);
-    border: calc(2px * var(--s)) solid var(--outline);
+    border: calc(2px * var(--s)) solid var(--od-line);
     color: #fff;
     font: inherit;
     text-transform: uppercase;
@@ -491,14 +529,14 @@ html, body {
     white-space: nowrap;
 }
 
-#od button:hover { background: rgba(255, 255, 255, 0.18); border-color: var(--outline-active); }
+#od button:hover { background: rgba(255, 255, 255, 0.18); border-color: #fff; }
 #od button.primary { background: #fff; color: #111; border-color: #fff; }
 #od button.primary:hover { background: rgba(255, 255, 255, 0.85); }
 #od button.danger:hover { background: var(--muted-color); border-color: var(--muted-color); }
 #od button.ghost { background: none; border: none; opacity: 0.6; padding: 0; }
 #od button.ghost:hover { opacity: 1; background: none; }
 #od button:disabled { opacity: 0.3; cursor: default; }
-#od button:disabled:hover { background: rgba(255, 255, 255, 0.09); border-color: var(--outline); }
+#od button:disabled:hover { background: rgba(255, 255, 255, 0.09); border-color: var(--od-line); }
 
 #od-notice {
     min-height: calc(18px * var(--s));
@@ -512,7 +550,7 @@ html, body {
     display: flex;
     justify-content: space-between;
     padding-bottom: calc(6px * var(--s));
-    border-bottom: calc(2px * var(--s)) solid var(--outline);
+    border-bottom: calc(2px * var(--s)) solid var(--od-line);
     font-family: 'Anton', Impact, sans-serif;
     font-size: calc(16px * var(--s));
     text-transform: uppercase;
@@ -576,7 +614,7 @@ html, body {
     align-items: center;
     gap: calc(18px * var(--s));
     padding-top: calc(12px * var(--s));
-    border-top: calc(2px * var(--s)) solid var(--outline);
+    border-top: calc(2px * var(--s)) solid var(--od-line);
     font-size: calc(14px * var(--s));
 }
 

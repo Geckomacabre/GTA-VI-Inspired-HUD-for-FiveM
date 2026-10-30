@@ -23,6 +23,11 @@ at the bottom right.
 Settings, Brief, Stats, Players and Report are GTA VI's settings screen: a list on the left, a picture and a line
 about the chosen row on the right.
 
+With `vi_extras` running, Settings starts with HUD OPTIONS: the same switches the hold-V menu shows (guns on back,
+kill camera, crosshair, police lights...), each changed in the one place both menus read. This page's own Crash
+Camera, Map Day/Night and Map in Vehicle Only rows then step aside for theirs. Radio (mute), Pause Menu, Key
+Bindings and Game Settings stay.
+
 | | |
 | --- | --- |
 | ![Settings](docs/settings.jpg) | ![Stats](docs/stats.jpg) |

@@ -44,6 +44,7 @@ function Run(ms) local t = Now + ms while Now < t do Tick(16) end end
 Kvp = {}
 function GetResourceKvpString(k) return Kvp[k] end
 function SetResourceKvp(k, v) Kvp[k] = v end
+function DeleteResourceKvp(k) Kvp[k] = nil end
 
 -- the player
 function PlayerPedId() return 100 end

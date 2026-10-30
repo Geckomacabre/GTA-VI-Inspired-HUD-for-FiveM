@@ -228,6 +228,13 @@ exports.qbx_honor:GetBadgeTier(value)
 
 -- Same story as GetHonor() -- cached client-side, no round-trip.
 exports.qbx_honor:IsHonorBroken()
+
+-- The Greet / Antagonize options on peds, switched per player (HUD OPTIONS'
+-- GREET / ANTAGONIZE). Saved in this resource's KVP (`qbx_honor:greet`), and
+-- Config.ConductWatcher.greetAntagonize until the player sets it. Off, the two
+-- options are taken off peds; on, they are put back. Also exports.vice_hud:.
+exports.qbx_honor:GetGreetEnabled()            -- bool
+exports.qbx_honor:SetGreetEnabled(on)
 ```
 
 `qbx_vehiclekeys` reads these client-side to scale how long a window smash takes and how

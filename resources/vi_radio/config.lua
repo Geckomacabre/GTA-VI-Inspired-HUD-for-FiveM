@@ -1,32 +1,47 @@
 --[[
     VI Radio - configuration
-    This mirrors the "VI Radio.ini" from the original singleplayer mod.
-    Anything the .ini exposed is exposed here, plus a few FiveM-only options.
+    This mirrors the "VI Radio.ini" from the original singleplayer mod, and the
+    [Radio] section of the single-player HUD's ViExtras.ini, which was ported
+    from this resource and has since moved on; the defaults here are that
+    port's. Plus a few FiveM-only options.
 ]]
 
 Config = {}
 
 -- ---------------------------------------------------------------------------
+-- On / off
+-- ---------------------------------------------------------------------------
+-- The VI radio wheel in place of GTA's own. Off hands everything back to GTA:
+-- its radio wheel and station HUD, its next / previous station keys, and no
+-- slow motion. Each player can switch it in HUD OPTIONS (VI RADIO WHEEL, or
+-- exports['vi_radio']:SetWheelEnabled); their choice is kept on their client.
+-- This is the default for anyone who has not chosen.
+Config.WheelEnabled = true
+
+-- ---------------------------------------------------------------------------
 -- Controls
 -- ---------------------------------------------------------------------------
--- Default key bindings. Players can rebind them in FiveM
+-- The wheel opens on the game's own radio wheel control (INPUT_VEH_RADIO_WHEEL:
+-- Q, or D-pad Left, or wherever the player's GTA settings put it), on the
+-- keyboard and the pad alike, as GTA's radio wheel does. OpenKey is an extra
+-- keyboard key on top of that; players can rebind both keys below in FiveM
 -- (Settings -> Key Bindings -> FiveM), these are only the defaults.
-Config.OpenKey         = 'Q'    -- hold to open the radio wheel
-Config.MuteKey         = 'O'    -- toggle mute / unmute
+Config.OpenKey         = 'Q'    -- also hold to open the radio wheel
+Config.MuteKey         = 'O'    -- toggle mute / unmute, in a vehicle
 
 Config.ScrollRadio     = true   -- mouse wheel also cycles stations while open
 Config.ArrowAutoRepeat = true   -- holding left/right keeps cycling
-Config.AutoRepeatDelay = 350    -- ms before auto repeat kicks in
-Config.AutoRepeatRate  = 120    -- ms between repeats
+Config.AutoRepeatDelay = 350    -- ms before auto repeat kicks in (real time)
+Config.AutoRepeatRate  = 120    -- ms between repeats (real time)
 
 -- Controller support.
--- The wheel opens on whatever the game has bound to the radio wheel control
--- (INPUT_VEH_RADIO_WHEEL, D-pad Left by default), read directly rather than
--- through a FiveM key binding -- key bindings only ever set a *default*, so a
--- pad binding added after the fact never reaches a client that already stored
--- one. Because D-pad Left is held to keep the wheel open, and is also
--- INPUT_CELLPHONE_LEFT, stations are browsed with the right stick, D-pad Right
--- and D-pad Up instead.
+-- The wheel opens on INPUT_VEH_RADIO_WHEEL (D-pad Left by default), read
+-- directly rather than through a FiveM key binding -- key bindings only ever
+-- set a *default*, so a pad binding added after the fact never reaches a
+-- client that already stored one. Whether the pad or the keyboard steers is
+-- decided by whichever the player touched last. Because D-pad Left is held to
+-- keep the wheel open, and is also INPUT_CELLPHONE_LEFT, stations are browsed
+-- with the right stick (one station a push), D-pad Right and D-pad Up instead.
 Config.Controller = {
     enabled    = true,
     deadzone   = 0.5,   -- right stick travel before a station change registers
@@ -37,16 +52,23 @@ Config.Controller = {
     -- If your pad reports it the other way round, set this to true.
     -- Leave lockCamera on unless you like the view tilting as you flip it.
     invertSwitchAxis = false,
+
+    -- Mute in the wheel is a right-stick click, as in single player. D-pad
+    -- Down muted here before that, and still does unless this is false
+    -- (single player gave it up because D-pad Down is its character wheel).
+    dpadDownMute = true,
 }
 
 -- Mute from inside the wheel. Up and down belong to the On Demand switch, so
 -- this sits on Spacebar on a keyboard (handbrake, which is not much use while
--- you are reading the radio anyway) and on D-pad Down on a controller, where
--- nothing else is free. The O binding above works everywhere, wheel or not.
+-- you are reading the radio anyway) and on a right-stick click on a controller.
+-- The O binding above works in any vehicle, wheel or not.
 Config.MuteInWheel = true
 
--- Permanently disable the vanilla radio controls (wheel, next/prev station) so
--- the stock wheel cannot flash open on the same button.
+-- Keep the game's own radio wheel shut, so it cannot flash open on the same
+-- button. GTA's next / previous station keys still work on a keyboard (the HUD
+-- follows the station); on a pad they share D-pad Left with the wheel, so
+-- there they are off.
 Config.DisableVanillaRadioControls = true
 
 -- Who may open the wheel. The wheel is vehicle-only by default, which is what
@@ -61,6 +83,8 @@ Config.AllowOnFoot     = false  -- true = also works with the mobile radio on fo
 -- The pad is read directly (see Controller above), so without this a menu that
 -- steers with the D-pad opens the wheel on every "left". While any key reads
 -- true the wheel and the mute key do nothing; whatever is playing carries on.
+-- (The pause menu, a cutscene, a black screen, the phone, being dead, the
+-- crash cam and the binoculars hold it shut too, as in single player.)
 --   'customs:menuOpen'   the mod shop (Lenonida_customs)
 Config.BlockedBy = { 'customs:menuOpen' }
 
@@ -71,7 +95,7 @@ Config.BlockedBy = { 'customs:menuOpen' }
 -- desync your vehicle from everyone else while the wheel is open. 1.0 disables
 -- the slow-motion entirely and keeps just the HUD.
 Config.TimeScale       = 0.075
-Config.TimeScaleFade   = 180    -- ms to ease in/out of slow motion
+Config.TimeScaleFade   = 180    -- real ms to ease in/out of slow motion
 
 Config.Timecycle         = 'hud_def_blur'
 Config.TimecycleStrength = 1.0
@@ -83,22 +107,39 @@ Config.DisableRadioHUD = true   -- permanently hide the vanilla radio station HU
 Config.RadioSounds     = true
 Config.OpenSound       = 'sfx/radioopen.wav'
 Config.CloseSound      = 'sfx/radioclose.wav'
-Config.SoundVolume     = 50     -- 0-100
+Config.SoundVolume     = 20     -- 0-100; the open / close clicks, kept subtle
+
+-- Let the car radio carry outside the car, as the game's "big speaker" cars do.
+Config.LoudRadio       = true
+
+-- While you are wanted and the game's chase music plays, the car radio goes
+-- quiet, and comes back 3 s after the music stops or at once when the stars go.
+-- Your own mute is left as it was. false lets them play together.
+Config.ChaseMusicTakesOver = true
 
 -- ---------------------------------------------------------------------------
 -- HUD layout (values are in 1920x1080 reference pixels and scale with the
--- player resolution, same as the original ini)
+-- player resolution, same as the original ini). The defaults are the single-
+-- player HUD's look, measured off the user's reference shots: each logo fills
+-- its tile, every tile at full size and opacity out to two either side (they
+-- fade on the way to the third), the highlighted one a little larger with a
+-- thin light outline, and the line and text in a light grey without a shadow.
 -- ---------------------------------------------------------------------------
 Config.Hud = {
     enabled           = true,
     iconSize          = 103,
-    spacing           = 112,
+    spacing           = 118,
     top               = 32,
-    borderSize        = 3.5,
-    boxColor          = '0,0,0,170',
-    boxActiveColor    = '45,45,45,220',
-    borderColor       = '255,255,255,90',
-    borderActiveColor = '255,255,255,255',
+    borderSize        = 2.5,                -- the highlighted tile's outline
+    boxColor          = '0,0,0,170',        -- behind each logo
+    boxActiveColor    = '0,0,0,170',
+    borderColor       = '255,255,255,0',    -- outline of the other tiles (none)
+    borderActiveColor = '192,194,200,255',  -- outline of the highlighted tile
+    inkColor          = '192,194,200,255',  -- the line and the text under it
+    activeScale       = 1.03,               -- the highlighted tile
+    inactiveScale     = 1.0,                -- the others (the original: 0.9)
+    inactiveOpacity   = 1.0,                -- the others (the original: 0.55)
+    textShadow        = false,              -- the original's shadow under the text
     slideTime         = 110,    -- ms for the carousel slide animation
     sideIcons         = true,
     sideGap           = 37,
@@ -110,19 +151,20 @@ Config.Hud = {
     muteDim           = true,           -- drain the rest of the HUD of colour when muted
     leftIconHeight    = 55,
     rightIconHeight   = 24,
-    infoLineY         = 24,
+    infoLineY         = 20,
     infoLineWidth     = 189,
-    infoLineHeight    = 6.5,
-    stationY          = 34,
-    stationScale      = 0.38,
-    titleY            = 68,
-    titleScale        = 0.33,
-    artistY           = 95,
-    artistScale       = 0.30,
-    fontPx            = 94,     -- base size the *Scale values multiply
+    infoLineHeight    = 4.8,
+    stationY          = 34.7,
+    stationScale      = 0.253,
+    titleY            = 70.6,
+    titleScale        = 0.206,
+    artistY           = 97.2,
+    artistScale       = 0.206,
+    fontPx            = 100,    -- base size the *Scale values multiply
     stationLogos      = true,
-    -- Secondary line under the station name when no live track info exists.
-    -- 'genre' uses the table below, 'none' hides it.
+    -- Under the station name go the song playing and its artist (the game's
+    -- own names for them). With no song -- a talk station -- the line under it
+    -- is the station's genre from the table below; 'none' leaves it empty.
     subtitle          = 'genre',
 }
 
@@ -130,8 +172,10 @@ Config.Hud = {
 -- Stations
 -- ---------------------------------------------------------------------------
 -- Stations not listed here still appear (using their raw name) as long as the
--- game reports them unlocked. Add hidden = true to drop one from the wheel.
+-- game reports them unlocked. Add hidden = true to drop one from the wheel, or
+-- list game names in HiddenStations.
 Config.IncludeOff = true        -- include the "Radio Off" entry
+Config.HiddenStations = {}      -- e.g. { 'RADIO_05_TALK_01', 'RADIO_11_TALK_02' }
 
 -- Note: an audio scene left running for the whole session can silence the car
 -- radio while the HUD still shows the station (CHARACTER_CHANGE_IN_SKY_SCENE,
@@ -188,12 +232,42 @@ Config.OnDemand = {
     -- The left side icon is a two-position switch, RADIO over ON DEMAND, and it
     -- is thrown the way it reads: down for On Demand, up to hand the radio
     -- back. It works from anywhere in the wheel -- there is nothing to scroll
-    -- to. Arrow keys on a keyboard, the right stick on a controller (the D-pad
-    -- cannot take it: down is mute, and on a keyboard the right-stick axis is
-    -- the mouse). Down also opens the panel once the wheel is released. Set
-    -- false to leave up and down alone and reach the switch only through the
-    -- panel and /ondemand.
+    -- to. Arrow keys on a keyboard, the right stick on a controller (on a
+    -- keyboard the right-stick axis is the mouse). Down also opens the panel
+    -- once the wheel is released. Set false to leave up and down alone and
+    -- reach the switch only through the panel and /ondemand.
     switchKeys = true,
+
+    -- With the switch down, the wheel lists On Demand's stations, as single
+    -- player's lists your own music's: first this vehicle's own queue (the
+    -- links pasted into the panel, under `label` above), then each of
+    -- `stations` below. Left / Right (the right stick) step through them and
+    -- each one plays as it is reached; the mouse wheel (D-pad Right / Up) and
+    -- GTA's next / previous track keys change the song. false keeps the radio's
+    -- stations listed instead: browsing them only previews, and the one you
+    -- let go on switches On Demand off.
+    stationsInWheel = true,
+
+    -- On Demand stations. Single player's are folders of your own music on
+    -- your disk; a server can only play what it ships or what a link points
+    -- at, so here each station is a list of tracks: a path under this
+    -- resource's html/ folder (put the files in html/music/<station>/, which
+    -- fxmanifest.lua streams -- every player downloads them when they join),
+    -- an https:// link to an audio file, or a YouTube link. A track can also
+    -- be { url = ..., title = ..., artist = ... }; without a title, a file's
+    -- name (or YouTube's title) is used. A station plays its tracks in order,
+    -- round and round, and remembers where it was for resumeMinutes.
+    --   {
+    --       label  = 'CHILL',
+    --       genre  = 'Lo-fi',                  -- the line under it, optional
+    --       logo   = 'logos/Chill.png',        -- a tile picture, optional
+    --       tracks = {
+    --           'music/chill/01 Morning.mp3',
+    --           { url = 'https://example.com/night.mp3', title = 'Night', artist = 'Someone' },
+    --       },
+    --   },
+    stations = {},
+    resumeMinutes = 30,
 
     queueLimit = 20,       -- tracks a single vehicle may have queued
     -- Lowered from 20.0/35/70 (2026-09-15): reported as too loud, especially
@@ -204,6 +278,10 @@ Config.OnDemand = {
     distance   = 12.0,     -- metres the audio carries from the vehicle
     volume     = 20,       -- default listener volume, 0-100
     maxVolume  = 45,       -- hard cap on what a listener can turn it up to
+
+    -- Your volume is scaled by the game's radio volume setting, as single
+    -- player's own music is. false plays it at your volume whatever that is.
+    followRadioVolume = true,
 
     -- Look the track title up through YouTube's oEmbed endpoint so the HUD's
     -- title/artist lines show something real. No API key needed. Set false to

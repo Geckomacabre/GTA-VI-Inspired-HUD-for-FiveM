@@ -146,13 +146,23 @@ end
 
 local ON_OFF = { { v = true, label = 'On' }, { v = false, label = 'Off' } }
 
+-- A vi_crashcam with IsCrashCamEnabled keeps the setting itself; an older one
+-- doesn't, and this menu keeps it for it.
+local function CrashCamKeepsItself()
+    return Export('vi_crashcam', 'IsCrashCamEnabled') ~= nil
+end
+
 local Settings = {
     {
         id = 'crashcam', label = 'Crash Camera', image = 'crashcam', needs = 'vi_crashcam', values = ON_OFF,
         desc = 'A slow replay from outside the car when you crash.',
-        get = function() return GetResourceKvpString(CRASHCAM_KVP) ~= 'off' end,
+        get = function()
+            local own = Export('vi_crashcam', 'IsCrashCamEnabled')
+            if own ~= nil then return own end
+            return GetResourceKvpString(CRASHCAM_KVP) ~= 'off'
+        end,
         set = function(v)
-            SetResourceKvp(CRASHCAM_KVP, v and 'on' or 'off')
+            if not CrashCamKeepsItself() then SetResourceKvp(CRASHCAM_KVP, v and 'on' or 'off') end
             Export('vi_crashcam', 'SetCrashCamEnabled', v)
         end,
     },
@@ -204,10 +214,49 @@ local function ValueLabel(setting, value)
     return tostring(value)
 end
 
-local function SettingsRows()
+-- HUD OPTIONS (vi_extras): while it runs, its rows lead this page, the same
+-- switches hold-V shows, and this page's own copies of three of them step aside.
+local HUD_IMAGES = { crashcam = 'crashcam', mapdaynight = 'mapnight', mapvehicleonly = 'mapvehicle', radiowheel = 'radio' }
+local HUD_REPLACES = { crashcam = true, mapmode = true, minimap = true }
+local SMALL_WORDS = { ['in'] = true, ['on'] = true, ['of'] = true, ['the'] = true, ['and'] = true, ['or'] = true }
+
+-- 'MAP IN VEHICLE ONLY' as this page writes it: 'Map in Vehicle Only'; VI stays VI
+local function TitleCase(s)
+    local first = true
+    return (s:lower():gsub("(%a)([%w']*)", function(a, b)
+        local word = a .. b
+        if not first and SMALL_WORDS[word] then return word end
+        first = false
+        if word == 'vi' then return 'VI' end
+        return a:upper() .. b
+    end))
+end
+
+-- ON -> On, NIGHT -> Night; 60% as it is
+local function ValueCase(v)
+    v = tostring(v)
+    if v:match('^%u[%u/]*$') and v ~= 'N/A' then return v:sub(1, 1) .. v:sub(2):lower() end
+    return v
+end
+
+local function HudRows()
+    local hud = Export('vi_extras', 'GetHudOptions')
+    if type(hud) ~= 'table' then return nil end
     local rows = {}
+    for _, r in ipairs(hud) do
+        local label = TitleCase(r.label)
+        rows[#rows + 1] = { id = 'hud:' .. r.id, label = label, value = ValueCase(r.value), image = HUD_IMAGES[r.id] or 'settings',
+                            title = label, desc = r.desc or '', change = true }
+    end
+    return rows
+end
+
+local function SettingsRows()
+    local rows = HudRows()
+    local hud = rows ~= nil
+    rows = rows or {}
     for _, s in ipairs(Settings) do
-        if ResourceUp(s.needs) then
+        if ResourceUp(s.needs) and not (hud and HUD_REPLACES[s.id]) then
             if s.action then
                 rows[#rows + 1] = { id = s.id, label = s.label, image = s.image, title = s.label, desc = s.desc, action = true }
             else
@@ -223,6 +272,10 @@ end
 
 -- a setting one along (dir 1) or back (-1)
 local function ChangeSetting(id, dir)
+    if id:sub(1, 4) == 'hud:' then
+        Export('vi_extras', 'StepHudOption', id:sub(5), dir)
+        return
+    end
     for _, s in ipairs(Settings) do
         if s.id == id and s.values then
             local value = s.get()
@@ -236,10 +289,13 @@ local function ChangeSetting(id, dir)
     end
 end
 
--- the crash camera as the player left it, whenever vi_crashcam (re)starts
+-- the crash camera as the player left it, whenever vi_crashcam (re)starts. A
+-- vi_crashcam that keeps the setting itself is told once, and from then on
+-- it's the one that remembers.
 local function ApplyCrashCam()
     if GetResourceKvpString(CRASHCAM_KVP) == 'off' then
         Export('vi_crashcam', 'SetCrashCamEnabled', false)
+        if CrashCamKeepsItself() then DeleteResourceKvp(CRASHCAM_KVP) end
     end
 end
 AddEventHandler('onClientResourceStart', function(resource)

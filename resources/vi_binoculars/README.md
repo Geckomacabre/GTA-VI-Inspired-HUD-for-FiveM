@@ -60,6 +60,13 @@ exports.vi_binoculars:IsActive()
 exports.vi_binoculars:GetZoom()    -- 0 (wide) .. 1 (fully in)
 exports.vi_binoculars:GetVision()  -- 'normal' | 'night' | 'thermal'
 
+-- The player's own switch (HUD OPTIONS' BINOCULARS, from vi_extras). Saved
+-- per player in this resource's KVP (`vi_binoculars:enabled`), and
+-- Config.Enabled until they set it. Off, nothing raises them (command, key,
+-- item or Use), and they come down if they are up.
+exports.vi_binoculars:GetBinocularsEnabled()   -- bool
+exports.vi_binoculars:SetBinocularsEnabled(on)
+
 -- Name what is being looked at, bottom left, with the button for `key`
 -- beside it (a control id). nil clears it.
 exports.vi_binoculars:SetLabel('Phone cases', 38)

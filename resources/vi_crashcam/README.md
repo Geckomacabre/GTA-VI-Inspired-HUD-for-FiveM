@@ -47,9 +47,18 @@ cooldown.
 
 ```lua
 exports.vi_crashcam:PlayCrashCam()              -- on the current vehicle
-exports.vi_crashcam:SetCrashCamEnabled(false)   -- e.g. during a race
+exports.vi_crashcam:IsCrashCamEnabled()         -- bool: the player's switch
+exports.vi_crashcam:SetCrashCamEnabled(false)   -- set it
 exports.vi_crashcam:IsCrashCamPlaying()
 ```
+
+`SetCrashCamEnabled` is the player's own switch, as HUD OPTIONS' CRASH CAMERA
+(`vi_extras`) and the pause menu's Crash Camera (`vi_pausemenu`) flip it. It
+is saved per player in this resource's KVP (`vi_crashcam:enabled`), so it is
+there again the next time they join, and it is `Config.Enabled` until they set
+it. Off, crashes are not watched for, and a shot already playing cuts back.
+`PlayCrashCam` and `/crashcam` still play a shot when asked. Because it is
+saved, it is not the way to hold the camera off for a while (a race, say).
 
 ## Install
 

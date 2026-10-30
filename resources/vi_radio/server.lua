@@ -17,6 +17,7 @@ if GetResourceState('xsound') ~= 'started' then
 end
 
 local OD = Config.OnDemand
+local RES = GetCurrentResourceName()
 
 -- state ----------------------------------------------------------------------
 -- A session existing at all means the vehicle's On Demand switch is ON. It
@@ -26,6 +27,9 @@ local OD = Config.OnDemand
 -- sessions[netId] = {
 --   queue    = { { url, kind, title, artist, duration }, ... },
 --   index    = current track, 0 when nothing is playing,
+--   station  = 0 for the vehicle's own queue, else the Config.OnDemand.stations
+--              entry playing (queue is then a copy of its tracks),
+--   own      = the vehicle's own queue and its place, kept while a station plays,
 --   previousStation = the radio station to put back when the switch goes off,
 --   token    = bumped on every track change, so a late duration report for the
 --              previous track can be thrown away,
@@ -33,6 +37,75 @@ local OD = Config.OnDemand
 -- }
 local sessions = {}
 local lastCommand = {}   -- [src] = GetGameTimer() of their last command
+
+-- Where each station was, per vehicle, kept past the switch going off:
+-- places[netId][station] = { index, position, at }. Single player's own music
+-- remembers a station's place for half an hour; so does this.
+local places = {}
+
+-- On Demand stations ---------------------------------------------------------
+-- Single player's On Demand plays your own music: a folder of tracks on your
+-- disk is a station. A server can only play what it ships or what a link
+-- points at, so here a station is Config.OnDemand.stations' list of tracks: a
+-- path under html/ (streamed with the resource, see fxmanifest.lua), a direct
+-- audio link, or a YouTube link. Server config, so trusted; still checked.
+
+local function fileTitle(url)
+    local name = url:match('([^/?#]+)%.%w+$') or url:match('([^/?#]+)$') or 'Track'
+    name = name:gsub('%%20', ' '):gsub('_', ' ')
+    return name
+end
+
+local function resolveTrack(entry)
+    local t = type(entry) == 'table' and entry or { url = entry }
+    if type(t.url) ~= 'string' or t.url == '' then return nil end
+
+    local url, kind
+    if t.url:match('^https?://') then
+        url, kind = Config.NormalizeUrl(t.url)
+        if not url then
+            print(('[vi_radio] On Demand station track skipped (%s): %s'):format(tostring(kind), t.url))
+            return nil
+        end
+    else
+        -- shipped with the resource, under html/
+        local path = t.url:gsub('\\', '/'):gsub('^/+', ''):gsub('^html/', '')
+        local ext = (path:match('%.(%w+)$') or ''):lower()
+        local known = false
+        for _, allowed in ipairs(OD.fileExtensions or {}) do
+            if ext == allowed then known = true break end
+        end
+        if path:find('%.%.') or not known then
+            print(('[vi_radio] On Demand station track skipped (not an audio file under html/): %s'):format(t.url))
+            return nil
+        end
+        url = ('https://cfx-nui-%s/html/%s'):format(RES, (path:gsub(' ', '%%20')))
+        kind = 'file'
+    end
+
+    return {
+        url    = url,
+        kind   = kind,
+        title  = t.title or (kind == 'youtube' and 'YouTube' or fileTitle(url)),
+        artist = t.artist,
+        fixedTitle = t.title ~= nil,
+    }
+end
+
+local fetchTitle   -- titles, below
+
+local STATIONS = {}
+for i, st in ipairs(OD.stations or {}) do
+    local tracks = {}
+    for _, entry in ipairs(st.tracks or {}) do
+        local track = resolveTrack(entry)
+        if track then tracks[#tracks + 1] = track end
+    end
+    STATIONS[i] = { label = st.label or ('STATION ' .. i), tracks = tracks }
+    if #tracks == 0 then
+        print(('[vi_radio] On Demand station %s has no playable tracks'):format(STATIONS[i].label))
+    end
+end
 
 -- helpers --------------------------------------------------------------------
 
@@ -92,6 +165,7 @@ local function payload(netId, s)
     return {
         netId    = netId,
         engaged  = true,
+        station  = s.station or 0,
         index    = s.index,
         token    = s.token,
         playing  = track ~= nil,
@@ -179,18 +253,35 @@ local function resolveAudioStream(track, callback, instanceIndex)
     end, 'GET')
 end
 
-local function startTrack(netId, s, i)
+-- `from` is a place in the track to start at, in seconds (a station resumed).
+local function startTrack(netId, s, i, from)
     s.index     = i
     s.token     = (s.token or 0) + 1
-    s.startedAt = GetGameTimer()
+    s.startedAt = GetGameTimer() - math.floor((from or 0) * 1000)
     s.paused    = false
     s.pausedAt  = 0.0
 
     local track = s.queue[i]
+
+    -- A station's tracks last as long as the server does, and a resolved
+    -- stream link expires after a few hours: an hour old, it is looked up again.
+    if track and (s.station or 0) ~= 0 and track.audioUrlAt
+       and GetGameTimer() - track.audioUrlAt > 3600000 then
+        track.audioUrl, track.audioUrlAt, track.audioResolveFailed = nil, nil, nil
+    end
+
     -- Broadcast immediately with the plain YouTube URL (the pre-existing
     -- iframe-embed behaviour -- nobody waits in silence for the resolver),
     -- then swap to a resolved, filterable stream URL once/if one shows up.
     broadcast(netId)
+
+    -- A station's YouTube track gets its title the first time it plays (a
+    -- queued link asks when it is added).
+    if track and (s.station or 0) ~= 0 and track.kind == 'youtube'
+       and not track.fixedTitle and not track.titleAsked then
+        track.titleAsked = true
+        fetchTitle(netId, track)
+    end
 
     if track and track.kind == 'youtube' and not track.audioUrl and not track.audioResolveFailed then
         resolveAudioStream(track, function(streamUrl)
@@ -201,6 +292,7 @@ local function startTrack(netId, s, i)
 
             if streamUrl then
                 track.audioUrl = streamUrl
+                track.audioUrlAt = GetGameTimer()
             else
                 track.audioResolveFailed = true
                 return -- stays on the already-playing iframe embed, nothing to swap to
@@ -246,6 +338,12 @@ end
 
 local function advance(netId, s, dir)
     local nextIndex = s.index + (dir or 1)
+    -- A station plays round and round, as single player's own music does.
+    if (s.station or 0) ~= 0 and #s.queue > 0 then
+        if nextIndex > #s.queue then nextIndex = 1 elseif nextIndex < 1 then nextIndex = #s.queue end
+        startTrack(netId, s, nextIndex)
+        return
+    end
     if nextIndex < 1 then nextIndex = 1 end
     if nextIndex > #s.queue then
         idle(netId, s)
@@ -258,7 +356,7 @@ end
 -- YouTube's oEmbed endpoint needs no key and returns the video title and the
 -- channel name, which is as close to "title / artist" as this gets.
 
-local function fetchTitle(netId, track)
+fetchTitle = function(netId, track)
     if not OD.fetchTitles or track.kind ~= 'youtube' then return end
 
     PerformHttpRequest('https://www.youtube.com/oembed?format=json&url=' .. track.url, function(status, body)
@@ -274,7 +372,71 @@ local function fetchTitle(netId, track)
     end, 'GET')
 end
 
+-- stations -------------------------------------------------------------------
+-- The wheel steps through On Demand's entries the way it does the radio's: the
+-- vehicle's own queue (station 0) and each of the server's stations. Leaving
+-- one keeps its place; coming back to a station within resumeMinutes carries
+-- on from there, and the vehicle's own queue always does.
+
+local function keepPlace(netId, s)
+    local place = { index = s.index, position = elapsed(s), at = GetGameTimer() }
+    if (s.station or 0) == 0 then
+        place.queue = s.queue
+        s.own = place
+    else
+        places[netId] = places[netId] or {}
+        places[netId][s.station] = place
+    end
+end
+
+local function tuneStation(netId, s, i)
+    keepPlace(netId, s)
+    s.station = i
+
+    local place
+    if i == 0 then
+        place = s.own
+        s.own = nil
+        s.queue = place and place.queue or {}
+    else
+        s.queue = {}
+        for n, track in ipairs(STATIONS[i].tracks) do s.queue[n] = track end
+        place = places[netId] and places[netId][i]
+        if place and GetGameTimer() - place.at > (OD.resumeMinutes or 30) * 60000 then place = nil end
+    end
+
+    if place and place.index > 0 and s.queue[place.index] then
+        local track = s.queue[place.index]
+        local from = place.position
+        if track.duration and from >= track.duration - 1 then from = 0 end
+        startTrack(netId, s, place.index, from)
+    elseif i ~= 0 and #s.queue > 0 then
+        startTrack(netId, s, 1)
+    else
+        idle(netId, s)
+    end
+end
+
 -- events ---------------------------------------------------------------------
+
+-- An On Demand entry picked in the wheel: 0 for the vehicle's own queue, else
+-- one of Config.OnDemand.stations. Only with the switch already on.
+RegisterNetEvent('vi_radio:od:station', function(i)
+    local src = source
+    if rateLimited(src) then return end
+    if type(i) ~= 'number' then return end
+    i = math.floor(i)
+    if i ~= 0 and not STATIONS[i] then return end
+
+    local s, netId = sessionFor(src)
+    if not s then return end
+
+    if (s.station or 0) == i then
+        broadcast(netId)
+        return
+    end
+    tuneStation(netId, s, i)
+end)
 
 -- The switch itself. Turning it on creates the session -- that is what "on"
 -- means -- and remembers the station to put back when it goes off again.
@@ -296,7 +458,7 @@ RegisterNetEvent('vi_radio:od:engage', function(previousStation)
     end
 
     sessions[netId] = {
-        queue = {}, index = 0, token = 0,
+        queue = {}, index = 0, token = 0, station = 0,
         paused = false, pausedAt = 0.0,
         previousStation = previousStation,
     }
@@ -331,12 +493,16 @@ RegisterNetEvent('vi_radio:od:add', function(link, playNow)
     local s = sessions[netId]
     if not s then
         s = {
-            queue = {}, index = 0, token = 0,
+            queue = {}, index = 0, token = 0, station = 0,
             paused = false, pausedAt = 0.0,
             previousStation = 'OFF',
         }
         sessions[netId] = s
     end
+
+    -- A link goes on the vehicle's own queue: one of the server's stations
+    -- playing is put aside for it, and keeps its place.
+    if (s.station or 0) ~= 0 then tuneStation(netId, s, 0) end
 
     if #s.queue >= OD.queueLimit then
         return notify(src, ('The queue is full (%d tracks)'):format(OD.queueLimit))
@@ -418,6 +584,11 @@ RegisterNetEvent('vi_radio:od:stop', function()
     local s, netId = sessionFor(src)
     if not s then return end
 
+    -- On one of the server's stations, Stop goes back to the vehicle's own
+    -- queue and clears that (the station keeps its place for later).
+    if (s.station or 0) ~= 0 then keepPlace(netId, s) end
+    s.station = 0
+    s.own = nil
     s.queue = {}
     idle(netId, s)
 end)
@@ -460,9 +631,16 @@ CreateThread(function()
         local resend = now - lastBroadcast >= OD.broadcastInterval
         if resend then lastBroadcast = now end
 
+        if resend then
+            for netId in pairs(places) do
+                if not sessions[netId] and not vehicleExists(netId) then places[netId] = nil end
+            end
+        end
+
         for netId, s in pairs(sessions) do
             if not vehicleExists(netId) then
                 stopSession(netId)
+                places[netId] = nil
             else
                 local track = s.queue[s.index]
                 if track and track.duration and not s.paused and elapsed(s) >= track.duration then

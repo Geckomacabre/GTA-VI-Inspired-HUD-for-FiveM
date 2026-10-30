@@ -28,6 +28,10 @@
                id) draws its button beside it. nil clears it.
          exports.vi_binoculars:GetTarget(maxDistance)
                -> hit, coords, entity   what the centre of the view is on
+         exports.vi_binoculars:GetBinocularsEnabled()  -> bool
+         exports.vi_binoculars:SetBinocularsEnabled(bool)
+               the player's own switch (HUD OPTIONS' BINOCULARS), saved;
+               off, nothing raises them, and they come down if they are up
 
      Events (client, local):  vi_binoculars:started   vi_binoculars:stopped
      ========================================================================= ]]
@@ -54,6 +58,15 @@ local scaleform = nil
 local vision = 'normal'
 local prop = nil             -- the binoculars in the ped's hand, while it can walk
 local promptDevice = nil     -- which device the ZOOM prompt was last drawn for
+
+-- The player's own switch (HUD OPTIONS' BINOCULARS): Config.Enabled until
+-- they choose, then theirs, kept in this resource's KVP.
+local ENABLED_KVP = 'vi_binoculars:enabled'
+local enabled = Config.Enabled ~= false
+do
+    local saved = GetResourceKvpString(ENABLED_KVP)
+    if saved == 'on' then enabled = true elseif saved == 'off' then enabled = false end
+end
 
 -- Plain first, then whichever of night and thermal config.lua turns on.
 local function visionModes()
@@ -368,6 +381,7 @@ end
 
 local function use()
     if active then stop() return true end
+    if not enabled then return false end
     local ped = PlayerPedId()
     if blockedReason(ped) then return false end
     CreateThread(function()
@@ -390,6 +404,14 @@ exports('Stop', stop)
 exports('IsActive', function() return active end)
 exports('GetZoom', function() return active and zoom or 0.0 end)
 exports('GetVision', function() return active and vision or 'normal' end)
+
+exports('GetBinocularsEnabled', function() return enabled end)
+exports('SetBinocularsEnabled', function(on)
+    enabled = on == true
+    SetResourceKvp(ENABLED_KVP, enabled and 'on' or 'off')
+    -- Off while they are up: down they come, the view and the HUD handed back.
+    if not enabled then stop() end
+end)
 
 exports('SetLabel', function(text, key)
     label = (text ~= nil and text ~= '') and tostring(text) or nil
@@ -417,6 +439,10 @@ RegisterNetEvent('vi_binoculars:use', function() use() end)
 exports('useItem', function() use() end)
 
 local function fromCommand()
+    if not active and not enabled then
+        print('^3[vi_binoculars]^7 binoculars are switched off (HUD OPTIONS).')
+        return
+    end
     if not active and not hasItem() then
         print('^3[vi_binoculars]^7 you are not carrying binoculars.')
         return

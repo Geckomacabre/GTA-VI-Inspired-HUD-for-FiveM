@@ -257,6 +257,16 @@ included here.
   looked at are its own. `/binoculars`, an optional key, or an inventory item.
   No dependencies; see `resources/vi_binoculars/README.md`.
 
+- **`vi_extras`**: Single player's features FiveM didn't have, and its **HUD
+  OPTIONS** menu (hold V) to switch them: guns on back, draw animations, chase
+  music, the kill camera, spin-outs, camera weight, calmer police and money in
+  stores, plus rows for the switches that live in the other resources
+  (crosshair, kill marks, wanted stars and box, police lights, search circle,
+  greet / antagonize, the radio wheel, binoculars, the crash camera). Built
+  like qbx_smallresources, one folder per feature, so a feature can be lifted
+  into another resource. Depends on `ox_lib`; see
+  `resources/vi_extras/README.md`.
+
 - **`vi_wasted`**: The WASTED and BUSTED screens: slow motion, a camera
   pulling back, a red wash and the word in Pricedown. Lifted out of the
   [fenix-police fork](https://github.com/Geckomacabre/fenix-police) so they
@@ -405,7 +415,7 @@ its own.
    `resources/qbx_vehiclekeys`, `resources/vi_pausemenu` (or `resources/gk_pausemenu`),
    `resources/qbx_relog`, `resources/vi_radio`,
    `resources/gk_basketball`, `resources/vi_crashcam`,
-   `resources/vi_binoculars`, `resources/vi_wasted`,
+   `resources/vi_binoculars`, `resources/vi_wasted`, `resources/vi_extras`,
    `resources/Lenonida_customs`, `resources/illenium-appearance`,
    `resources/streetkings_audio` and/or
    `resources/sk_streetkings` into your
@@ -423,6 +433,7 @@ its own.
    ensure vi_crashcam
    ensure vi_binoculars
    ensure vi_wasted
+   ensure vi_extras      # after the ones above: HUD OPTIONS lists their switches
    ensure Lenonida_customs
    ensure illenium-appearance
    ensure streetkings_audio
@@ -470,6 +481,9 @@ its own.
    - `vi_crashcam`, `vi_binoculars` and `vi_wasted` have no dependency.
      Skip `vi_wasted` if you run fenix-police: it plays the same two
      screens itself.
+   - `vi_extras` needs **ox_lib**. Its draw animations want ox_inventory's own
+     switch animations off (`setr inventory:weaponanims 0`); see
+     `resources/vi_extras/README.md`.
    - `illenium-appearance` needs **oxmysql**, **ox_lib** and a framework
      (Qbox, QBCore or ESX). It replaces any `illenium-appearance` you already
      run (same folder name, which other resources call its exports by). Two

@@ -3,6 +3,12 @@
 
     var REFERENCE_HEIGHT = 1080; // the layout numbers in config.lua are 1080p
 
+    // The carousel, as the single-player wheel (ViExtras RadioHud) draws it:
+    // tiles are whole out to two slots either side of the highlighted one and
+    // fade out on the way to three. The track slides on --slide's curve.
+    var SOLID_SLOTS = 2;
+    var GONE_SLOTS  = 3;
+
     var root     = document.documentElement;
     var radio    = document.getElementById('radio');
     var track    = document.getElementById('track');
@@ -29,11 +35,12 @@
     var odVolumeVal = document.getElementById('od-volume-value');
     var odMute      = document.getElementById('od-mute');
     var odClose     = document.getElementById('od-close');
-    var odSwitch    = document.getElementById('od-switch');
-    var odSwitchTxt = odSwitch.querySelector('.switch-state');
+    var odPanelSw   = document.getElementById('od-switch');
+    var odSwitchTxt = odPanelSw.querySelector('.switch-state');
 
     var hud       = null;
     var stations  = [];
+    var slots     = [];     // one .slot (holding its .tile) per station
     var index     = 0;
     var muted     = false;
     var odOn      = false;
@@ -56,20 +63,42 @@
 
     function px(n) { return n + 'px'; }
 
+    // The tile outline's width at this resolution, in whole device pixels the
+    // way the browser will draw it, so the tile can be centred on it exactly.
+    function borderPx() {
+        var dpr = window.devicePixelRatio || 1;
+        var b = num(hud && hud.borderSize, 2.5) * scale() * dpr;
+        if (b <= 0) return '0px';
+        return (Math.max(1, Math.floor(b + 1e-6)) / dpr) + 'px';
+    }
+
+    function num(v, fallback) {
+        return typeof v === 'number' && isFinite(v) ? v : fallback;
+    }
+
     function applyHud(cfg) {
         hud = cfg;
         var s = root.style;
-        var font = cfg.fontPx || 94;
+        var font = cfg.fontPx || 100;
 
         s.setProperty('--s', scale());
         s.setProperty('--icon', px(cfg.iconSize));
         s.setProperty('--spacing', px(cfg.spacing));
         s.setProperty('--top', px(cfg.top));
         s.setProperty('--border', px(cfg.borderSize));
+        s.setProperty('--border-px', borderPx());
         s.setProperty('--box', rgba(cfg.boxColor, 'rgba(0,0,0,0.667)'));
-        s.setProperty('--box-active', rgba(cfg.boxActiveColor, 'rgba(45,45,45,0.863)'));
-        s.setProperty('--outline', rgba(cfg.borderColor, 'rgba(255,255,255,0.353)'));
-        s.setProperty('--outline-active', rgba(cfg.borderActiveColor, 'rgba(255,255,255,1)'));
+        s.setProperty('--box-active', rgba(cfg.boxActiveColor, 'rgba(0,0,0,0.667)'));
+        s.setProperty('--outline', rgba(cfg.borderColor, 'rgba(255,255,255,0)'));
+        s.setProperty('--outline-active', rgba(cfg.borderActiveColor, 'rgba(192,194,200,1)'));
+        // Unset, the text stays the stylesheet's white (see style.css).
+        if (cfg.inkColor) s.setProperty('--ink', rgba(cfg.inkColor, '#ffffff'));
+        s.setProperty('--tile-scale-on', num(cfg.activeScale, 1.03));
+        s.setProperty('--tile-scale-off', num(cfg.inactiveScale, 1));
+        s.setProperty('--tile-opacity-off', num(cfg.inactiveOpacity, 1));
+        s.setProperty('--text-shadow', cfg.textShadow
+            ? '0 calc(2px * var(--s)) calc(6px * var(--s)) rgba(0, 0, 0, 0.75)' : 'none');
+        radio.classList.toggle('shadowed', !!cfg.textShadow);
         s.setProperty('--slide', (cfg.slideTime || 110) + 'ms');
         s.setProperty('--side-gap', px(cfg.sideGap));
         s.setProperty('--left-icon-h', px(cfg.leftIconHeight));
@@ -100,10 +129,14 @@
     function buildTrack(list) {
         stations = list || [];
         track.innerHTML = '';
+        slots = [];
 
-        stations.forEach(function (station) {
+        stations.forEach(function (station, i) {
+            var slot = document.createElement('div');
+            slot.className = 'slot';
             var tile = document.createElement('div');
-            tile.className = 'tile';
+            // New tiles start in their end state, as the single-player wheel's do.
+            tile.className = 'tile' + (i === index ? ' active' : '');
 
             if (station.logo && (!hud || hud.stationLogos !== false)) {
                 var img = document.createElement('img');
@@ -118,7 +151,9 @@
                 tile.appendChild(fallbackNode(station.label));
             }
 
-            track.appendChild(tile);
+            slot.appendChild(tile);
+            track.appendChild(slot);
+            slots.push(slot);
         });
     }
 
@@ -145,23 +180,91 @@
         probe.src = src;
     }
 
-    function fallbackNode(label) {
+    function fallbackNode(text) {
         var span = document.createElement('span');
         span.className = 'fallback';
-        span.textContent = label || '';
+        span.textContent = text || '';
         return span;
     }
 
-    function render() {
-        var tiles = track.children;
-        for (var i = 0; i < tiles.length; i++) {
-            tiles[i].classList.toggle('active', i === index);
-        }
+    // -- the carousel's slide ----------------------------------------------
+    // The track's place is a fractional index, eased from where it was to the
+    // new one over --slide on cubic-bezier(0.22, 0.61, 0.36, 1), and every
+    // tile is placed and faded off it each frame while that runs (a CSS
+    // transition could slide the track, but not fade a tile by where it is
+    // mid-slide). The tiles' own scale and outline are CSS transitions.
 
-        if (hud) {
-            var step = hud.spacing * scale();
-            track.style.transform = 'translateX(' + (-(index * step) - step / 2) + 'px)';
+    var dispFrom = 0, dispTo = 0, dispStart = -1, placed = false, frame = 0;
+
+    function cubic(a, b, t) {
+        var u = 1 - t;
+        return 3 * u * u * t * a + 3 * u * t * t * b + t * t * t;
+    }
+
+    // CSS cubic-bezier(x1, y1, x2, y2) at x, by bisection.
+    function bezier(x1, y1, x2, y2, x) {
+        if (x <= 0) return 0;
+        if (x >= 1) return 1;
+        var lo = 0, hi = 1, t = x;
+        for (var i = 0; i < 24; i++) {
+            t = (lo + hi) / 2;
+            if (cubic(x1, x2, t) < x) lo = t; else hi = t;
         }
+        return cubic(y1, y2, t);
+    }
+
+    function slideMs() { return Math.max(1, (hud && hud.slideTime) || 110); }
+
+    function disp(t) {
+        if (dispStart < 0) return dispTo;
+        var p = Math.min(1, Math.max(0, (t - dispStart) / slideMs()));
+        return dispFrom + (dispTo - dispFrom) * bezier(0.22, 0.61, 0.36, 1, p);
+    }
+
+    function layout(t) {
+        var d = disp(t);
+        var step = (hud ? hud.spacing : 118) * scale();
+        for (var i = 0; i < slots.length; i++) {
+            var rel = i - d;
+            var far = Math.abs(rel);
+            var a = far >= GONE_SLOTS ? 0 : far <= SOLID_SLOTS ? 1 : GONE_SLOTS - far;
+            var slot = slots[i];
+            slot.style.left = (rel * step).toFixed(2) + 'px';
+            slot.style.opacity = a.toFixed(3);
+            slot.style.visibility = a > 0.001 ? 'visible' : 'hidden';
+        }
+    }
+
+    function animate() {
+        frame = 0;
+        var t = performance.now();
+        layout(t);
+        if (dispStart >= 0 && t - dispStart < slideMs()) frame = requestAnimationFrame(animate);
+        else dispStart = -1;
+    }
+
+    function slideTo(i) {
+        var t = performance.now();
+        if (!placed) {
+            dispFrom = dispTo = i;
+            dispStart = -1;
+            placed = true;
+        } else if (Math.abs(dispTo - i) > 0.0001) {
+            dispFrom = disp(t);
+            dispTo = i;
+            dispStart = t;
+        }
+        layout(t);
+        if (dispStart >= 0 && !frame) frame = requestAnimationFrame(animate);
+    }
+
+    // -- rendering ---------------------------------------------------------
+
+    function render() {
+        for (var i = 0; i < slots.length; i++) {
+            slots[i].firstChild.classList.toggle('active', i === index);
+        }
+        slideTo(index);
 
         var station = stations[index];
         elStat.textContent = label || (station ? station.label : '');
@@ -172,6 +275,9 @@
         if (hud) setMaskIcon(iconR, muted ? hud.unmuteIcon : hud.rightIcon);
     }
 
+    // The two lines under the station, as the single-player wheel sets them:
+    // the song on the first and its artist on the second; with no song, the
+    // station's genre on the second; a highlighted RADIO OFF blanks both.
     function renderNowPlaying(title, artist) {
         var station = stations[index];
         // A highlighted "radio off" tile blanks the lines -- unless On Demand
@@ -184,18 +290,15 @@
             return;
         }
 
-        // Either line on its own is still a live feed. On Demand with an empty
-        // queue sends only the second one ("Nothing queued"), and falling
-        // through to the genre below would answer it with the highlighted
-        // station's -- which is not what is playing, because nothing is.
-        if (title || artist) {
-            elTitle.textContent = title || '';
+        // The artist only goes with a song.
+        if (title) {
+            elTitle.textContent = title;
             elArtist.textContent = artist || '';
             return;
         }
 
-        // No live track feed: fall back to the station genre, like the wheel
-        // does in the singleplayer mod when a track has no metadata.
+        // No song: the station's genre, as the wheel does in the single-player
+        // mod when a track has no name (a talk station).
         elTitle.textContent = '';
         var wantsGenre = !hud || hud.subtitle === 'genre';
         elArtist.textContent = (wantsGenre && station && station.genre) ? station.genre : '';
@@ -212,9 +315,9 @@
 
         if (data.action === 'state') {
             if (data.hud) applyHud(data.hud);
+            if (typeof data.index === 'number') index = data.index;
             if (data.list) buildTrack(data.list);
 
-            index  = typeof data.index === 'number' ? data.index : index;
             muted  = !!data.muted;
             odOn   = !!data.odOn;
             label  = data.label || null;
@@ -228,6 +331,16 @@
             return;
         }
 
+        // The song changed (or its name came in): the lines only, so a mute
+        // flash on screen is left to run its course.
+        if (data.action === 'track') {
+            label = data.label || null;
+            var station = stations[index];
+            elStat.textContent = label || (station ? station.label : '');
+            renderNowPlaying(data.title, data.artist);
+            return;
+        }
+
         if (data.action === 'flash') {
             muted = !!data.muted;
             render();
@@ -237,6 +350,13 @@
                 if (!isOpen) setVisible(false);
                 flashTimer = null;
             }, 1400);
+            return;
+        }
+
+        // The pause menu, a cutscene or a black screen: nothing of the HUD shows
+        // over it, as in single player.
+        if (data.action === 'hold') {
+            radio.classList.toggle('held', !!data.held);
             return;
         }
 
@@ -257,7 +377,8 @@
 
     window.addEventListener('resize', function () {
         root.style.setProperty('--s', scale());
-        render();
+        root.style.setProperty('--border-px', borderPx());
+        layout(performance.now());
     });
 
 
@@ -304,7 +425,9 @@
     function renderQueue(state) {
         var queue = state.queue || [];
         odQueue.innerHTML = '';
-        odQueueNum.textContent = queue.length + ' / ' + state.limit;
+        odQueueNum.textContent = state.stationLabel
+            ? state.stationLabel + '  \u00B7  ' + queue.length
+            : queue.length + ' / ' + state.limit;
 
         if (!queue.length) {
             var empty = document.createElement('li');
@@ -351,7 +474,7 @@
 
         var playing = !!state.playing;
 
-        odSwitch.setAttribute('aria-checked', state.engaged ? 'true' : 'false');
+        odPanelSw.setAttribute('aria-checked', state.engaged ? 'true' : 'false');
         odSwitchTxt.textContent = state.engaged ? 'On' : 'Off';
 
         odNowTitle.textContent  = playing ? (state.title || 'Track') : 'Nothing queued';
@@ -408,7 +531,7 @@
 
     odQueueBtn.addEventListener('click', function () { submitLink(false); });
     odClose.addEventListener('click', function () { post('odClose'); });
-    odSwitch.addEventListener('click', function () { post('odDisengage'); });
+    odPanelSw.addEventListener('click', function () { post('odDisengage'); });
 
     odTransport.addEventListener('click', function (event) {
         var act = event.target.dataset && event.target.dataset.act;

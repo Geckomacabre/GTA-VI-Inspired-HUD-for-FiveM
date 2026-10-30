@@ -2679,6 +2679,14 @@ local lastWantedState = false
 local lastTellsKey = ''
 local lastWaypointAccentKey = nil
 
+-- HUD OPTIONS' VI WANTED STARS and WANTED BOX, per player (client_options.lua);
+-- Config.WantedStarStates / Config.WantedBox until they choose. Either one
+-- changing sends the wanted row again on the next tick.
+ViceOption('WantedStarsEnabled', 'vice_hud:wantedStars', Config.WantedStarStates ~= false,
+    function() lastWanted = -1 end)
+ViceOption('WantedBoxEnabled', 'vice_hud:wantedBox', Config.WantedBox ~= false,
+    function() lastWanted = -1 end)
+
 --- True when a police ped actually has line of sight to the player.
 --- Only the fallback for when fenix-police isn't installed, see
 --- wantedState() below, which prefers that resource's own contact model
@@ -2899,6 +2907,23 @@ exports('ReportWantedTellSighting', function(id, source)
     if not seen then return end
 
     seen[(type(source) == 'string' and source ~= '') and source or 'default'] = true
+end)
+
+-- Other resources keeping the cash and bank rows up while they matter, as the
+-- weapon wheel and an ATM do: vi_extras' MONEY IN STORES while the player is
+-- in a store, as single player's HUD keeps its money row up there.
+local moneyShown = {}
+
+--- Keep the cash and bank rows up (on) or let them go (off).
+---@param on boolean
+---@param source? string your resource name, or name:part; each holds its own
+exports('SetMoneyShown', function(on, source)
+    moneyShown[(type(source) == 'string' and source ~= '') and source or 'default'] = on and true or nil
+end)
+AddEventHandler('onResourceStop', function(name)
+    for key in pairs(moneyShown) do
+        if key == name or key:sub(1, #name + 1) == name .. ':' then moneyShown[key] = nil end
+    end
 end)
 
 --- Drop every claim and sighting a source holds, for a resource going down
@@ -3458,14 +3483,22 @@ CreateThread(function()
         -- clothes or vehicles, with wanted level and state untouched.
         local tells = getWantedTells(wanted, wstate)
         local tellsKey = table.concat(tells, ',')
-        if wanted ~= lastWanted or wstate ~= lastWantedState or tellsKey ~= lastTellsKey then
-            lastWanted, lastWantedState, lastTellsKey = wanted, wstate, tellsKey
+        -- VI WANTED STARS off: the stars the level has earned, plain white,
+        -- and nothing of what the police know. wstate is still worked out
+        -- above, since the tells, the drawn minimap and the tracker pip run
+        -- on it; only the stars stop showing it.
+        local starState = wstate
+        if wanted > 0 and not ViceOptions.WantedStarsEnabled then starState = 'plain' end
+        if wanted ~= lastWanted or starState ~= lastWantedState or tellsKey ~= lastTellsKey then
+            lastWanted, lastWantedState, lastTellsKey = wanted, starState, tellsKey
             ui('wanted', {
                 active = wanted > 0,
                 stars = wanted,
                 maxStars = Config.MaxStars or 6,
-                state = wstate,
+                state = starState,
                 tells = tells,
+                -- WANTED BOX off: the page keeps the box down.
+                box = ViceOptions.WantedBoxEnabled,
             })
         end
         -- The vehicle panel's tracker pip follows the SAME wanted state by
@@ -3568,8 +3601,9 @@ CreateThread(function()
             -- hasn't moved, or the rows would keep showing whatever `show`
             -- state happened to be baked into the LAST balance change.
             -- Standing at an ATM (Renewed-Banking's BuckMe screen sets atmOpen)
-            -- is a reason to read both balances too, as the reference shows.
-            local wheel = wheelHeld() or LocalPlayer.state.atmOpen == true
+            -- is a reason to read both balances too, as the reference shows,
+            -- and so is another resource holding them up (SetMoneyShown).
+            local wheel = wheelHeld() or LocalPlayer.state.atmOpen == true or next(moneyShown) ~= nil
             local key = tostring(cash) .. '|' .. tostring(bank) .. '|' .. tostring(wheel)
             if key ~= lastCash then
                 lastCash = key
@@ -3724,6 +3758,10 @@ local EDGE_ANGLE = { top = 0.0, left = 90.0, bottom = 180.0, right = -90.0 }
 -- and how often they're scanned: that's fixed behaviour, not feel, and has no
 -- business being in this panel.
 local KVP_POLICE = 'vice_hud:police'
+-- The Size row has a key of its own: HUD OPTIONS' POLICE LIGHTS (vi_extras)
+-- steps it too, and until the player sets it, it is the server's
+-- (Config.PoliceLights), whatever else they have tuned here.
+local KVP_POLICE_SIZE = 'vice_hud:policeSize'
 
 local function defaultPoliceTune()
     return {
@@ -3735,8 +3773,12 @@ local function defaultPoliceTune()
         -- 'round'  GTA VI's row of lights rising from the edge (sprite frames)
         -- 'wide'   the classic soft lamps the sliders below shape
         shape        = 'round',
-        size         = 100,   -- GTA VI row size, % (60-140; 0 = no row, the arrow keeps its own switch)
-        arrow        = true,  -- GTA VI's police arrow round the middle of the screen
+        -- The lights' size, % (0 = none, else 40-200; the editor's slider has
+        -- 60-140). Shapes the GTA VI row; at 0 the classic lamps stay dark
+        -- too, as single player's Size 0 is no lights. The arrow keeps its
+        -- own switch. Config.PoliceLights.enable = false starts both off.
+        size         = Config.PoliceLights.enable == false and 0 or (Config.PoliceLights.size or 100),
+        arrow        = Config.PoliceLights.enable ~= false,  -- GTA VI's police arrow round the middle of the screen
         maxOpacity   = Config.PoliceLights.maxOpacity,
         flashMs      = Config.PoliceLights.flashMs,
         white        = Config.PoliceLights.white ~= false,
@@ -3767,13 +3809,32 @@ do
         local ok, dec = pcall(json.decode, raw)
         if ok and type(dec) == 'table' then
             for k, v in pairs(dec) do PoliceTune[k] = v end
+            -- The size used to be saved in here with everything else, as 100
+            -- unless the player moved it. Moved, it goes to its own key.
+            if tonumber(dec.size) and dec.size ~= 100 and not GetResourceKvpString(KVP_POLICE_SIZE) then
+                SetResourceKvp(KVP_POLICE_SIZE, tostring(dec.size))
+            end
         end
     end
+    PoliceTune.size = tonumber(GetResourceKvpString(KVP_POLICE_SIZE) or '') or defaultPoliceTune().size
 end
 
+-- Everything but the size, which is kept on its own key (setPoliceSize).
 local function savePoliceTune()
-    local ok, enc = pcall(json.encode, PoliceTune)
+    local tune = {}
+    for k, v in pairs(PoliceTune) do
+        if k ~= 'size' then tune[k] = v end
+    end
+    local ok, enc = pcall(json.encode, tune)
     if ok then SetResourceKvp(KVP_POLICE, enc) end
+end
+
+--- The lights' size, in %: 0 for none, else 40-200 as single player takes it.
+local function setPoliceSize(percent)
+    percent = tonumber(percent)
+    if not percent then return end
+    PoliceTune.size = percent <= 0 and 0 or math.floor(math.max(40, math.min(200, percent)) + 0.5)
+    SetResourceKvp(KVP_POLICE_SIZE, tostring(PoliceTune.size))
 end
 
 -- Tracked with our own flag rather than IsNuiFocused(), for the same reason
@@ -3990,12 +4051,22 @@ end
 
 CreateThread(function()
     local lastKey = nil
+    -- Something to draw: the lights (size above 0) or the arrow. Neither
+    -- (HUD OPTIONS' POLICE LIGHTS at 0 with the arrow off, or the server's
+    -- Config.PoliceLights.enable = false) and nothing is scanned or shown.
+    local function anyToDraw() return (PoliceTune.size or 0) > 0 or PoliceTune.arrow ~= false end
     while true do
-        Wait(Config.PoliceLights.enable and Config.PoliceLights.scanMs or 2000)
+        Wait(anyToDraw() and Config.PoliceLights.scanMs or 1000)
+        if not anyToDraw() and not policeEditorOpen then
+            if lastKey ~= 'off' then
+                lastKey = 'off'
+                arrowBeside = false
+                clearPoliceUi()
+            end
         -- Skip real detection entirely while the editor is open: it drives its
         -- own preview, and the two pushing over each other every 250ms would
         -- flicker the panel between "your tuned preview" and "nothing nearby".
-        if Config.PoliceLights.enable and not policeEditorOpen then
+        elseif not policeEditorOpen then
             local ok, err = pcall(function()
                 -- The pause menu draws under the NUI, so the lights would
                 -- flash over it; they fade out instead, as in single player.
@@ -4030,13 +4101,19 @@ CreateThread(function()
                 else
                     extra.edges = s.edges
                 end
+                -- Size 0: no lights at all, the classic lamps included (the
+                -- page draws no GTA VI row at 0). The arrow is on its own.
+                if (PoliceTune.size or 0) <= 0 then extra.strength, extra.edges = nil, nil end
 
                 -- Only message the NUI when something actually changed,
                 -- rounded so tiny distance jitter doesn't spam every scan.
+                -- The size and the arrow are in it so HUD OPTIONS changing
+                -- either shows on the next scan.
                 local e, a = s.edges, extra.arrow
-                local key = ('%.0f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%s'):format(
+                local key = ('%.0f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%s|%s|%s'):format(
                     s.rel, s.strength, e.top, e.right, e.bottom, e.left,
-                    extra.near or 0, a.fill or 0, tostring(a.beside))
+                    extra.near or 0, a.fill or 0, tostring(a.beside),
+                    tostring(PoliceTune.size), tostring(PoliceTune.arrow))
                 if key ~= lastKey then
                     lastKey = key
                     pushPoliceUi(true, extra)
@@ -4116,7 +4193,9 @@ RegisterCommand('hudpolice', function(_, args)
 end, false)
 
 RegisterNUICallback('policeTune', function(data, cb)
-    if type(data) == 'table' and data.key ~= nil then
+    if type(data) == 'table' and data.key == 'size' then
+        setPoliceSize(data.value)
+    elseif type(data) == 'table' and data.key ~= nil then
         PoliceTune[data.key] = data.value
         savePoliceTune()
     end
@@ -4147,8 +4226,18 @@ end)
 RegisterNUICallback('policeReset', function(_, cb)
     PoliceTune = defaultPoliceTune()
     DeleteResourceKvp(KVP_POLICE)
+    DeleteResourceKvp(KVP_POLICE_SIZE)
     if policeEditorOpen then pushEditorPreview() end
     cb(PoliceTune)
+end)
+
+-- HUD OPTIONS' POLICE LIGHTS (vi_extras): the Size row above, 0 for no lights
+-- (the arrow keeps its own switch). The scan picks a change up on its next
+-- pass; with the editor open its preview is redrawn now.
+exports('GetPoliceLightsSize', function() return PoliceTune.size or 0 end)
+exports('SetPoliceLightsSize', function(percent)
+    setPoliceSize(percent)
+    if policeEditorOpen then pushEditorPreview() end
 end)
 
 RegisterNUICallback('policeEditorClose', function(_, cb)
